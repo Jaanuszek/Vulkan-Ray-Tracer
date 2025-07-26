@@ -2,7 +2,7 @@
 
 set -e
 
-pythonVenvDir="./venv"
+pythonVenvDir="/app/venv"
 
 activate_venv_and_install_requirements(){
     if [ ! -d "$pythonVenvDir" ]; then

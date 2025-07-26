@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
 
+find_package(fmt REQUIRED)
+
 include(UsePkgConfig)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLFW REQUIRED glfw3)
@@ -19,4 +21,5 @@ add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} 
     Vulkan::Vulkan
     ${GLFW_LIBRARIES}
+    fmt::fmt
     )

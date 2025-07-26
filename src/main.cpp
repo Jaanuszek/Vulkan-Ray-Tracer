@@ -6,15 +6,17 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
+#include <fmt/core.h>
 #include <iostream>
 
 int main() {
     #ifdef NDEBUG
-    std::cout << "Running in release mode\n";
+    fmt::print("Running in release mode\n");
     #else
     std::cout << "Running in debug mode\n";
     #endif
     
+    fmt::print("Hello, Siema Eniu!\n");
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

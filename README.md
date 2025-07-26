@@ -15,7 +15,7 @@
 * To run a docker container that builds the app and then exit
 
     ```bash
-    docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build --rm test:latest build [-v | --vebose] [-d | --debug]
+    docker run --hostname AppBuilder -it -v $(pwd)/:/app/ --rm test:latest build [-v | --vebose] [-d | --debug]
     ```
 
 * To run a docker container with a custom entrypoint exec
