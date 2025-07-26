@@ -9,6 +9,12 @@
 #include <iostream>
 
 int main() {
+    #ifdef NDEBUG
+    std::cout << "Running in release mode\n";
+    #else
+    std::cout << "Running in debug mode\n";
+    #endif
+    
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
