@@ -22,12 +22,20 @@ args = parser.parse_args()
 build_type:str = "Debug" if args.debug else "Release"
 verbose:bool = args.verbose
 
-# Delete previous build directory if it exists
+# Delete files in build directory if it exists
 build_dir:str = "build"
 if os.path.exists(build_dir):
-    shutil.rmtree(build_dir)
-
-os.makedirs(build_dir)
+    for filename in os.listdir(build_dir):
+        file_path = os.path.join(build_dir, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
+else:
+    os.makedirs(build_dir, exist_ok=True)
 
 # check=True tells that subprocess should raise an exception on error, that's why I implemented a try-catch here
 try:
