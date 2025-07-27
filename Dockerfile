@@ -12,7 +12,7 @@ RUN apt-get update && \
     git cmake vulkan-tools libvulkan-dev \
     vulkan-utility-libraries-dev spirv-tools \
     libglfw3-dev libglm-dev glslang-tools glslc \ 
-    pkg-config libfmt-dev
+    pkg-config
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

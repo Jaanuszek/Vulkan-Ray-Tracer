@@ -24,8 +24,15 @@ verbose:bool = args.verbose
 
 # Delete files in build directory if it exists
 build_dir:str = "build"
-if os.path.exists(build_dir):
-    shutil.rmtree(build_dir)
+for filename in os.listdir(build_dir):
+    file_path = os.path.join(build_dir, filename)
+    try:
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+        elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
+    except Exception as e:
+        print(f"Error deleting {file_path}: {e}")
 
 os.makedirs(build_dir, exist_ok=True)
 
@@ -41,5 +48,6 @@ try:
 
     subprocess.run(["cmake", ".."] + cmake_conf_args, cwd=build_dir, check=True)
     subprocess.run(["cmake", "--build", "."] + cmake_build_args, cwd=build_dir, check=True)
+    subprocess.run(["cmake", "--install", "."], cwd=build_dir, check=True)
 except subprocess.CalledProcessError as e:
     print(f"Error during build: {e}")

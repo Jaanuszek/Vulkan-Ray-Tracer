@@ -3,22 +3,28 @@
 
 ## Docker
 * To build a docker container
-    ```bash
-    docker build -t test:latest .
-    ```
+```bash
+docker build -t test:latest .
+```
+
+Every container has mounted the `build/` folder as `read-write`, and any other folder as `read-only`, so docker container can't delete anything beside `build/` content.
+
+> [!NOTE]
+> TODO think about docker-compose!!!
 
 * To run a docker conatiner with bash terminal
-    ```bash
-    docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build --rm test:latest
-    ```
+```bash
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest
+```
 
 * To run a docker container that builds the app and then exit
 
-    ```bash
-    docker run --hostname AppBuilder -it -v $(pwd)/:/app/ --rm test:latest build [-v | --vebose] [-d | --debug]
-    ```
+```bash
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest build [-v | --vebose] [-d | --debug]
+```
 
 * To run a docker container with a custom entrypoint exec
-    ```bash
-    docker run --entrypoint /bin/bash -it --hostname AppBuilder --rm -v $(pwd)/build:/app/buildtest:latest
-    ```
+* 
+```bash
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
+```

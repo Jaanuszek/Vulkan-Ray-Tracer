@@ -7,8 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
 
-find_package(fmt REQUIRED)
-
 include(UsePkgConfig)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLFW REQUIRED glfw3)
@@ -16,10 +14,21 @@ pkg_check_modules(GLFW REQUIRED glfw3)
 include_directories(${GLFW_INCLUDE_DIRS})
 link_directories(${GLFW_LIBRARY_DIRS})
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_subdirectory(src/core)
+add_subdirectory(src/engine)
+add_subdirectory(src/renderer)
+
+SET(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+
+add_executable(${PROJECT_NAME} src/application/main.cpp)
 
 target_link_libraries(${PROJECT_NAME} 
     Vulkan::Vulkan
     ${GLFW_LIBRARIES}
-    fmt::fmt
+    Core
     )
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    BUILD_RPATH "$ORIGIN/lib"
+    INSTALL_RPATH "$ORIGIN/lib"
+)

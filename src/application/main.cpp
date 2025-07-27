@@ -6,18 +6,19 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
-#include <fmt/core.h>
 #include <iostream>
+
+#include "Logger.hpp"
 
 int main() {
     #ifdef NDEBUG
-    fmt::print("Running in release mode\n");
     #else
     std::cout << "Running in debug mode\n";
     #endif
-    
-    fmt::print("Hello, Siema Eniu!\n");
     glfwInit();
+    std::cout << "siema";
+
+    logSomething();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
