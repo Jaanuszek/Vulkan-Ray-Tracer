@@ -11,14 +11,14 @@
 #include "Logger.hpp"
 
 int main() {
-    #ifdef NDEBUG
-    #else
-    std::cout << "Running in debug mode\n";
-    #endif
-    glfwInit();
-    std::cout << "siema";
 
-    logSomething();
+    VRTR::Logger::init();
+
+    VRTR_INFO("Logger initialized successfully");
+    VRTR_DEBUG("This is a debug message");
+    VRTR_TRACE("This is a trace message");
+
+    glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
