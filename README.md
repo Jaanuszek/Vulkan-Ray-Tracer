@@ -17,10 +17,16 @@ Every container has mounted the `build/` folder as `read-write`, and any other f
 docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest
 ```
 
-* To run a docker container that builds the app and then exit
+* To run a docker container that *builds* the app and then exit
 
 ```bash
 docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest build [-v | --vebose] [-d | --debug]
+```
+
+* To run a docker container that *rebuilds* the app and then exit
+
+```bash
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest rebuild [-v | --vebose] [-d | --debug]
 ```
 
 * To run a docker container with a custom entrypoint exec
