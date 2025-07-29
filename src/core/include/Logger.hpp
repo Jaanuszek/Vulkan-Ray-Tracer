@@ -1,8 +1,4 @@
 #pragma once
-#include <format>
-#include <memory>
-#include <vector>
-
 #include "Core_export.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>

@@ -14,6 +14,7 @@ pkg_check_modules(GLFW REQUIRED glfw3)
 include_directories(${GLFW_INCLUDE_DIRS})
 link_directories(${GLFW_LIBRARY_DIRS})
 
+add_subdirectory(src/common)
 add_subdirectory(src/core)
 add_subdirectory(src/engine)
 add_subdirectory(src/renderer)
@@ -26,7 +27,11 @@ target_link_libraries(${PROJECT_NAME}
     Vulkan::Vulkan
     ${GLFW_LIBRARIES}
     Core
-    )
+    common
+)
+
+# Exe needs to have different precompiled headers because of usage of different compiler flags
+target_precompile_headers(${PROJECT_NAME} PRIVATE "${PROJECT_SOURCE_DIR}/src/common/pch.h")
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     BUILD_RPATH "$ORIGIN/lib"

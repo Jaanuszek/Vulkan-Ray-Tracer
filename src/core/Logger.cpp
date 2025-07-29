@@ -1,6 +1,5 @@
+#include <pch.h>
 #include "Logger.hpp"
-#include <iostream>
-#include <format>
 
 namespace VRTR 
 {
