@@ -15,6 +15,7 @@ subparser = parser.add_subparsers(required=True, dest="command")
 
 build_parser = subparser.add_parser("build", parents=[optional_args], help="Build the project")
 test_parser = subparser.add_parser("test", parents=[optional_args], help="Run unit tests")
+rebuild_parser = subparser.add_parser("rebuild", parents=[optional_args], help="Rebuild the project")
 
 args = parser.parse_args()
 
@@ -24,15 +25,16 @@ verbose:bool = args.verbose
 
 # Delete files in build directory if it exists
 build_dir:str = "build"
-for filename in os.listdir(build_dir):
-    file_path = os.path.join(build_dir, filename)
-    try:
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-    except Exception as e:
-        print(f"Error deleting {file_path}: {e}")
+if not args.command == "rebuild":
+    for filename in os.listdir(build_dir):
+        file_path = os.path.join(build_dir, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Error deleting {file_path}: {e}")
 
 os.makedirs(build_dir, exist_ok=True)
 

@@ -44,6 +44,9 @@ elif [ "${command}" == "build" ]; then
 elif [ "${command}" == "test" ]; then
     activate_venv_and_install_requirements
     ./build.py test "${additionalFlags[@]}"
+elif [ "${command}" == "rebuild" ]; then
+    activate_venv_and_install_requirements
+    ./build.py rebuild "${additionalFlags[@]}"
 else
     echo "Unknown command: $1"
     exit 1

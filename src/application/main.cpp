@@ -12,6 +12,7 @@
 
 int main() {
 
+    std::cout << "SIEMA ENIU" << std::endl;
     VRTR::Logger::init();
 
     VRTR_INFO("Logger initialized successfully");
