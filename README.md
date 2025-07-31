@@ -1,36 +1,55 @@
 # Vulkan-Ray-Tracer
 3D graphics engine (Ray tracing + Radiosity). Written in C++, Vulkan and Cuda.
 
+## Cloning
+
+This repo uses `submodules`, so make sure to clone it using:
+```bash
+git clone --recurse-submodules <URL>
+```
+Or if you already cloned it, just use this command:
+```bash
+git submodule update --init --recursive
+```
+
 ## Docker
-* To build a docker container
+To build a docker container
 ```bash
 docker build -t test:latest .
 ```
 
-Every container has mounted the `build/` folder as `read-write`, and any other folder as `read-only`, so docker container can't delete anything beside `build/` content.
+Every container mounted the `build/` and `venv/` folders as `read-write`, and any other folders as `read-only`, so docker container can't delete anything beside `build/` and `venv/` content.
 
-> [!NOTE]
-> TODO think about docker-compose!!!
+### Building container using `docker compose`
 
+```bash
+docker compose run --rm appbuilder [build | rebuild | test] [ -v | --verbose ] [ -d | --debug ] 
+```
+
+#### Building options:
+- Without any flags - open docker container, so the user can build the project inside virtual environment
+- `build` - Open container, build the project automatically and leave
+- `rebuild` - Open container, rebuild existing binary and leave
+- `test` - Open container, run unit tests and leave **TODO!!**
+### Building container using `docker run`
 * To run a docker conatiner with bash terminal
 ```bash
-docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm test:latest
 ```
 
 * To run a docker container that *builds* the app and then exit
 
 ```bash
-docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest build [-v | --vebose] [-d | --debug]
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm test:latest build [-v | --vebose] [-d | --debug]
 ```
 
 * To run a docker container that *rebuilds* the app and then exit
 
 ```bash
-docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm test:latest rebuild [-v | --vebose] [-d | --debug]
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm test:latest rebuild [-v | --vebose] [-d | --debug]
 ```
 
 * To run a docker container with a custom entrypoint exec
-* 
 ```bash
-docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
+docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
 ```

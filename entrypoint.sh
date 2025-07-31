@@ -5,7 +5,7 @@ set -e
 pythonVenvDir="/app/venv"
 
 activate_venv_and_install_requirements(){
-    if [ ! -d "$pythonVenvDir" ]; then
+    if [ ! -d "${pythonVenvDir}/bin" ]; then
         python3 -m venv "$pythonVenvDir"
     fi
     source ${pythonVenvDir}/bin/activate

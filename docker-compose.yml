@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  appbuilder:
+    image: test:latest
+    hostname: appbuilder
+    volumes:
+      - ./build:/app/build:rw
+      - ./venv:/app/venv:rw
+      - ./:/app:ro
+    stdin_open: true
+    tty: true
