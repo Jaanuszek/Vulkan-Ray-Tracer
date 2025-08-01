@@ -9,6 +9,7 @@
 #include <pch.h>
 
 #include "Logger.hpp"
+#include "RTRenderer.hpp"
 
 int main() {
 
@@ -18,6 +19,8 @@ int main() {
     VRTR_INFO("Logger initialized successfully");
     VRTR_DEBUG("This is a debug message");
     VRTR_TRACE("This is a trace message");
+
+    VRTR::RTRenderer renderer;
 
     glfwInit();
 

@@ -28,6 +28,7 @@ target_link_libraries(${PROJECT_NAME}
     ${GLFW_LIBRARIES}
     Core
     common
+    renderer
 )
 
 # Exe needs to have different precompiled headers because of usage of different compiler flags

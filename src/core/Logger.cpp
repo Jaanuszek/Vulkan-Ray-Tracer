@@ -9,7 +9,7 @@ namespace VRTR
     void Logger::init()
     {
         Logger::stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        Logger::stdout_sink->set_pattern("%^[%Y-%m-%d %H:%M:%S.%e] [%l] %v%$");
+        Logger::stdout_sink->set_pattern("%^[%H:%M:%S.%e] [%l] %v%$");
         Logger::stdout_sink->set_level(spdlog::level::trace);
 
         std::vector<spdlog::sink_ptr> sinks = {Logger::stdout_sink};
