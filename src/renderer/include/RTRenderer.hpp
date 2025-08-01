@@ -13,6 +13,6 @@ namespace VRTR
             void init();
             void destroy();
         private:
-            VulkanInstance instance;
+            std::shared_ptr<VulkanInstance> instance;
     };
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(renderer VERSION 1.0.0 DESCRIPTION "Dynamic library for Vulkan Ray Tracer")
+project(renderer VERSION 1.0.0 DESCRIPTION "Rederer library for Vulkan Ray Tracer")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,14 +23,15 @@ generate_export_header(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE
     common
     Core
-    # Vulkan::Vulkan
+    Vulkan::Vulkan
 )
+
 target_precompile_headers(${PROJECT_NAME} REUSE_FROM common)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES 
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
-    PUBLIC_HEADER include/VulkanInstance.hpp
+    PUBLIC_HEADER include/RTRenderer.hpp
 )
 
 target_include_directories(${PROJECT_NAME}

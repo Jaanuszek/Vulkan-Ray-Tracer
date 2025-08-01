@@ -11,36 +11,19 @@
 #include "Logger.hpp"
 #include "RTRenderer.hpp"
 
-int main() {
-
-    std::cout << "SIEMA ENIU" << std::endl;
+int main()
+{
     VRTR::Logger::init();
-
-    VRTR_INFO("Logger initialized successfully");
-    VRTR_DEBUG("This is a debug message");
-    VRTR_TRACE("This is a trace message");
-
-    VRTR::RTRenderer renderer;
-
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
-
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    VkInstance instance;
-
-    std::cout << extensionCount << " extensions supported\n";
-
-    glm::mat4 matrix;
-    glm::vec4 vec;
-    auto test = matrix * vec;
-
+    VRTR::RTRenderer renderer;
+    renderer.init();
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
     }
-
+    renderer.destroy();
     glfwDestroyWindow(window);
 
     glfwTerminate();
