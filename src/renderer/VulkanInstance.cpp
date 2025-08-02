@@ -1,4 +1,5 @@
 #include "VulkanInstance.hpp"
+#include "pch.h"
 
 namespace VRTR
 {
@@ -39,19 +40,18 @@ namespace VRTR
             createInfo.enabledLayerCount = 0;
             createInfo.ppEnabledLayerNames = nullptr;
         }
-        
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
+    
+        auto extensions = getRequiredExtensions();
+        uint32_t extensionsCount = static_cast<uint32_t>(extensions.size());
+        createInfo.enabledExtensionCount = extensionsCount;
+        createInfo.ppEnabledExtensionNames = extensions.data();
 
         uint32_t instanceExtensionsCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
         std::vector<VkExtensionProperties> extensionProperties(instanceExtensionsCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, extensionProperties.data());
 
-        if(!checkExtensionsSupport(glfwExtensions, glfwExtensionCount, extensionProperties))
+        if(!checkExtensionsSupport(extensions.data(), extensionsCount, extensionProperties))
             VRTR_CRITICAL("GLFW EXTENSION DOES NOT MACH INSTANCE EXTENSIONS");
 
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
@@ -86,4 +86,20 @@ namespace VRTR
         }
         return true;
     }
+
+    std::vector<const char*> VulkanInstance::getRequiredExtensions()
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+        if(enableValidationLayers)
+        {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        return extensions;
+    } 
 }

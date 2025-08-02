@@ -14,5 +14,6 @@ namespace VRTR
             VkInstance instance;
             bool checkExtensionsSupport(const char** glfwExtentions, uint32_t glfwExtensionCount,
                 const std::vector<VkExtensionProperties>& extensionsProperties);
+            std::vector<const char*> getRequiredExtensions();
     };
 }
