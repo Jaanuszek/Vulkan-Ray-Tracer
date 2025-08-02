@@ -53,3 +53,11 @@ docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/ven
 ```bash
 docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
 ```
+
+## Validation layer
+
+To run application with validation layers on `Ubuntu`, build it in debug mode, and make sure you have installed it on your OS:
+
+```bash
+sudo apt install vulkan-validationlayers
+```

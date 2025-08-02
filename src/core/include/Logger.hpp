@@ -4,20 +4,21 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #define VRTR_LOGGER "VRTR"
-#ifndef NDEBUG
+// TODO add a compiler flag that enable/disable logs
+#ifdef NDEBUG
+    #define VRTR_TRACE(...) VRTR::Logger::get()->trace(__VA_ARGS__)
+    #define VRTR_DEBUG(...) void(0)
+    #define VRTR_INFO(...) VRTR::Logger::get()->info(__VA_ARGS__)
+    #define VRTR_WARN(...) VRTR::Logger::get()->warn(__VA_ARGS__)
+    #define VRTR_ERROR(...) VRTR::Logger::get()->error(__VA_ARGS__)
+    #define VRTR_CRITICAL(...) VRTR::Logger::get()->critical(__VA_ARGS__)
+#else
     #define VRTR_TRACE(...) VRTR::Logger::get()->trace(__VA_ARGS__)
     #define VRTR_DEBUG(...) VRTR::Logger::get()->debug(__VA_ARGS__)
     #define VRTR_INFO(...) VRTR::Logger::get()->info(__VA_ARGS__)
     #define VRTR_WARN(...) VRTR::Logger::get()->warn(__VA_ARGS__)
     #define VRTR_ERROR(...) VRTR::Logger::get()->error(__VA_ARGS__)
     #define VRTR_CRITICAL(...) VRTR::Logger::get()->critical(__VA_ARGS__)
-#else
-    #define VRTR_TRACE(...) void(0)
-    #define VRTR_DEBUG(...) void(0)
-    #define VRTR_INFO(...) void(0)
-    #define VRTR_WARN(...) void(0)
-    #define VRTR_ERROR(...) void(0)
-    #define VRTR_CRITICAL(...) void(0)
 #endif
 
 namespace VRTR

@@ -8,7 +8,13 @@ namespace VRTR
         if(glfwVulkanSupported() != GLFW_TRUE)
         {
             VRTR_CRITICAL("GLFW VULKAN NOT SUPPORTED");
-            exit(0);
+            throw std::runtime_error("GLFW VULKAN NOT SUPPORTED");
+        }
+
+        if(enableValidationLayers && !ValidationLayers::checkLayerValidationSupport())
+        {
+            VRTR_CRITICAL("Validation layer not available!");
+            throw std::runtime_error("Validation layer not available!");
         }
 
         VkApplicationInfo appInfo{};
@@ -22,14 +28,23 @@ namespace VRTR
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = 0;
-        createInfo.ppEnabledLayerNames = nullptr;
+
+        if(enableValidationLayers)
+        {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        }
+        else
+        {
+            createInfo.enabledLayerCount = 0;
+            createInfo.ppEnabledLayerNames = nullptr;
+        }
+        
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         createInfo.enabledExtensionCount = glfwExtensionCount;
         createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = 0;
 
         uint32_t instanceExtensionsCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);

@@ -1,5 +1,6 @@
 #pragma once
 
+// C/C++
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -17,3 +18,9 @@
 #include <optional>
 #include <variant>
 #include <array>
+#include <cstdlib>
+#include <cstring>
+
+// VULKAN
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
