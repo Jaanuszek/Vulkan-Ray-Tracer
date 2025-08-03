@@ -1,3 +1,4 @@
+#pragma once
 #include "renderer_export.h"
 #include "Logger.hpp"
 #include "ValidationLayers.hpp"
@@ -7,8 +8,10 @@ namespace VRTR
     class RENDERER_EXPORT VulkanInstance
     {
         public:
-            VulkanInstance();
-            ~VulkanInstance();
+            VulkanInstance() = default;
+            ~VulkanInstance() = default;
+            void init();
+            void destroy();
             VkInstance getInstance() const { return instance; }
         private:
             VkInstance instance;

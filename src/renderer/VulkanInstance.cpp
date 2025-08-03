@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    VulkanInstance::VulkanInstance()
+    void VulkanInstance::init()
     {
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if(glfwVulkanSupported() != GLFW_TRUE)
@@ -30,15 +30,20 @@ namespace VRTR
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
 
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         if(enableValidationLayers)
         {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             createInfo.ppEnabledLayerNames = validationLayers.data();
+
+            ValidationLayers::populateDebugMessengerCreateInfo(debugCreateInfo);
+            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
         }
         else
         {
             createInfo.enabledLayerCount = 0;
             createInfo.ppEnabledLayerNames = nullptr;
+            createInfo.pNext = nullptr;
         }
     
         auto extensions = getRequiredExtensions();
@@ -50,7 +55,6 @@ namespace VRTR
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
         std::vector<VkExtensionProperties> extensionProperties(instanceExtensionsCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, extensionProperties.data());
-
         if(!checkExtensionsSupport(extensions.data(), extensionsCount, extensionProperties))
             VRTR_CRITICAL("GLFW EXTENSION DOES NOT MACH INSTANCE EXTENSIONS");
 
@@ -58,7 +62,8 @@ namespace VRTR
            throw std::runtime_error("failed to create instance!");
         }
     }
-    VulkanInstance::~VulkanInstance()
+
+    void VulkanInstance::destroy()
     {
         VRTR_DEBUG("DESTROYING VULKAN INSTANCE");
         vkDestroyInstance(instance, nullptr);

@@ -13,6 +13,9 @@ namespace VRTR
             void init();
             void destroy();
         private:
+            // Probably I would not need to store these as shared_ptrs.
+            // But I will keep it for now
             std::shared_ptr<VulkanInstance> instance;
+            std::shared_ptr<ValidationLayers> validationLayers;
     };
 }

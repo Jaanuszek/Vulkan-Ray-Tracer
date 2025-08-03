@@ -13,20 +13,28 @@
 
 int main()
 {
-    VRTR::Logger::init();
-    glfwInit();
+    try
+    {
+        VRTR::Logger::init();
+        glfwInit();
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
-    VRTR::RTRenderer renderer;
-    renderer.init();
-    while(!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
+        VRTR::RTRenderer renderer;
+        renderer.init();
+        while(!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+        }
+        renderer.destroy();
+        glfwDestroyWindow(window);
+
+        glfwTerminate();
     }
-    renderer.destroy();
-    glfwDestroyWindow(window);
-
-    glfwTerminate();
+    catch (const std::exception& e)
+    {
+        VRTR_CRITICAL("Exception: {}", e.what());
+        return EXIT_FAILURE;
+    }
 
     return 0;
 }
