@@ -12,11 +12,13 @@ namespace VRTR
             ~VulkanInstance() = default;
             void init();
             void destroy();
-            VkInstance getInstance() const { return instance; }
+            const vk::raii::Instance& getInstance() const { return instance; }
         private:
-            VkInstance instance;
-            bool checkExtensionsSupport(const char** glfwExtentions, uint32_t glfwExtensionCount,
-                const std::vector<VkExtensionProperties>& extensionsProperties);
+            vk::raii::Context context;
+            vk::raii::Instance instance{nullptr};
+            void createInstance();
+            bool checkExtensionsSupport(const char** glfwExtensions, uint32_t glfwExtensionCount,
+                const std::vector<vk::ExtensionProperties>& extensionsProperties);
             std::vector<const char*> getRequiredExtensions();
     };
 }
