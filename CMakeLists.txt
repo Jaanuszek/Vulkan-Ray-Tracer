@@ -9,9 +9,7 @@ find_package(Vulkan REQUIRED)
 
 include(UsePkgConfig)
 find_package(PkgConfig REQUIRED)
-
-#external
-add_subdirectory(third-party/glfw)
+find_package(glfw3 REQUIRED)
 
 #internal
 add_subdirectory(src/common)
@@ -26,14 +24,10 @@ add_executable(${PROJECT_NAME} src/application/main.cpp)
 target_link_libraries(${PROJECT_NAME} 
     Vulkan::Vulkan
     glfw
+    glfw
     Core
     common
     renderer
-)
-
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-    third-party/glfw/include
 )
 
 # Exe needs to have different precompiled headers because of usage of different compiler flags

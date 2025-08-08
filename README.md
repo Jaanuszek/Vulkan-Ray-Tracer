@@ -7,6 +7,10 @@
 > 
 > Using the same aformentioned tarball, install `VulkanSdk` on your local machine. Here's an [official documentation](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html), `VulkanSdk` can be downloaded from [here](https://vulkan.lunarg.com/). 
 
+- **GLFW3**
+    ```bash
+    apt-get install libglfw3-dev
+    ```
 ## Cloning
 
 This repo uses `submodules`, so make sure to clone it using:

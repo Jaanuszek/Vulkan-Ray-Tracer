@@ -9,8 +9,7 @@ USER root
 
 RUN apt-get update && \
     apt-get install -y python3 python3-pip python3-venv \
-    git cmake libglfw3-dev pkg-config libxkbcommon-dev \
-    libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+    git cmake libglfw3-dev pkg-config libglfw3-dev
 
 # Vulkan download
 RUN apt-get install -y libglm-dev libxcb-dri3-0 libxcb-present0 libpciaccess0 \
