@@ -1,6 +1,12 @@
 # Vulkan-Ray-Tracer
 3D graphics engine (Ray tracing + Radiosity). Written in C++, Vulkan and Cuda.
 
+## prerequisites
+> [!IMPORTANT]
+> In order to build the application, you need to download `VulkanSdk` tarball and copy it to repo main folder (so docker container can copy it and built it inside container).
+> 
+> Using the same aformentioned tarball, install `VulkanSdk` on your local machine. Here's an [official documentation](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html), `VulkanSdk` can be downloaded from [here](https://vulkan.lunarg.com/). 
+
 ## Cloning
 
 This repo uses `submodules`, so make sure to clone it using:

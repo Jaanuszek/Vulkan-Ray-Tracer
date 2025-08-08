@@ -9,11 +9,11 @@ find_package(Vulkan REQUIRED)
 
 include(UsePkgConfig)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GLFW REQUIRED glfw3)
 
-include_directories(${GLFW_INCLUDE_DIRS})
-link_directories(${GLFW_LIBRARY_DIRS})
+#external
+add_subdirectory(third-party/glfw)
 
+#internal
 add_subdirectory(src/common)
 add_subdirectory(src/core)
 add_subdirectory(src/engine)
@@ -25,10 +25,15 @@ add_executable(${PROJECT_NAME} src/application/main.cpp)
 
 target_link_libraries(${PROJECT_NAME} 
     Vulkan::Vulkan
-    ${GLFW_LIBRARIES}
+    glfw
     Core
     common
     renderer
+)
+
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+    third-party/glfw/include
 )
 
 # Exe needs to have different precompiled headers because of usage of different compiler flags

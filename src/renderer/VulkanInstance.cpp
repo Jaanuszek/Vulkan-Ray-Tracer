@@ -29,12 +29,29 @@ namespace VRTR
         //     throw std::runtime_error("Validation layer not available!");
         // }
 
-        constexpr vk::ApplicationInfo appInfo{
+        uint32_t ApiVersion = 0;
+        if(vk::enumerateInstanceVersion(&ApiVersion) != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Can't enumerate instance version");
+            throw std::runtime_error("Can't enumerate instance version");
+        }
+
+        uint32_t major = vk::apiVersionMajor(ApiVersion);
+        uint32_t minor = vk::apiVersionMinor(ApiVersion);
+        uint32_t patch = vk::apiVersionPatch(ApiVersion);
+
+        VRTR_INFO("Vulkan API Version: {}.{}.{}", major, minor, patch);
+        vk::ApplicationInfo appInfo{
             .pApplicationName = "Vulkan Ray tracer with radiosity",
             .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
             .pEngineName = "No Engine",
             .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-            .apiVersion = vk::ApiVersion13
+            .apiVersion = vk::makeApiVersion(
+                 static_cast<uint32_t>(0),
+                 major,
+                 minor,
+                 patch 
+                )
         };
 
         vk::InstanceCreateInfo createInfo
