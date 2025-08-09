@@ -33,9 +33,12 @@ namespace VRTR
         : context(ctx)
     {}
 
-    void ValidationLayers::init(vk::raii::Instance&instance)
+    void ValidationLayers::setupDebugMessenger(vk::raii::Instance& instance)
     {
-        setupDebugMessenger(instance);
+        if(!enableValidationLayers) return;
+
+        auto debugUtilsMessengerCreateInfoEXT = debugCreateInfo();
+        debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT, nullptr);
     }
 
     bool ValidationLayers::checkLayerValidationSupport(vk::raii::Context& ctx)
@@ -72,13 +75,6 @@ namespace VRTR
             .pfnUserCallback = &debugCallback
         };
         return debugUtilsMessengerCreateInfoEXT;
-    }
-    void ValidationLayers::setupDebugMessenger(vk::raii::Instance& instance)
-    {
-        if(!enableValidationLayers) return;
-
-        auto debugUtilsMessengerCreateInfoEXT = debugCreateInfo();
-        debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT, nullptr);
     }
 
 }

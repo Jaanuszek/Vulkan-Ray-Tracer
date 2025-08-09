@@ -8,14 +8,11 @@ namespace VRTR
     class RENDERER_EXPORT VulkanInstance
     {
         public:
-            VulkanInstance(vk::raii::Context& ctx, vk::raii::Instance& inst);
+            VulkanInstance(vk::raii::Context& ctx);
             ~VulkanInstance() = default;
-            void init();
-            void createInstance();
-            void destroy();
+            void createInstance(vk::raii::Instance& inst);
         private:
             vk::raii::Context& context;
-            vk::raii::Instance& instance;
             bool checkExtensionsSupport(const char** glfwExtensions, uint32_t glfwExtensionCount,
                 const std::vector<vk::ExtensionProperties>& extensionsProperties);
             std::vector<const char*> getRequiredExtensions();

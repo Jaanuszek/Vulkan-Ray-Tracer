@@ -3,19 +3,11 @@
 
 namespace VRTR
 {
-    VulkanInstance::VulkanInstance(vk::raii::Context& ctx, vk::raii::Instance& inst)
-        : context(ctx), instance(inst)
+    VulkanInstance::VulkanInstance(vk::raii::Context& ctx)
+        : context(ctx)
     {}
 
-    void VulkanInstance::init()
-    {
-        createInstance();
-    }
-
-    void VulkanInstance::destroy()
-    {}
-
-    void VulkanInstance::createInstance()
+    void VulkanInstance::createInstance(vk::raii::Instance& instance)
     {
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if(glfwVulkanSupported() != GLFW_TRUE)

@@ -26,12 +26,11 @@ namespace VRTR
         public:
             ValidationLayers(vk::raii::Context& ctx);
             ~ValidationLayers() = default;
-            void init(vk::raii::Instance& instance);
+            void setupDebugMessenger(vk::raii::Instance&  instance);
             static bool checkLayerValidationSupport(vk::raii::Context& ctx);
             static vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo();
         private:
             vk::raii::Context& context;
             vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
-            void setupDebugMessenger(vk::raii::Instance&  instance);
     };
 }
