@@ -10,29 +10,27 @@
 
 namespace VRTR
 {
-    const std::vector<const char*> validationLayers
+    inline const std::vector<const char*> validationLayers
     {
         "VK_LAYER_KHRONOS_validation"
     };
 
+    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
+        vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+        vk::DebugUtilsMessageTypeFlagsEXT type,
+        const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void*);
+
     class ValidationLayers
     {
         public:
-            ValidationLayers() = default;
+            ValidationLayers(vk::raii::Context& ctx);
             ~ValidationLayers() = default;
-            void init(VkInstance instance);
-            void destroy(VkInstance instance);
-            static bool checkLayerValidationSupport();
-            static void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
-            static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-                    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                    VkDebugUtilsMessageTypeFlagsEXT messageType,
-                    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                    void* pUserData);
+            void setupDebugMessenger(vk::raii::Instance&  instance);
+            static bool checkLayerValidationSupport(vk::raii::Context& ctx);
+            static vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo();
         private:
-            VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
-            void setupDebugMessenger(VkInstance instance);
-            void destroyDebugMessenger(VkInstance instance);
-
+            vk::raii::Context& context;
+            vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
     };
 }

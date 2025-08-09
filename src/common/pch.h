@@ -20,7 +20,13 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <ranges>
 
 // VULKAN
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "GLFW/glfw3.h"
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS 1
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
+#include <vulkan/vulkan_structs.hpp>
+#include <vulkan/vulkan_hpp_macros.hpp>

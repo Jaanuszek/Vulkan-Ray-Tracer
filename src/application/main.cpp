@@ -11,6 +11,11 @@
 #include "Logger.hpp"
 #include "RTRenderer.hpp"
 
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
+constexpr unsigned int WIDTH = 800;
+constexpr unsigned int HEIGHT = 600;
+
 int main()
 {
     try
@@ -19,13 +24,14 @@ int main()
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        GLFWwindow* window = glfwCreateWindow(800, 600, "Siema Eniu", nullptr, nullptr);
-        VRTR::RTRenderer renderer;
-        renderer.init();
+        GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Siema Eniu", nullptr, nullptr);
+
+        std::unique_ptr<VRTR::RTRenderer> renderer = std::make_unique<VRTR::RTRenderer>();
+        renderer->init();
+        
         while(!glfwWindowShouldClose(window)) {
-            glfwPollEvents();
+            glfwPollEvents();   
         }
-        renderer.destroy();
         glfwDestroyWindow(window);
 
         glfwTerminate();

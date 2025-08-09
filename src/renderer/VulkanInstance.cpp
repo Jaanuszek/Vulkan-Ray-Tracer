@@ -3,7 +3,11 @@
 
 namespace VRTR
 {
-    void VulkanInstance::init()
+    VulkanInstance::VulkanInstance(vk::raii::Context& ctx)
+        : context(ctx)
+    {}
+
+    void VulkanInstance::createInstance(vk::raii::Instance& instance)
     {
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if(glfwVulkanSupported() != GLFW_TRUE)
@@ -12,82 +16,66 @@ namespace VRTR
             throw std::runtime_error("GLFW VULKAN NOT SUPPORTED");
         }
 
-        if(enableValidationLayers && !ValidationLayers::checkLayerValidationSupport())
+        vk::ApplicationInfo appInfo{
+            .pApplicationName = "Vulkan Ray tracer with radiosity",
+            .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+            .pEngineName = "No Engine",
+            .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+            .apiVersion = vk::ApiVersion14
+        };
+
+        if(enableValidationLayers && !ValidationLayers::checkLayerValidationSupport(context))
         {
             VRTR_CRITICAL("Validation layer not available!");
             throw std::runtime_error("Validation layer not available!");
         }
 
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "Vulkan Ray tracer with radiosity";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.pEngineName = "No Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
-
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if(enableValidationLayers)
-        {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-            createInfo.ppEnabledLayerNames = validationLayers.data();
-
-            ValidationLayers::populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
-        }
-        else
-        {
-            createInfo.enabledLayerCount = 0;
-            createInfo.ppEnabledLayerNames = nullptr;
-            createInfo.pNext = nullptr;
-        }
-    
         auto extensions = getRequiredExtensions();
         uint32_t extensionsCount = static_cast<uint32_t>(extensions.size());
-        createInfo.enabledExtensionCount = extensionsCount;
-        createInfo.ppEnabledExtensionNames = extensions.data();
 
-        uint32_t instanceExtensionsCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
-        std::vector<VkExtensionProperties> extensionProperties(instanceExtensionsCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, extensionProperties.data());
+        auto extensionProperties = context.enumerateInstanceExtensionProperties();
+
         if(!checkExtensionsSupport(extensions.data(), extensionsCount, extensionProperties))
             VRTR_CRITICAL("GLFW EXTENSION DOES NOT MACH INSTANCE EXTENSIONS");
 
-        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-           throw std::runtime_error("failed to create instance!");
+        auto debugCI = ValidationLayers::debugCreateInfo();
+        vk::InstanceCreateInfo createInfo{};
+        createInfo.pApplicationInfo = &appInfo;
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+        createInfo.enabledExtensionCount = extensionsCount;
+        createInfo.ppEnabledExtensionNames = extensions.data();
+        createInfo.pNext = &debugCI;
+
+        try
+        {
+            instance = vk::raii::Instance(context, createInfo);
+        }
+        catch (const vk::SystemError& e)
+        {
+            VRTR_CRITICAL("Failed to create Vulkan instance: {}", e.what());
+            throw;
+        }
+        catch (const std::exception& e)
+        {
+            VRTR_CRITICAL("Failed to create Vulkan instance: {}", e.what());
+            throw;
         }
     }
 
-    void VulkanInstance::destroy()
-    {
-        VRTR_DEBUG("DESTROYING VULKAN INSTANCE");
-        vkDestroyInstance(instance, nullptr);
-    }
-
-    bool VulkanInstance::checkExtensionsSupport(const char** glfwExtentions, uint32_t glfwExtensionCount, 
-        const std::vector<VkExtensionProperties>& extensionsProperties)
+    bool VulkanInstance::checkExtensionsSupport(const char** glfwExtensions, uint32_t glfwExtensionCount, 
+        const std::vector<vk::ExtensionProperties>& extensionsProperties)
     {
         for(uint32_t extension = 0;  extension < glfwExtensionCount; extension++)
         {
-            const char* requiredExtension = glfwExtentions[extension];
-            auto it = std::find_if(
-                extensionsProperties.begin(),
-                extensionsProperties.end(),
-                [requiredExtension](const VkExtensionProperties& prop)
+            if (std::ranges::none_of(extensionsProperties,
+                [glfwExtension = glfwExtensions[extension]](auto const& extensionProperty)
                 {
-                    return (strcmp(requiredExtension, prop.extensionName) == 0);
+                    return (strcmp(glfwExtension, extensionProperty.extensionName) == 0);
+                }))
+                {
+                    throw std::runtime_error("Required extension not supported: " + std::string(glfwExtensions[extension]));
                 }
-            );
-
-            if(it == extensionsProperties.end())
-            {
-                return false;
-            }
         }
         return true;
     }
@@ -102,7 +90,7 @@ namespace VRTR
 
         if(enableValidationLayers)
         {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            extensions.push_back(vk::EXTDebugUtilsExtensionName);
         }
 
         return extensions;
