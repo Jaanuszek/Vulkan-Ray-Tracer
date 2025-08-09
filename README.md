@@ -2,10 +2,7 @@
 3D graphics engine (Ray tracing + Radiosity). Written in C++, Vulkan and Cuda.
 
 ## prerequisites
-> [!IMPORTANT]
-> In order to build the application, you need to download `VulkanSdk` tarball and copy it to repo main folder (so docker container can copy it and built it inside container).
-> 
-> Using the same aformentioned tarball, install `VulkanSdk` on your local machine. Here's an [official documentation](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html), `VulkanSdk` can be downloaded from [here](https://vulkan.lunarg.com/). 
+- **VULKAN** - [latest](https://vulkan.lunarg.com/sdk/home#linux) 
 
 - **GLFW3**
     ```bash
@@ -22,7 +19,21 @@ Or if you already cloned it, just use this command:
 git submodule update --init --recursive
 ```
 
+## Validation layer
+
+To run application with validation layers on `Ubuntu`, build it in debug mode, and make sure you have installed it on your OS:
+
+```bash
+sudo apt install vulkan-validationlayers
+```
+
 ## Docker
+
+>> [!IMPORTANT]
+>> For this moment (09.08.2025) It is still possible to build the app using docker, but when project 
+>> will get more complicated, there is a high chance that it will not be possible.
+
+
 To build a docker container
 ```bash
 docker build -t test:latest .
@@ -62,12 +73,4 @@ docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/ven
 * To run a docker container with a custom entrypoint exec
 ```bash
 docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
-```
-
-## Validation layer
-
-To run application with validation layers on `Ubuntu`, build it in debug mode, and make sure you have installed it on your OS:
-
-```bash
-sudo apt install vulkan-validationlayers
 ```

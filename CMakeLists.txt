@@ -6,9 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
-
-include(UsePkgConfig)
-find_package(PkgConfig REQUIRED)
 find_package(glfw3 REQUIRED)
 
 #internal
@@ -24,12 +21,10 @@ add_executable(${PROJECT_NAME} src/application/main.cpp)
 target_link_libraries(${PROJECT_NAME} 
     Vulkan::Vulkan
     glfw
-    glfw
     Core
     common
     renderer
 )
-
 # Exe needs to have different precompiled headers because of usage of different compiler flags
 target_precompile_headers(${PROJECT_NAME} PRIVATE "${PROJECT_SOURCE_DIR}/src/common/pch.h")
 

@@ -11,11 +11,10 @@ namespace VRTR
             RTRenderer() = default;
             ~RTRenderer() = default;
             void init();
-            void destroy();
         private:
-            // Probably I would not need to store these as shared_ptrs.
-            // But I will keep it for now
-            std::shared_ptr<VulkanInstance> instance;
-            // std::shared_ptr<ValidationLayers> validationLayers;
+            vk::raii::Context context;
+            vk::raii::Instance instance{nullptr};
+            std::unique_ptr<VulkanInstance> VRTR_Instance;
+            std::unique_ptr<ValidationLayers> VRTR_valLayers;
     };
 }

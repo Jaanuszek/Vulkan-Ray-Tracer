@@ -33,9 +33,6 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-VERSION=$(find ~/vulkan -maxdepth 1 -type d | grep "1\." | xargs basename)
-source ~/vulkan/$VERSION/setup-env.sh
-
 # ${additionalFlags[@]} - all stored in array arguments
 echo "Running command: ${command} with flags: ${additionalFlags[@]}"
 

@@ -6,17 +6,13 @@ namespace VRTR
     void RTRenderer::init()
     {
         VRTR_DEBUG("RTRENDERER INIT");
-        instance = std::make_shared<VulkanInstance>();
-        // validationLayers = std::make_shared<ValidationLayers>();
+        VRTR_Instance = std::make_unique<VulkanInstance>(context, instance);
+        VRTR_valLayers = std::make_unique<ValidationLayers>(context);
 
-        instance->init();
-        // validationLayers->init(instance->getInstance());
+        VRTR_Instance->createInstance();
+        VRTR_valLayers->init(instance);
     }
 
     void RTRenderer::destroy()
-    {
-        VRTR_DEBUG("RTRENDERER DESTROY");
-        // validationLayers->destroy(instance->getInstance());
-        instance->destroy();
-    }
+    {}
 }

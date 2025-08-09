@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ubuntu:latest
+FROM ubuntu:24.04
 
 ENV rootpath=/app
 WORKDIR ${rootpath}
@@ -19,27 +19,12 @@ RUN apt-get install -y libglm-dev libxcb-dri3-0 libxcb-present0 libpciaccess0 \
     ocaml-core ninja-build libxml2-dev wayland-protocols python3-jsonschema \
     clang-format qtbase5-dev qt6-base-dev
 
-COPY vulkansdk-linux-* /tmp/
+RUN apt update && apt install -y wget gnupg
 
-RUN if ls -d /tmp/vulkansdk-linux-* 1> /dev/null 2>&1; then \
-        echo "VulkanSDK Tarball exists!"; \
-    else \
-        echo "VulkanSDK Tarball does not exist!"; \
-        exit 1; \
-    fi
-
-RUN mkdir -p ~/vulkan && \
-    tar xf /tmp/vulkansdk-linux-* -C ~/vulkan && \
-    rm /tmp/vulkansdk-linux-*
-
-RUN apt install -y libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev
-
-# this is not needed for building, but I will leave it so VAR ENVS are set inside container
-RUN VERSION=$(find ~/vulkan -maxdepth 1 -type d | grep "1\." | xargs basename) && \
-    echo "Vulkan version: $VERSION" && \
-    echo "if [ -d ~/vulkan/$VERSION/x86_64 ]; then" >> ~/.bashrc && \
-    echo "    source $HOME/vulkan/$VERSION/setup-env.sh" >> ~/.bashrc && \
-    echo "fi" >> ~/.bashrc
+RUN wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | tee /etc/apt/trusted.gpg.d/lunarg.asc
+RUN wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list http://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list  
+RUN apt update
+RUN apt -y install vulkan-sdk
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

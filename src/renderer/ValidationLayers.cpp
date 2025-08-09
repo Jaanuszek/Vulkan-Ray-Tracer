@@ -1,136 +1,84 @@
-// #include "ValidationLayers.hpp"
-// #include "pch.h"
+#include "ValidationLayers.hpp"
+#include "pch.h"
 
-// namespace VRTR
-// {
-//     void ValidationLayers::init(VkInstance instance)
-//     {
-//         setupDebugMessenger(instance);
-//     }
+namespace VRTR
+{
+    VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
+            vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+            vk::DebugUtilsMessageTypeFlagsEXT type,
+            const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+            void*)
+    {
+        switch (severity) {
+            case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
+                VRTR_VALIDATION_TRACE("Message: {}", pCallbackData->pMessage);
+                break;
+            case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
+                VRTR_VALIDATION_INFO("Message: {}", pCallbackData->pMessage);
+                break;
+            case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
+                VRTR_VALIDATION_WARN("Message: {}", pCallbackData->pMessage);
+                break;
+            case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
+                VRTR_VALIDATION_ERROR("Message: {}", pCallbackData->pMessage);
+                break;
+            default:
+                break;
+        }
 
-//     void ValidationLayers::destroy(VkInstance instance)
-//     {
-//         destroyDebugMessenger(instance);
-//     }
+        return VK_FALSE;
+    }
 
-//     bool ValidationLayers::checkLayerValidationSupport()
-//     {
-//         uint32_t extensionCount;
-//         vkEnumerateInstanceLayerProperties(&extensionCount, nullptr);
-//         std::vector<VkLayerProperties> layerProperties(extensionCount);
-//         vkEnumerateInstanceLayerProperties(&extensionCount, layerProperties.data());
+    ValidationLayers::ValidationLayers(vk::raii::Context& ctx)
+        : context(ctx)
+    {}
 
-//         for(const char* layerName : validationLayers)
-//         {
-//             bool foundLayer = false;
+    void ValidationLayers::init(vk::raii::Instance&instance)
+    {
+        setupDebugMessenger(instance);
+    }
 
-//             for(const auto& layerProperty : layerProperties)
-//             {
-//                 if(strcmp(layerName, layerProperty.layerName) == 0)
-//                 {
-//                     foundLayer = true;
-//                     break;
-//                 }
-//             }
+    bool ValidationLayers::checkLayerValidationSupport(vk::raii::Context& ctx)
+    {
+        auto layerProperties = ctx.enumerateInstanceLayerProperties();
+        for(const char* layerName : validationLayers)
+        {
+            bool foundLayer = false;
 
-//             if(foundLayer == false)
-//             {
-//                 return false;
-//             }
-//         }
-//         return true;
-//     }
+            for(const auto& layerProperty : layerProperties)
+            {
+                if(strcmp(layerName, layerProperty.layerName) == 0)
+                {
+                    foundLayer = true;
+                    break;
+                }
+            }
 
-//     VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayers::debugCallback(
-//     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-//     VkDebugUtilsMessageTypeFlagsEXT messageType,
-//     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-//     void* pUserData)
-//     {
-//         // TODO add another logger for validation layers
-//         switch (messageSeverity)
-//         {
-//             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-//                 VRTR_VALIDATION_TRACE("MessageID: {}, Message: {}", pCallbackData->pMessageIdName, pCallbackData->pMessage);
-//                 break;
-//             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-//                 VRTR_VALIDATION_INFO("MessageID: {}, Message: {}", pCallbackData->pMessageIdName, pCallbackData->pMessage);
-//                 break;
-//             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-//                 VRTR_VALIDATION_WARN("MessageID: {}, Message: {}", pCallbackData->pMessageIdName, pCallbackData->pMessage);
-//                 break;
-//             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-//                 VRTR_VALIDATION_ERROR("MessageID: {}, Message: {}", pCallbackData->pMessageIdName, pCallbackData->pMessage);
-//                 break;
-//             default:
-//                 VRTR_VALIDATION_CRITICAL("MessageID: {}, Message: {}", pCallbackData->pMessageIdName, pCallbackData->pMessage);
-//                 return VK_FALSE;
-//         }
-//         // I will disable it for now
-//         bool enableVerbose = false;
-//         if(enableVerbose){
-//             for (uint32_t i = 0; i < pCallbackData->objectCount; ++i)
-//             {
-//                 if(pCallbackData->pObjects[i].objectHandle)
-//                 {
-//                     VRTR_VALIDATION_INFO("Object [{}]: Handle: {}", i, pCallbackData->pObjects[i].objectHandle);
-//                 }
-//                 if(pCallbackData->pObjects[i].pObjectName)
-//                 {
-//                     VRTR_VALIDATION_INFO("Object [{}]: Name: {}", i, pCallbackData->pObjects[i].pObjectName);
-//                 }
-//             }
-//         }
+            if(foundLayer == false)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 
-//         return VK_FALSE;
-//     }
-    
-//     void ValidationLayers::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
-//     {
-//         createInfo = {};
-//         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-//         createInfo.pNext = nullptr;
-//         createInfo.flags = 0;
-//         createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-//                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-//                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-//         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-//                                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-//                                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-//         // VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT might be interesting flag to set in the future
-//         createInfo.pfnUserCallback = ValidationLayers::debugCallback;
-//         createInfo.pUserData = nullptr;
-//     }
+    vk::DebugUtilsMessengerCreateInfoEXT ValidationLayers::debugCreateInfo()
+    {
+        vk::DebugUtilsMessageSeverityFlagsEXT severityFlags( vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError );
+        vk::DebugUtilsMessageTypeFlagsEXT    messageTypeFlags( vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation );
+        vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT{
+            .messageSeverity = severityFlags,
+            .messageType = messageTypeFlags,
+            .pfnUserCallback = &debugCallback
+        };
+        return debugUtilsMessengerCreateInfoEXT;
+    }
+    void ValidationLayers::setupDebugMessenger(vk::raii::Instance& instance)
+    {
+        if(!enableValidationLayers) return;
 
-//     void ValidationLayers::setupDebugMessenger(VkInstance instance)
-//     {
-//         if(!enableValidationLayers) return;
+        auto debugUtilsMessengerCreateInfoEXT = debugCreateInfo();
+        debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT, nullptr);
+    }
 
-//         VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-//         populateDebugMessengerCreateInfo(createInfo);
-
-//         PFN_vkVoidFunction temp_fp;
-//         temp_fp = vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-//         if ( !temp_fp ) throw std::runtime_error("Failed to load vkCreateDebugUtilsMessengerEXT function");
-
-//         auto vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(temp_fp);
-//         if (vkCreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS)
-//         {
-//             throw std::runtime_error("failed to set up debug messenger!");
-//         }
-//     }
-
-//     void ValidationLayers::destroyDebugMessenger(VkInstance instance)
-//     {
-//         if (debugMessenger != VK_NULL_HANDLE)
-//         {
-//             PFN_vkVoidFunction temp_fp;
-//             temp_fp = vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-//             if ( !temp_fp ) throw std::runtime_error("Failed to load vkDestroyDebugUtilsMessengerEXT function");
-
-//             auto vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(temp_fp);
-//             vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-//             debugMessenger = VK_NULL_HANDLE;
-//         }
-//     }
-// }
+}
