@@ -14,6 +14,8 @@ add_library(${PROJECT_NAME} SHARED
     RTRenderer.cpp
     VulkanInstance.cpp
     ValidationLayers.cpp
+    PhysicalDevice.cpp
+    LogicalDevice.cpp
 )
 
 include(GenerateExportHeader)
