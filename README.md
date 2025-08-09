@@ -29,9 +29,9 @@ sudo apt install vulkan-validationlayers
 
 ## Docker
 
->> [!IMPORTANT]
->> For this moment (09.08.2025) It is still possible to build the app using docker, but when project 
->> will get more complicated, there is a high chance that it will not be possible.
+> [!IMPORTANT]
+> For this moment (09.08.2025) It is still possible to build the app using docker, but when project 
+> will get more complicated, there is a high chance that it will not be possible.
 
 
 To build a docker container
