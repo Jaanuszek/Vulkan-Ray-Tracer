@@ -11,7 +11,7 @@ namespace VRTR
             ~LogicalDevice() = default;
 
             void createLogicalDevice(vk::raii::PhysicalDevice& physicalDevice, vk::raii::Device& logicalDevice,
-                                     vk::raii::Queue& graphicsQueue);
+                                     vk::raii::Queue& Queue, vk::raii::SurfaceKHR& surface);
         private:
     };
 }

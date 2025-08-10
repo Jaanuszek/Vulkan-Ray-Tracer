@@ -16,6 +16,8 @@ add_library(${PROJECT_NAME} SHARED
     ValidationLayers.cpp
     PhysicalDevice.cpp
     LogicalDevice.cpp
+    WindowSurface.cpp
+    SwapChain.cpp
 )
 
 include(GenerateExportHeader)

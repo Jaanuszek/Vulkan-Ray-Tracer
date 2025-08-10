@@ -5,13 +5,13 @@
 namespace VRTR
 {
     void LogicalDevice::createLogicalDevice(vk::raii::PhysicalDevice& physicalDevice, vk::raii::Device& logicalDevice,
-                                            vk::raii::Queue& graphicsQueue)
+                                            vk::raii::Queue& Queue, vk::raii::SurfaceKHR& surface)
     {
         VRTR_DEBUG("CREATING LOGICAL DEVICE");
 
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
         float queuePriority = 0.0f;
-        uint32_t graphicsQueueFamilyIndex = PhysicalDevice::findQueueFamilies(physicalDevice);
+        uint32_t graphicsAndPresentationQueueFamilyIndex = PhysicalDevice::findQueueFamilies(physicalDevice, surface);
 
         vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featuresChain
@@ -23,7 +23,7 @@ namespace VRTR
 
         vk::DeviceQueueCreateInfo queueCreateInfo
         {
-            .queueFamilyIndex = graphicsQueueFamilyIndex,
+            .queueFamilyIndex = graphicsAndPresentationQueueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority 
         };
@@ -39,6 +39,6 @@ namespace VRTR
         };
 
         logicalDevice = vk::raii::Device(physicalDevice, deviceCreateInfo);
-        graphicsQueue = vk::raii::Queue(logicalDevice, graphicsQueueFamilyIndex, 0);
+        Queue = vk::raii::Queue(logicalDevice, graphicsAndPresentationQueueFamilyIndex, 0);
     }
 }

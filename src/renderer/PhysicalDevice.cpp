@@ -56,16 +56,19 @@ namespace VRTR
         return isSuitable;
     }
 
-    uint32_t PhysicalDevice::findQueueFamilies(vk::raii::PhysicalDevice& physicalDevice)
+    uint32_t PhysicalDevice::findQueueFamilies(vk::raii::PhysicalDevice& physicalDevice, vk::raii::SurfaceKHR& surface)
     {
         std::vector<vk::QueueFamilyProperties> queueFamilies = physicalDevice.getQueueFamilyProperties();
         uint32_t index = 0;
 
         for (const auto& queueFamily : queueFamilies)
         {
-            if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+            // As of now, I will just look for a queue family that supports both graphics and presentation
+            // I will need to update it later
+            if ((queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) && 
+                (physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(index), *surface)))
             {
-                VRTR_DEBUG("Found graphics queue family at index: {}", index);
+                VRTR_DEBUG("Found graphics queue family that supports both graphics and presentation at index: {}", index);
                 return index;
             }
             index++;

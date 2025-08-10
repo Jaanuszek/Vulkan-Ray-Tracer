@@ -1,11 +1,3 @@
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
-
 #include <pch.h>
 
 #include "Logger.hpp"
@@ -27,7 +19,7 @@ int main()
         GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Siema Eniu", nullptr, nullptr);
 
         std::unique_ptr<VRTR::RTRenderer> renderer = std::make_unique<VRTR::RTRenderer>();
-        renderer->init();
+        renderer->init(window);
         
         while(!glfwWindowShouldClose(window)) {
             glfwPollEvents();   
