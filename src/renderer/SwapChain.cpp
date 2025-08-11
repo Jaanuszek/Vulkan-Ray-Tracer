@@ -61,4 +61,44 @@ namespace VRTR
         swapChain = vk::raii::SwapchainKHR(device, createInfo);
         swapChainImages = swapChain.getImages();
     }
+
+    void SwapChain::createImageViews(vk::raii::Device& device, const std::vector<vk::Image>& swapChainImages,
+                                     std::vector<vk::raii::ImageView>& imageViews)
+    {
+        VRTR_DEBUG("CREATING IMAGE VIEWS");
+        imageViews.clear();
+        imageViews.reserve(swapChainImages.size());
+
+        auto format = surfaceCapabilities.surfaceFormat.format;
+
+        vk::ImageViewCreateInfo createInfo
+        {
+            .pNext = nullptr,
+            .flags = {},
+            .image = {},
+            .viewType = vk::ImageViewType::e2D,
+            .format = format,
+            .components = {
+                // Identity swizzle - default color components
+                .r = vk::ComponentSwizzle::eIdentity,
+                .g = vk::ComponentSwizzle::eIdentity,
+                .b = vk::ComponentSwizzle::eIdentity,
+                .a = vk::ComponentSwizzle::eIdentity
+            },
+            .subresourceRange = {
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            }
+        };
+        for (const auto& image : swapChainImages)
+        {
+            createInfo.image = image;
+            // constructing ImageView from vk::raii::ImageView
+            imageViews.emplace_back(device, createInfo);
+        }
+
+    }
 }

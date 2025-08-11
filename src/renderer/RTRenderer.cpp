@@ -25,5 +25,6 @@ namespace VRTR
 
         VRTR_LogicalDevice->createLogicalDevice(physicalDevice, logicalDevice, Queue, surface);
         VRTR_SwapChain->createSwapChain(logicalDevice, surface, swapChain, swapChainImages);
+        VRTR_SwapChain->createImageViews(logicalDevice, swapChainImages, swapChainImageViews);
     }
 }
