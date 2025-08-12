@@ -7,6 +7,7 @@
 #include "LogicalDevice.hpp"
 #include "WindowSurface.hpp"
 #include "SwapChain.hpp"
+#include "RasterGraphicsPipeline.hpp"
 
 namespace VRTR
 {
@@ -34,5 +35,6 @@ namespace VRTR
             std::unique_ptr<LogicalDevice> VRTR_LogicalDevice;
             std::unique_ptr<WindowSurface> VRTR_WindowSurface;
             std::unique_ptr<SwapChain> VRTR_SwapChain;
+            std::unique_ptr<RasterGraphicsPipeline> VRTR_RasterGraphicsPipeline;
     };
 }

@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
-find_package(Vulkan REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
     RTRenderer.cpp
@@ -18,6 +17,8 @@ add_library(${PROJECT_NAME} SHARED
     LogicalDevice.cpp
     WindowSurface.cpp
     SwapChain.cpp
+    RasterGraphicsPipeline.cpp
+    Shader.cpp
 )
 
 include(GenerateExportHeader)
@@ -28,7 +29,6 @@ generate_export_header(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE
     common
     Core
-    Vulkan::Vulkan
 )
 
 target_precompile_headers(${PROJECT_NAME} REUSE_FROM common)

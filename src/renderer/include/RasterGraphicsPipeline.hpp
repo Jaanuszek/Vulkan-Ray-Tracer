@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Logger.hpp"
+#include "Shader.hpp"
 
 namespace VRTR
 {
@@ -10,7 +11,9 @@ namespace VRTR
             RasterGraphicsPipeline() = default;
             ~RasterGraphicsPipeline() = default;
 
-        void createPipeline(vk::raii::Device& device, vk::raii::RenderPass& renderPass,
-                            vk::raii::PipelineLayout& pipelineLayout, vk::raii::Pipeline& pipeline);
+        void createPipeline(vk::raii::Device& device);
+            
+        private:
+            Shader shaderHandler;
     };
 }

@@ -16,7 +16,8 @@ namespace VRTR
     
     static std::vector<const char*> deviceExtensions = 
     {
-        vk::KHRSwapchainExtensionName
+        vk::KHRSwapchainExtensionName,
+        vk::KHRSpirv14ExtensionName
     };
 
     class PhysicalDevice

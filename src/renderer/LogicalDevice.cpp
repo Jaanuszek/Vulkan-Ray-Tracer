@@ -13,10 +13,13 @@ namespace VRTR
         float queuePriority = 0.0f;
         uint32_t graphicsAndPresentationQueueFamilyIndex = PhysicalDevice::findQueueFamilies(physicalDevice, surface);
 
-        vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featuresChain
+        vk::StructureChain<vk::PhysicalDeviceFeatures2,
+                            vk::PhysicalDeviceVulkan11Features, 
+                            vk::PhysicalDeviceVulkan13Features,
+                            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featuresChain
         {
             {},
+            {.shaderDrawParameters = VK_TRUE},
             {.dynamicRendering = true},
             {.extendedDynamicState = true}
         };
