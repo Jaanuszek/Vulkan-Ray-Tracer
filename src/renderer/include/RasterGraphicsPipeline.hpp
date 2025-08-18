@@ -8,12 +8,14 @@ namespace VRTR
     class RasterGraphicsPipeline
     {
         public:
-            RasterGraphicsPipeline() = default;
+            RasterGraphicsPipeline();
             ~RasterGraphicsPipeline() = default;
 
-        void createPipeline(vk::raii::Device& device);
+        void createPipeline(vk::raii::Device& device, 
+                            const vk::SurfaceCapabilitiesKHR& capabilities);
             
         private:
             Shader shaderHandler;
+            vk::SurfaceCapabilitiesKHR surCapabilities;
     };
 }

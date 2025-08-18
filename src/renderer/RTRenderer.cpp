@@ -14,19 +14,23 @@ namespace VRTR
         VRTR_WindowSurface = std::make_unique<WindowSurface>();
         VRTR_RasterGraphicsPipeline = std::make_unique<RasterGraphicsPipeline>();
 
+
         VRTR_Instance->createInstance(instance);
         VRTR_valLayers->setupDebugMessenger(instance);
+
         VRTR_WindowSurface->setupSurface(instance, window, surface);
+
         VRTR_PhysicalDevice->pickPhysicalDevice(instance, physicalDevice);
 
         // It has to be done after the physical device is picked
-        VRTR_SwapChain = std::make_unique<SwapChain>(
-            VRTR_WindowSurface->generateSurfaceCapabilities(physicalDevice, surface, window)
+        SurfaceCapabilities surfaceCapabilities = VRTR_WindowSurface->generateSurfaceCapabilities(
+            physicalDevice, surface, window
         );
+        VRTR_SwapChain = std::make_unique<SwapChain>(surfaceCapabilities);
 
         VRTR_LogicalDevice->createLogicalDevice(physicalDevice, logicalDevice, Queue, surface);
         VRTR_SwapChain->createSwapChain(logicalDevice, surface, swapChain, swapChainImages);
         VRTR_SwapChain->createImageViews(logicalDevice, swapChainImages, swapChainImageViews);
-        VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice);
+        VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice, surfaceCapabilities.capabilities);
     }
 }
