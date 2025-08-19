@@ -8,7 +8,9 @@ namespace VRTR
     {}
 
     void RasterGraphicsPipeline::createPipeline(vk::raii::Device& device, 
-                                                const vk::SurfaceCapabilitiesKHR& capabilities)
+                                                const SurfaceCapabilities& capabilities,
+                                                vk::raii::PipelineLayout& pipelineLayout,
+                                                vk::raii::Pipeline& pipeline)
     {
         VRTR_DEBUG("Creating Raster Graphics Pipeline");
         // SHADERS
@@ -135,10 +137,10 @@ namespace VRTR
             .polygonMode = vk::PolygonMode::eFill,
             .cullMode = vk::CullModeFlagBits::eBack,
             .frontFace = vk::FrontFace::eCounterClockwise,
-            .depthBiasEnable = false,
+            .depthBiasEnable = vk::False,
             .depthBiasConstantFactor = 0.0f,
             .depthBiasClamp = 0.0f,
-            .depthBiasSlopeFactor = 0.0f,
+            .depthBiasSlopeFactor = 1.0f,
             .lineWidth = 1.0f 
         };
 
@@ -211,8 +213,42 @@ namespace VRTR
             .pPushConstantRanges = nullptr
         };
 
-        vk::PipelineRenderingCreateInfo renderingInfo{};
+        // I am using dynamic rendering that is above version 1.3,
+        // so I don't need rederPass and framebuffer objects
+        pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
 
-        vk::GraphicsPipelineCreateInfo pipelineInfo{};
+        vk::PipelineRenderingCreateInfo renderingInfo
+        {
+            .pNext = nullptr,
+            .viewMask = 0,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &capabilities.surfaceFormat.format,
+            .depthAttachmentFormat = vk::Format::eUndefined,
+            .stencilAttachmentFormat = vk::Format::eUndefined
+        };
+
+        vk::GraphicsPipelineCreateInfo pipelineInfo
+        {
+            .pNext = &renderingInfo,
+            .flags = {},
+            .stageCount = static_cast<uint32_t>(shaderStages.size()),
+            .pStages = shaderStages.data(),
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssemblyInfo,
+            .pTessellationState = nullptr,
+            .pViewportState = &viewportStateInfo,
+            .pRasterizationState = &rasterizationInfo,
+            .pMultisampleState = &multisampleInfo,
+            .pDepthStencilState = nullptr, // I dont use it now
+            .pColorBlendState = &colorBlendInfo,
+            .pDynamicState = &dynamicStateInfo,
+            .layout = pipelineLayout,
+            .renderPass = nullptr,
+            .subpass = 0,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1
+        };
+
+        pipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
     }
 }

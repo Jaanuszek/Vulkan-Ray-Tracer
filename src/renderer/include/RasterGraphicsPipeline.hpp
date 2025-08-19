@@ -2,6 +2,7 @@
 
 #include "Logger.hpp"
 #include "Shader.hpp"
+#include "WindowSurface.hpp"
 
 namespace VRTR
 {
@@ -12,10 +13,12 @@ namespace VRTR
             ~RasterGraphicsPipeline() = default;
 
         void createPipeline(vk::raii::Device& device, 
-                            const vk::SurfaceCapabilitiesKHR& capabilities);
+                            const SurfaceCapabilities& capabilities,
+                            vk::raii::PipelineLayout& pipelineLayout,
+                            vk::raii::Pipeline& pipeline);
             
         private:
             Shader shaderHandler;
-            vk::SurfaceCapabilitiesKHR surCapabilities;
+            SurfaceCapabilities surCapabilities;
     };
 }

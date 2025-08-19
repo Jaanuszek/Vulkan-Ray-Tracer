@@ -28,6 +28,8 @@ namespace VRTR
             vk::raii::SwapchainKHR swapChain{nullptr};
             std::vector<vk::Image> swapChainImages;
             std::vector<vk::raii::ImageView> swapChainImageViews;
+            vk::raii::PipelineLayout pipelineLayout{nullptr};
+            vk::raii::Pipeline rasterGraphicsPipeline{nullptr};
 
             std::unique_ptr<VulkanInstance> VRTR_Instance;
             std::unique_ptr<ValidationLayers> VRTR_valLayers;

@@ -31,6 +31,7 @@ namespace VRTR
         VRTR_LogicalDevice->createLogicalDevice(physicalDevice, logicalDevice, Queue, surface);
         VRTR_SwapChain->createSwapChain(logicalDevice, surface, swapChain, swapChainImages);
         VRTR_SwapChain->createImageViews(logicalDevice, swapChainImages, swapChainImageViews);
-        VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice, surfaceCapabilities.capabilities);
+        VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice, surfaceCapabilities,
+                                                    pipelineLayout, rasterGraphicsPipeline);
     }
 }
