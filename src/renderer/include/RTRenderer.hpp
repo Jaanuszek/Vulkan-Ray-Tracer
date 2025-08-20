@@ -8,6 +8,7 @@
 #include "WindowSurface.hpp"
 #include "SwapChain.hpp"
 #include "RasterGraphicsPipeline.hpp"
+#include "CommandBuffer.hpp"
 
 namespace VRTR
 {
@@ -17,6 +18,7 @@ namespace VRTR
             RTRenderer() = default;
             ~RTRenderer() = default;
             void init(GLFWwindow* window);
+            void renderFrame(uint32_t imageIndex);
         private:
             GLFWwindow* window = nullptr;
             vk::raii::Context context;
@@ -30,6 +32,8 @@ namespace VRTR
             std::vector<vk::raii::ImageView> swapChainImageViews;
             vk::raii::PipelineLayout pipelineLayout{nullptr};
             vk::raii::Pipeline rasterGraphicsPipeline{nullptr};
+            vk::raii::CommandPool commandPool{nullptr};
+            vk::raii::CommandBuffer commandBuffer{nullptr};
 
             std::unique_ptr<VulkanInstance> VRTR_Instance;
             std::unique_ptr<ValidationLayers> VRTR_valLayers;
@@ -38,5 +42,9 @@ namespace VRTR
             std::unique_ptr<WindowSurface> VRTR_WindowSurface;
             std::unique_ptr<SwapChain> VRTR_SwapChain;
             std::unique_ptr<RasterGraphicsPipeline> VRTR_RasterGraphicsPipeline;
+            std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
+
+            SurfaceCapabilities surfaceCapabilities;
+            uint32_t QueueFamilyIndex; // graphics and presentation queue
     };
 }

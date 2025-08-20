@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME} SHARED
     SwapChain.cpp
     RasterGraphicsPipeline.cpp
     Shader.cpp
+    CommandBuffer.cpp
 )
 
 include(GenerateExportHeader)
