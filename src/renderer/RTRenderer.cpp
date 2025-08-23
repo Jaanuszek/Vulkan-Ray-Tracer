@@ -3,6 +3,11 @@
 
 namespace VRTR
 {
+    RTRenderer::~RTRenderer()
+    {
+        logicalDevice.waitIdle();
+    }
+    
     void RTRenderer::init(GLFWwindow* window)
     {
         VRTR_DEBUG("RTRENDERER INIT");
@@ -38,10 +43,33 @@ namespace VRTR
                                                     pipelineLayout, rasterGraphicsPipeline);
         VRTR_CommandBuffer->createCommandPool(logicalDevice, QueueFamilyIndex);
         VRTR_CommandBuffer->createCommandBuffer(logicalDevice);
+        createSyncObjects();
     }
 
-    void RTRenderer::renderFrame(uint32_t imageIndex)
+    void RTRenderer::createSyncObjects()
     {
+        VRTR_DEBUG("Creating Sync Objects");
+
+        vk::SemaphoreCreateInfo semaphoreInfo
+        {
+            .pNext = nullptr,
+            .flags = {}
+        };
+
+        vk::FenceCreateInfo fenceInfo
+        {
+            .pNext = nullptr,
+            .flags = vk::FenceCreateFlagBits::eSignaled // so we don't wait forever the first time
+        };
+
+        presentCompleteSemaphore = vk::raii::Semaphore(logicalDevice, semaphoreInfo);
+        renderCompleteSemaphore = vk::raii::Semaphore(logicalDevice, semaphoreInfo);
+        drawFence = vk::raii::Fence(logicalDevice, fenceInfo);
+    }
+
+    void RTRenderer::recordCommandBuffer(uint32_t imageIndex)
+    {
+        commandBuffer.begin({});
         VRTR_CommandBuffer->transition_image_layout
         (
             swapChainImages, imageIndex,
@@ -93,5 +121,43 @@ namespace VRTR
         );
 
         commandBuffer.end();
+    }
+
+    void RTRenderer::drawFrame()
+    {
+        logicalDevice.waitIdle();
+        // logicalDevice.waitForFences({drawFence}, VK_TRUE, UINT64_MAX);
+        auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphore, nullptr);
+
+        recordCommandBuffer(imageIndex);
+        logicalDevice.resetFences({drawFence});
+
+        vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+        const vk::SubmitInfo submitInfo
+        {
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &*presentCompleteSemaphore,
+            .pWaitDstStageMask = &waitDestinationStageMask,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*commandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &*renderCompleteSemaphore
+        };
+        Queue.submit({submitInfo}, *drawFence);
+        while (vk::Result::eTimeout == logicalDevice.waitForFences(*drawFence, VK_TRUE, UINT64_MAX))
+                ;
+
+        const vk::PresentInfoKHR presentInfoKHR{
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &*renderCompleteSemaphore,
+            .swapchainCount = 1,
+            .pSwapchains = &*swapChain,
+            .pImageIndices = &imageIndex,
+            .pResults = nullptr
+        };
+
+        result = Queue.presentKHR(presentInfoKHR);
     }
 }

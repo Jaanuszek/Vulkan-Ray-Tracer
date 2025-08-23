@@ -42,7 +42,7 @@ namespace VRTR
     void CommandBuffer::recordCommandBuffer(uint32_t imageIndex)
     {
         VRTR_DEBUG("Recording Command Buffer");
-
+        // commandBuffer
         // .begin() wrapper function for vkBeginCommandBuffer
         commandBuffer.begin(
             {
@@ -57,12 +57,14 @@ namespace VRTR
                                             vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
                                             vk::AccessFlags2 srcAccessMask, vk::AccessFlags2 dstAccessMask,
                                             vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask,
-                                            uint32_t baseMipLevel = 0, uint32_t levelCount = 1)
+                                            uint32_t baseMipLevel, uint32_t levelCount)
     {
         vk::ImageMemoryBarrier2 barrier
         {
             .pNext = nullptr,
+            .srcStageMask = srcStageMask,
             .srcAccessMask = srcAccessMask,
+            .dstStageMask = dstStageMask,
             .dstAccessMask = dstAccessMask,
             .oldLayout = oldLayout,
             .newLayout = newLayout,

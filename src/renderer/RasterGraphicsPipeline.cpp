@@ -47,33 +47,34 @@ namespace VRTR
         };
 
         // ==== VERTEX INPUT STAGES ====
-        vk::VertexInputBindingDescription bindingDescription{
-            .binding = 0, // used in shaders "layout(binding = X)"
-            .stride = sizeof(float) * 3, // Assuming 3 floats per vertex (x, y, z)
-            .inputRate = vk::VertexInputRate::eVertex
-        };
+        // vk::VertexInputBindingDescription bindingDescription{
+        //     .binding = 0, // used in shaders "layout(binding = X)"
+        //     .stride = sizeof(float) * 3, // Assuming 3 floats per vertex (x, y, z)
+        //     .inputRate = vk::VertexInputRate::eVertex
+        // };
 
-        // POS
-        vk::VertexInputAttributeDescription attributeDescription{
-            .location = 0, // used in shaders "layout(location = X)"
-            .binding = 0, // from witch binding from "VertexInputBindingDescription" take data
-            .format = vk::Format::eR32G32B32Sfloat, // Assuming 3 floats (x, y, z)
-            .offset = 0
-        };
-        // COLOR
-        // TODO
+        // // POS
+        // vk::VertexInputAttributeDescription attributeDescription{
+        //     .location = 0, // used in shaders "layout(location = X)"
+        //     .binding = 0, // from witch binding from "VertexInputBindingDescription" take data
+        //     .format = vk::Format::eR32G32B32Sfloat, // Assuming 3 floats (x, y, z)
+        //     .offset = 0
+        // };
+        // // COLOR
+        // // TODO
 
-        // TEX CORD
-        // TODO
+        // // TEX CORD
+        // // TODO
 
-        vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
-            .pNext = nullptr,
-            .flags = {},
-            .vertexBindingDescriptionCount = 1,
-            .pVertexBindingDescriptions = &bindingDescription,
-            .vertexAttributeDescriptionCount = 1,
-            .pVertexAttributeDescriptions = &attributeDescription
-        };
+        // vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
+        //     .pNext = nullptr,
+        //     .flags = {},
+        //     .vertexBindingDescriptionCount = 1,
+        //     .pVertexBindingDescriptions = &bindingDescription,
+        //     .vertexAttributeDescriptionCount = 1,
+        //     .pVertexAttributeDescriptions = &attributeDescription
+        // };
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo {};
 
         // ==== INPUT ASSEMBLY STAGE ====
         // "contains the configuration for what kind of topology will be drawn. 
@@ -136,7 +137,7 @@ namespace VRTR
             .rasterizerDiscardEnable = vk::False,
             .polygonMode = vk::PolygonMode::eFill,
             .cullMode = vk::CullModeFlagBits::eBack,
-            .frontFace = vk::FrontFace::eCounterClockwise,
+            .frontFace = vk::FrontFace::eClockwise,
             .depthBiasEnable = vk::False,
             .depthBiasConstantFactor = 0.0f,
             .depthBiasClamp = 0.0f,
@@ -186,7 +187,12 @@ namespace VRTR
             .srcAlphaBlendFactor = vk::BlendFactor::eZero,
             .dstAlphaBlendFactor = vk::BlendFactor::eZero,
             .alphaBlendOp = vk::BlendOp::eAdd,
-            .colorWriteMask = {}
+            .colorWriteMask = {
+                vk::ColorComponentFlagBits::eR |
+                vk::ColorComponentFlagBits::eG |
+                vk::ColorComponentFlagBits::eB |
+                vk::ColorComponentFlagBits::eA
+            }
         };
 
         std::array<float, 4> bc = {0.0f, 0.0f, 0.0f, 0.0f};

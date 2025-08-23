@@ -16,10 +16,13 @@ namespace VRTR
     {
         public:
             RTRenderer() = default;
-            ~RTRenderer() = default;
+            ~RTRenderer();
             void init(GLFWwindow* window);
-            void renderFrame(uint32_t imageIndex);
+            void createSyncObjects();
+            void recordCommandBuffer(uint32_t imageIndex);
+            void drawFrame();
         private:
+            // GENERAL VARIABLES
             GLFWwindow* window = nullptr;
             vk::raii::Context context;
             vk::raii::Instance instance{nullptr};
@@ -34,6 +37,11 @@ namespace VRTR
             vk::raii::Pipeline rasterGraphicsPipeline{nullptr};
             vk::raii::CommandPool commandPool{nullptr};
             vk::raii::CommandBuffer commandBuffer{nullptr};
+
+            // SYNC VARIABLES
+            vk::raii::Semaphore presentCompleteSemaphore{nullptr}; // image has been acquired and is ready for rendering
+            vk::raii::Semaphore renderCompleteSemaphore{nullptr}; // rendering finished and presentation can happen
+            vk::raii::Fence drawFence{nullptr}; 
 
             std::unique_ptr<VulkanInstance> VRTR_Instance;
             std::unique_ptr<ValidationLayers> VRTR_valLayers;

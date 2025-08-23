@@ -19,8 +19,11 @@ namespace VRTR
         {
             {},
             {.shaderDrawParameters = VK_TRUE},
-            {.dynamicRendering = true},
-            {.extendedDynamicState = true}
+            {
+                .synchronization2 = VK_TRUE,
+                .dynamicRendering = VK_TRUE
+            },
+            {.extendedDynamicState = VK_TRUE}
         };
 
         vk::DeviceQueueCreateInfo queueCreateInfo
