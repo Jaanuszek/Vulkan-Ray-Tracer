@@ -1,20 +1,18 @@
 #pragma once
 #include "Logger.hpp"
+#include "Constants.hpp"
 
 namespace VRTR
 {
     class CommandBuffer
     {
         public:
-            CommandBuffer(vk::raii::CommandPool& commandPool, vk::raii::CommandBuffer& commandBuffer);
+            CommandBuffer(vk::raii::CommandPool& commandPool, std::vector<vk::raii::CommandBuffer>& commandBuffers);
             ~CommandBuffer() = default;
 
             void createCommandPool(vk::raii::Device& device, uint32_t queueFamilyIndex);
 
-            void createCommandBuffer(vk::raii::Device& device);
-
-            // writes the command we want to execute into a command buffer :)
-            void recordCommandBuffer(uint32_t imageIndex);
+            void createCommandBuffers(vk::raii::Device& device);
 
             void transition_image_layout(const std::vector<vk::Image>& images, uint32_t imageIndex,
                                             vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
@@ -26,6 +24,6 @@ namespace VRTR
 
         // In case of any problems with ownership, lets look here first!
         vk::raii::CommandPool& commandPool;
-        vk::raii::CommandBuffer& commandBuffer;
+        std::vector<vk::raii::CommandBuffer>& commandBuffers;
     };
 }

@@ -1,6 +1,7 @@
 #include <pch.h>
 
 #include "Logger.hpp"
+#include "Constants.hpp"
 #include "RTRenderer.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -20,6 +21,8 @@ int main()
 
         std::unique_ptr<VRTR::RTRenderer> renderer = std::make_unique<VRTR::RTRenderer>();
         renderer->init(window);
+        glfwSetWindowUserPointer(window, renderer.get());
+        glfwSetFramebufferSizeCallback(window, VRTR::framebufferResizeCallback);
         
         while(!glfwWindowShouldClose(window)) {
             glfwPollEvents();

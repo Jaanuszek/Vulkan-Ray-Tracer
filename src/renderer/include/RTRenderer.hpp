@@ -9,12 +9,15 @@
 #include "SwapChain.hpp"
 #include "RasterGraphicsPipeline.hpp"
 #include "CommandBuffer.hpp"
+#include "Constants.hpp"
 
 namespace VRTR
 {
     class RENDERER_EXPORT RTRenderer
     {
         public:
+            bool framebufferResized = false;
+
             RTRenderer() = default;
             ~RTRenderer();
             void init(GLFWwindow* window);
@@ -36,12 +39,12 @@ namespace VRTR
             vk::raii::PipelineLayout pipelineLayout{nullptr};
             vk::raii::Pipeline rasterGraphicsPipeline{nullptr};
             vk::raii::CommandPool commandPool{nullptr};
-            vk::raii::CommandBuffer commandBuffer{nullptr};
+            std::vector<vk::raii::CommandBuffer> commandBuffers;
 
             // SYNC VARIABLES
-            vk::raii::Semaphore presentCompleteSemaphore{nullptr}; // image has been acquired and is ready for rendering
-            vk::raii::Semaphore renderCompleteSemaphore{nullptr}; // rendering finished and presentation can happen
-            vk::raii::Fence drawFence{nullptr}; 
+            std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+            std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
+            std::vector<vk::raii::Fence> drawFences;
 
             std::unique_ptr<VulkanInstance> VRTR_Instance;
             std::unique_ptr<ValidationLayers> VRTR_valLayers;
@@ -55,4 +58,9 @@ namespace VRTR
             SurfaceCapabilities surfaceCapabilities;
             uint32_t QueueFamilyIndex; // graphics and presentation queue
     };
+
+    inline static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<RTRenderer*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
+    }
 }

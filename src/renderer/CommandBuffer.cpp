@@ -3,8 +3,8 @@
 
 namespace VRTR
 {
-    CommandBuffer::CommandBuffer(vk::raii::CommandPool& commandPool, vk::raii::CommandBuffer& commandBuffer)
-        : commandPool(commandPool), commandBuffer(commandBuffer)
+    CommandBuffer::CommandBuffer(vk::raii::CommandPool& commandPool, std::vector<vk::raii::CommandBuffer>& commandBuffers)
+        : commandPool(commandPool), commandBuffers(commandBuffers)
     {}
 
     void CommandBuffer::createCommandPool(vk::raii::Device& device, 
@@ -22,35 +22,21 @@ namespace VRTR
         commandPool = vk::raii::CommandPool(device, poolInfo);
     }
 
-    void CommandBuffer::createCommandBuffer(vk::raii::Device& device)
+    void CommandBuffer::createCommandBuffers(vk::raii::Device& device)
     {
-        VRTR_DEBUG("Creating Command Buffer");
-
+        VRTR_DEBUG("Creating Command Buffers");
+        commandBuffers.clear();
         vk::CommandBufferAllocateInfo allocInfo
         {
             .pNext = nullptr,
             .commandPool = commandPool,
             .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1
+            .commandBufferCount = MAX_FRAMES_IN_FLIGHT
         };
 
         // Allocate the command buffers (see commandBufferCount above)
         // std::move so we can move the lifetime to commandBuffer variable (ownership)
-        commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
-    }
-
-    void CommandBuffer::recordCommandBuffer(uint32_t imageIndex)
-    {
-        VRTR_DEBUG("Recording Command Buffer");
-        // commandBuffer
-        // .begin() wrapper function for vkBeginCommandBuffer
-        commandBuffer.begin(
-            {
-                .pNext = nullptr,
-                .flags = {},
-                .pInheritanceInfo = nullptr // only relevant for secondary command buffers
-            }
-        );
+        commandBuffers = std::move(vk::raii::CommandBuffers(device, allocInfo));
     }
 
     void CommandBuffer::transition_image_layout(const std::vector<vk::Image>& images, uint32_t imageIndex,
@@ -92,6 +78,6 @@ namespace VRTR
             .pImageMemoryBarriers = &barrier
         };
 
-        commandBuffer.pipelineBarrier2(dependencyInfo);
+        commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
     }
 }

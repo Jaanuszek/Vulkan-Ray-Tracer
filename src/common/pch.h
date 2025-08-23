@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ranges>
+#include <atomic>
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN

@@ -2,7 +2,7 @@
 
 #include "Logger.hpp"
 #include "Shader.hpp"
-#include "WindowSurface.hpp"
+#include "SwapChain.hpp"
 
 namespace VRTR
 {
