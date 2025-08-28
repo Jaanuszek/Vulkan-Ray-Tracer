@@ -11,41 +11,55 @@ namespace VRTR
     void RTRenderer::init(GLFWwindow* window)
     {
         VRTR_DEBUG("RTRENDERER INIT");
-        this->window = window;
-        VRTR_Instance = std::make_unique<VulkanInstance>(context);
-        VRTR_valLayers = std::make_unique<ValidationLayers>(context);
-        VRTR_PhysicalDevice = std::make_unique<PhysicalDevice>();
-        VRTR_LogicalDevice = std::make_unique<LogicalDevice>();
-        VRTR_WindowSurface = std::make_unique<WindowSurface>();
-        VRTR_RasterGraphicsPipeline = std::make_unique<RasterGraphicsPipeline>();
-        VRTR_CommandBuffer = std::make_unique<CommandBuffer>(commandPool, commandBuffers);
+
+        initInstance();
+
+        initPhysicalDevice();
+
+        findQueueFamilies();
+
+        initSurface(window);
+
+        initLogicalDevice();
+
+        initSwapChain();
+
+        initPipeline();
+        // this->window = window;
+        // VRTR_Instance = std::make_unique<VulkanInstance>(context);
+        // VRTR_valLayers = std::make_unique<ValidationLayers>(context);
+        // VRTR_PhysicalDevice = std::make_unique<PhysicalDevice>();
+        // VRTR_LogicalDevice = std::make_unique<LogicalDevice>();
+        // VRTR_WindowSurface = std::make_unique<WindowSurface>();
+        // VRTR_RasterGraphicsPipeline = std::make_unique<RasterGraphicsPipeline>();
+        // VRTR_CommandBuffer = std::make_unique<CommandBuffer>(commandPool, commandBuffers);
 
 
-        VRTR_Instance->createInstance(instance);
-        VRTR_valLayers->setupDebugMessenger(instance);
+        // VRTR_Instance->createInstance(instance);
+        // VRTR_valLayers->setupDebugMessenger(instance);
 
-        VRTR_WindowSurface->setupSurface(instance, window, surface);
+        // VRTR_WindowSurface->setupSurface(instance, window, surface);
 
-        VRTR_PhysicalDevice->pickPhysicalDevice(instance, physicalDevice);
+        // VRTR_PhysicalDevice->pickPhysicalDevice(instance, physicalDevice);
 
-        VRTR_SwapChain = std::make_unique<SwapChain>(logicalDevice,
-                                                    surface, swapChain,
-                                                    swapChainImages, swapChainImageViews
-                                                    );
+        // VRTR_SwapChain = std::make_unique<SwapChain>(logicalDevice,
+        //                                             surface, swapChain,
+        //                                             swapChainImages, swapChainImageViews
+        //                                             );
 
 
-        QueueFamilyIndex = PhysicalDevice::findQueueFamilies(physicalDevice, surface);
+        // QueueFamilyIndex = PhysicalDevice::findQueueFamilies(physicalDevice, surface);
 
-        VRTR_LogicalDevice->createLogicalDevice(physicalDevice, logicalDevice, Queue, QueueFamilyIndex);
-        VRTR_SwapChain->createSwapChain(physicalDevice, window);
-        VRTR_SwapChain->createImageViews();
-        surfaceCapabilities = VRTR_SwapChain->getSurfaceCapabilities();
+        // VRTR_LogicalDevice->createLogicalDevice(physicalDevice, logicalDevice, Queue, QueueFamilyIndex);
+        // VRTR_SwapChain->createSwapChain(physicalDevice, window);
+        // VRTR_SwapChain->createImageViews();
+        // surfaceCapabilities = VRTR_SwapChain->getSurfaceCapabilities();
 
-        VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice, surfaceCapabilities,
-                                                    pipelineLayout, rasterGraphicsPipeline);
-        VRTR_CommandBuffer->createCommandPool(logicalDevice, QueueFamilyIndex);
-        VRTR_CommandBuffer->createCommandBuffers(logicalDevice);
-        createSyncObjects();
+        // VRTR_RasterGraphicsPipeline->createPipeline(logicalDevice, surfaceCapabilities,
+        //                                             pipelineLayout, rasterGraphicsPipeline);
+        // VRTR_CommandBuffer->createCommandPool(logicalDevice, QueueFamilyIndex);
+        // VRTR_CommandBuffer->createCommandBuffers(logicalDevice);
+        // createSyncObjects();
     }
 
     void RTRenderer::createSyncObjects()
