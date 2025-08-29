@@ -1,8 +1,6 @@
 #pragma once
 
 #include "renderer_export.h"
-#include "VulkanInstance.hpp"
-#include "ValidationLayers.hpp"
 #include "PhysicalDevice.hpp"
 #include "LogicalDevice.hpp"
 #include "WindowSurface.hpp"
@@ -13,6 +11,16 @@
 
 namespace VRTR
 {
+    #ifndef NDEBUG
+        constexpr bool enableValidationLayers = true;
+        std::vector<const char*> validationLayers
+        {
+            "VK_LAYER_KHRONOS_validation"
+        };
+    #elif
+        constexpr bool enableValidationLayers = false;
+    #endif
+
     class RENDERER_EXPORT RTRenderer
     {
         struct Context
@@ -45,7 +53,7 @@ namespace VRTR
 
             std::vector<vk::raii::CommandBuffer> commandBuffers;
 
-            vk::DebugUtilsMessengerEXT debug_callback{nullptr};
+            vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
 
             vk::Buffer vertex_buffer{nullptr};
 
@@ -61,17 +69,31 @@ namespace VRTR
             bool framebufferResized = false;
 
             RTRenderer() = default;
-            ~RTRenderer();
+            // ~RTRenderer();
             void init(GLFWwindow* window);
             void createSyncObjects();
             void recordCommandBuffer(uint32_t imageIndex);
-            void drawFrame();
+            // void drawFrame();
 
         private:
+
+            std::vector<const char*> getRequiredExtensions();
+
+            // Check if selected extensions are supported by the instance
+            bool checkExtensionsSupport(const std::vector<const char*>& glfwExtensions, 
+                                         const std::vector<vk::ExtensionProperties>& extensionsProperties);
+
             void initInstance();
-            void initPhysicalDevice();
-            void findQueueFamilies();
-            void initSurface(GLFWwindow* window);
+
+            #ifndef NDEBUG
+                void initValidationLayers();
+                vk::DebugUtilsMessengerCreateInfoEXT populateDebugMessengerCreateInfo();
+            #endif
+
+            bool isDeviceSuitable(const vk::raii::PhysicalDevice& device);
+            uint32_t findQueueFamilies();
+            void initPhysicalDeviceAndSurface(GLFWwindow* window);
+
             void initLogicalDevice();
             void initSwapChain();
             void initPipeline();
@@ -112,6 +134,11 @@ namespace VRTR
             // uint32_t QueueFamilyIndex; // graphics and presentation queue
     };
 
+
+    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+                                                vk::DebugUtilsMessageTypeFlagsEXT type,
+                                                const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                                void*);
     inline static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
         auto app = reinterpret_cast<RTRenderer*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
