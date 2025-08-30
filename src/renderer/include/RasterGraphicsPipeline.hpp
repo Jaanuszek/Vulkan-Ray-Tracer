@@ -2,23 +2,21 @@
 
 #include "Logger.hpp"
 #include "Shader.hpp"
-#include "SwapChain.hpp"
+#include "ConstantsAndStructs.hpp"
+// #include "SwapChainManager.hpp"
 
 namespace VRTR
 {
     class RasterGraphicsPipeline
     {
         public:
-            RasterGraphicsPipeline();
+            RasterGraphicsPipeline(Context& ctx);
             ~RasterGraphicsPipeline() = default;
 
-        void createPipeline(vk::raii::Device& device, 
-                            const SurfaceCapabilities& capabilities,
-                            vk::raii::PipelineLayout& pipelineLayout,
-                            vk::raii::Pipeline& pipeline);
-            
+        void createPipeline(vk::Format& format);
+
         private:
+            Context& ctx;
             Shader shaderHandler;
-            SurfaceCapabilities surCapabilities;
     };
 }

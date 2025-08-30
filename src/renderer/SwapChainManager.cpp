@@ -1,36 +1,33 @@
 #include "pch.h"
-#include "SwapChain.hpp"
+#include "SwapChainManager.hpp"
 
 namespace VRTR
 {
-    SwapChain::SwapChain(vk::raii::Device& device, vk::raii::SurfaceKHR& surface, vk::raii::SwapchainKHR& swapChain,
-                      std::vector<vk::Image>& swapChainImages, std::vector<vk::raii::ImageView>& imageViews)
-        :  device(device), surface(surface),
-          swapChain(swapChain), swapChainImages(swapChainImages), swapChainImageViews(imageViews)
-    {}
+    SwapChainManager::SwapChainManager(Context& ctx) : ctx(ctx)
+    {
 
-    SurfaceCapabilities SwapChain::generateSurfaceCapabilities(vk::raii::PhysicalDevice& physicalDevice,
-                                                                   vk::raii::SurfaceKHR& surface,
-                                                                   GLFWwindow* window)
+    }
+
+    SurfaceCapabilities SwapChainManager::generateSurfaceCapabilities(GLFWwindow* window)
     {
         // VRTR_DEBUG("GENERATING SURFACE CAPABILITIES");
 
         SurfaceCapabilities capabilities;
-        auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-        auto availableFormats = physicalDevice.getSurfaceFormatsKHR(surface);
-        auto availablePresentModes = physicalDevice.getSurfacePresentModesKHR(surface);
+        auto surfaceCapabilities = ctx.gpu.getSurfaceCapabilitiesKHR(ctx.surface);
+        auto availableFormats = ctx.gpu.getSurfaceFormatsKHR(ctx.surface);
+        auto availablePresentModes = ctx.gpu.getSurfacePresentModesKHR(ctx.surface);
 
         capabilities.capabilities = surfaceCapabilities;
         capabilities.availableFormats = availableFormats;
         capabilities.availablePresentModes = availablePresentModes;
-        capabilities.surfaceFormat = SwapChain::chooseSurfaceFormat(availableFormats);
-        capabilities.presentMode = SwapChain::choosePresentMode(availablePresentModes);
-        capabilities.extent = SwapChain::chooseSwapExtent(surfaceCapabilities, window);
+        capabilities.surfaceFormat = SwapChainManager::chooseSurfaceFormat(availableFormats);
+        capabilities.presentMode = SwapChainManager::choosePresentMode(availablePresentModes);
+        capabilities.extent = SwapChainManager::chooseSwapExtent(surfaceCapabilities, window);
 
         return capabilities;
     }
 
-    vk::SurfaceFormatKHR SwapChain::chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
+    vk::SurfaceFormatKHR SwapChainManager::chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
     {
         for(const auto& format : availableFormats)
         {
@@ -44,7 +41,7 @@ namespace VRTR
         return availableFormats[0];
     }
 
-    vk::PresentModeKHR SwapChain::choosePresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
+    vk::PresentModeKHR SwapChainManager::choosePresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
     {
         for(const auto& presentMode : availablePresentModes)
         {
@@ -58,7 +55,7 @@ namespace VRTR
         return vk::PresentModeKHR::eFifo; // Fallback to FIFO
     }
 
-    vk::Extent2D SwapChain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window)
+    vk::Extent2D SwapChainManager::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window)
     {
         // If currentExtent is not set to special uint32_t max value,
         // then we need to use it
@@ -76,9 +73,10 @@ namespace VRTR
     }
 
 
-    void SwapChain::createSwapChain(vk::raii::PhysicalDevice physicalDevice, GLFWwindow* window)
+    void SwapChainManager::createSwapChain(GLFWwindow* window)
     {
-        surfaceCapabilities = generateSurfaceCapabilities(physicalDevice, surface, window);
+        VRTR_DEBUG("CREATING SWAP CHAIN");
+        surfaceCapabilities = generateSurfaceCapabilities(window);
         vk::SurfaceFormatKHR  surfaceFormat = surfaceCapabilities.surfaceFormat;
         vk::PresentModeKHR presentMode = surfaceCapabilities.presentMode;
         vk::Extent2D extent = surfaceCapabilities.extent;
@@ -94,7 +92,7 @@ namespace VRTR
 
         vk::SwapchainCreateInfoKHR createInfo{
             .flags = vk::SwapchainCreateFlagsKHR{},
-            .surface = surface,
+            .surface = ctx.surface,
             .minImageCount = minImageCount,
             .imageFormat = surfaceFormat.format,
             .imageColorSpace = surfaceFormat.colorSpace,
@@ -124,14 +122,15 @@ namespace VRTR
         //     swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         // }
 
-        swapChain = vk::raii::SwapchainKHR(device, createInfo);
-        swapChainImages = swapChain.getImages();
+        ctx.swapChain = vk::raii::SwapchainKHR(ctx.logicalDevice, createInfo);
+        ctx.swapChainImages = ctx.swapChain.getImages();
     }
 
-    void SwapChain::createImageViews()
+    void SwapChainManager::createImageViews()
     {
-        swapChainImageViews.clear();
-        swapChainImageViews.reserve(swapChainImages.size());
+        VRTR_DEBUG("CREATING IMAGE VIEWS");
+        ctx.swapChainImageViews.clear();
+        ctx.swapChainImageViews.reserve(ctx.swapChainImages.size());
 
         auto format = surfaceCapabilities.surfaceFormat.format;
 
@@ -157,21 +156,21 @@ namespace VRTR
                 .layerCount = 1
             }
         };
-        for (const auto& image : swapChainImages)
+        for (const auto& image : ctx.swapChainImages)
         {
             createInfo.image = image;
             // constructing ImageView from vk::raii::ImageView
-            swapChainImageViews.emplace_back(device, createInfo);
+            ctx.swapChainImageViews.emplace_back(ctx.logicalDevice, createInfo);
         }
     }
 
-    void SwapChain::cleanupSwapChain()
+    void SwapChainManager::cleanupSwapChain()
     {
-        swapChainImageViews.clear();
-        swapChain = nullptr;
+        ctx.swapChainImageViews.clear();
+        ctx.swapChain = nullptr;
     }
 
-    void SwapChain::recreateSwapChain(vk::raii::PhysicalDevice physicalDevice, GLFWwindow* window)
+    void SwapChainManager::recreateSwapChain(GLFWwindow* window)
     {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
@@ -180,11 +179,11 @@ namespace VRTR
             glfwWaitEvents();
         }
 
-        device.waitIdle();
+        ctx.logicalDevice.waitIdle();
 
         cleanupSwapChain();
 
-        createSwapChain(physicalDevice, window);
+        createSwapChain(window);
         createImageViews();
     }
 }

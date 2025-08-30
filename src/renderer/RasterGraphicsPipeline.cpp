@@ -4,18 +4,15 @@
 
 namespace VRTR
 {
-    RasterGraphicsPipeline::RasterGraphicsPipeline()
+    RasterGraphicsPipeline::RasterGraphicsPipeline(Context& ctx) : ctx(ctx)
     {}
 
-    void RasterGraphicsPipeline::createPipeline(vk::raii::Device& device, 
-                                                const SurfaceCapabilities& capabilities,
-                                                vk::raii::PipelineLayout& pipelineLayout,
-                                                vk::raii::Pipeline& pipeline)
+    void RasterGraphicsPipeline::createPipeline(vk::Format& format)
     {
         VRTR_DEBUG("Creating Raster Graphics Pipeline");
         // SHADERS
         std::vector<char> shaderCode = shaderHandler.readFile("shaders/slang.spv");
-        vk::raii::ShaderModule shaderModule = shaderHandler.createShaderModule(device, shaderCode);
+        vk::raii::ShaderModule shaderModule = shaderHandler.createShaderModule(ctx.logicalDevice, shaderCode);
 
         // PIPELINE CREATION
 
@@ -221,14 +218,14 @@ namespace VRTR
 
         // I am using dynamic rendering that is above version 1.3,
         // so I don't need rederPass and framebuffer objects
-        pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
+        ctx.pipelineLayout = vk::raii::PipelineLayout(ctx.logicalDevice, pipelineLayoutInfo);
 
         vk::PipelineRenderingCreateInfo renderingInfo
         {
             .pNext = nullptr,
             .viewMask = 0,
             .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &capabilities.surfaceFormat.format,
+            .pColorAttachmentFormats = &format,
             .depthAttachmentFormat = vk::Format::eUndefined,
             .stencilAttachmentFormat = vk::Format::eUndefined
         };
@@ -248,13 +245,13 @@ namespace VRTR
             .pDepthStencilState = nullptr, // I dont use it now
             .pColorBlendState = &colorBlendInfo,
             .pDynamicState = &dynamicStateInfo,
-            .layout = pipelineLayout,
+            .layout = ctx.pipelineLayout,
             .renderPass = nullptr,
             .subpass = 0,
             .basePipelineHandle = VK_NULL_HANDLE,
             .basePipelineIndex = -1
         };
 
-        pipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
+        ctx.pipeline = vk::raii::Pipeline(ctx.logicalDevice, nullptr, pipelineInfo);
     }
 }

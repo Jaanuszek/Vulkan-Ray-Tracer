@@ -1,7 +1,7 @@
 #include <pch.h>
 
 #include "Logger.hpp"
-#include "Constants.hpp"
+#include "ConstantsAndStructs.hpp"
 #include "RTRenderer.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -26,7 +26,7 @@ int main()
         
         while(!glfwWindowShouldClose(window)) {
             glfwPollEvents();
-            // renderer->drawFrame();
+            renderer->drawFrame(window);
         }
         renderer.reset();   
         glfwDestroyWindow(window);
