@@ -3,12 +3,11 @@
 
 namespace VRTR
 {
-    CommandBuffer::CommandBuffer(vk::raii::CommandPool& commandPool, std::vector<vk::raii::CommandBuffer>& commandBuffers)
-        : commandPool(commandPool), commandBuffers(commandBuffers)
+    CommandBuffer::CommandBuffer(Context& ctx)
+        : ctx(ctx)
     {}
 
-    void CommandBuffer::createCommandPool(vk::raii::Device& device, 
-                                          uint32_t queueFamilyIndex)
+    void CommandBuffer::createCommandPool()
     {
         VRTR_DEBUG("Creating Command Pool");
 
@@ -16,34 +15,39 @@ namespace VRTR
         {
             .pNext = nullptr,
             .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-            .queueFamilyIndex = queueFamilyIndex
+            .queueFamilyIndex = static_cast<uint32_t>(ctx.graphics_queue_index)
         };
 
-        commandPool = vk::raii::CommandPool(device, poolInfo);
+        ctx.commandPool = vk::raii::CommandPool(ctx.logicalDevice, poolInfo);
     }
 
-    void CommandBuffer::createCommandBuffers(vk::raii::Device& device)
+    void CommandBuffer::createCommandBuffers()
     {
         VRTR_DEBUG("Creating Command Buffers");
-        commandBuffers.clear();
+        ctx.commandBuffers.clear();
         vk::CommandBufferAllocateInfo allocInfo
         {
             .pNext = nullptr,
-            .commandPool = commandPool,
+            .commandPool = ctx.commandPool,
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = MAX_FRAMES_IN_FLIGHT
         };
 
         // Allocate the command buffers (see commandBufferCount above)
         // std::move so we can move the lifetime to commandBuffer variable (ownership)
-        commandBuffers = std::move(vk::raii::CommandBuffers(device, allocInfo));
+        ctx.commandBuffers = std::move(vk::raii::CommandBuffers(ctx.logicalDevice, allocInfo));
     }
 
-    void CommandBuffer::transition_image_layout(const std::vector<vk::Image>& images, uint32_t imageIndex,
-                                            vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
-                                            vk::AccessFlags2 srcAccessMask, vk::AccessFlags2 dstAccessMask,
-                                            vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask,
-                                            uint32_t baseMipLevel, uint32_t levelCount)
+    void CommandBuffer::transition_image_layout(const std::vector<vk::Image>& images, 
+                                                uint32_t imageIndex,
+                                                vk::ImageLayout oldLayout, 
+                                                vk::ImageLayout newLayout,
+                                                vk::AccessFlags2 srcAccessMask,
+                                                vk::AccessFlags2 dstAccessMask,
+                                                vk::PipelineStageFlags2 srcStageMask,
+                                                vk::PipelineStageFlags2 dstStageMask,
+                                                uint32_t baseMipLevel,
+                                                uint32_t levelCount)
     {
         vk::ImageMemoryBarrier2 barrier
         {
@@ -78,6 +82,6 @@ namespace VRTR
             .pImageMemoryBarriers = &barrier
         };
 
-        commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
+        ctx.commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
     }
 }
