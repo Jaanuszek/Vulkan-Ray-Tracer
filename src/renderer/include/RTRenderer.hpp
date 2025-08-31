@@ -33,7 +33,11 @@ namespace VRTR
             inline static std::vector<const char*> deviceExtensions // gpu logical device extensions
             {
                 vk::KHRSwapchainExtensionName,
-                vk::KHRSpirv14ExtensionName
+                vk::KHRSpirv14ExtensionName,
+
+                vk::KHRAccelerationStructureExtensionName,
+                vk::KHRRayTracingPipelineExtensionName,
+                vk::KHRDeferredHostOperationsExtensionName
             };
 
             inline static const std::vector<Vertex> vertices = {
@@ -77,6 +81,10 @@ namespace VRTR
 
             void recordCommandBuffer(uint32_t imageIndex);
 
+            // ================== RAY TRACING ==================
+
+            void initRayTracing();
+
         private:
             Context ctx;
             std::unique_ptr<SwapChainManager> swapChainManager;
@@ -85,6 +93,9 @@ namespace VRTR
             std::unique_ptr<SwapChainManager> VRTR_SwapChain;
             std::unique_ptr<RasterGraphicsPipeline> VRTR_RasterGraphicsPipeline;
             std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
+
+            // ================== RAY TRACING ==================
+            vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
     };
 
 

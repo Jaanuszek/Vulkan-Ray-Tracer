@@ -18,6 +18,8 @@ namespace VRTR
 
         initPhysicalDeviceAndSurface(window);
 
+        initRayTracing();
+
         initLogicalDevice();
 
         initSwapChain(window);
@@ -282,7 +284,8 @@ namespace VRTR
         vk::StructureChain<vk::PhysicalDeviceFeatures2,
                             vk::PhysicalDeviceVulkan11Features, 
                             vk::PhysicalDeviceVulkan13Features,
-                            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featuresChain
+                            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+                            vk::PhysicalDeviceRayTracingPipelineFeaturesKHR> featuresChain
         {
             {},
             {.shaderDrawParameters = VK_TRUE},
@@ -290,7 +293,8 @@ namespace VRTR
                 .synchronization2 = VK_TRUE,
                 .dynamicRendering = VK_TRUE
             },
-            {.extendedDynamicState = VK_TRUE}
+            {.extendedDynamicState = VK_TRUE},
+            {.rayTracingPipeline = VK_TRUE}
         };
 
         vk::DeviceQueueCreateInfo queueCreateInfo
@@ -470,6 +474,20 @@ namespace VRTR
         );
 
         ctx.commandBuffers.at(currentFrame).end();
+    }
+
+    void RTRenderer::initRayTracing()
+    {
+        vk::PhysicalDeviceProperties2 properties2
+        {
+            .pNext = &rayTracingPipelineProperties
+        };
+        auto prop = ctx.gpu.getProperties2<vk::PhysicalDeviceProperties2,
+            vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+
+        auto rtProps = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+
+        VRTR_DEBUG("RT vars {}", rtProps.maxRayRecursionDepth);
     }
 
     void RTRenderer::drawFrame(GLFWwindow* window)
