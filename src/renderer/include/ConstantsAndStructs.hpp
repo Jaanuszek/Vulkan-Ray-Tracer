@@ -39,7 +39,9 @@ namespace VRTR
 
         vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
 
-        vk::Buffer vertex_buffer{nullptr};
+        vk::raii::Buffer vertex_buffer{nullptr};
+        
+        vk::raii::DeviceMemory vertex_buffer_memory{nullptr};
 
         // SYNC VARIABLES
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -47,5 +49,11 @@ namespace VRTR
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
 
         std::vector<vk::raii::Fence> drawFences;
+    };
+
+    struct Vertex
+    {
+        glm::vec2 pos;
+        glm::vec3 color;
     };
 }

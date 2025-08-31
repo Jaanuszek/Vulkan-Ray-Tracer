@@ -10,6 +10,42 @@ namespace VRTR
     void RasterGraphicsPipeline::createPipeline(vk::Format& format)
     {
         VRTR_DEBUG("Creating Raster Graphics Pipeline");
+
+        // VBO
+
+        vk::VertexInputBindingDescription bindingDescription
+        {
+            .binding = 0,
+            .stride = sizeof(Vertex),
+            .inputRate = vk::VertexInputRate::eVertex
+        };
+
+        std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions = 
+        {{
+            {
+                .location = 0,
+                .binding = 0,
+                .format = vk::Format::eR32G32B32Sfloat,
+                .offset = offsetof(Vertex, pos)
+            },
+            {
+                .location = 1,
+                .binding = 0,
+                .format = vk::Format::eR32G32B32Sfloat,
+                .offset = offsetof(Vertex, color)
+            }
+        }};
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo =
+        {
+            .pNext = nullptr,
+            .flags = {},
+            .vertexBindingDescriptionCount = 1,
+            .pVertexBindingDescriptions = &bindingDescription,
+            .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+            .pVertexAttributeDescriptions = attributeDescriptions.data()
+        };
+
         // SHADERS
         std::vector<char> shaderCode = shaderHandler.readFile("shaders/slang.spv");
         vk::raii::ShaderModule shaderModule = shaderHandler.createShaderModule(ctx.logicalDevice, shaderCode);
@@ -42,36 +78,6 @@ namespace VRTR
             vertShaderStageInfo,
             fragShaderStageInfo
         };
-
-        // ==== VERTEX INPUT STAGES ====
-        // vk::VertexInputBindingDescription bindingDescription{
-        //     .binding = 0, // used in shaders "layout(binding = X)"
-        //     .stride = sizeof(float) * 3, // Assuming 3 floats per vertex (x, y, z)
-        //     .inputRate = vk::VertexInputRate::eVertex
-        // };
-
-        // // POS
-        // vk::VertexInputAttributeDescription attributeDescription{
-        //     .location = 0, // used in shaders "layout(location = X)"
-        //     .binding = 0, // from witch binding from "VertexInputBindingDescription" take data
-        //     .format = vk::Format::eR32G32B32Sfloat, // Assuming 3 floats (x, y, z)
-        //     .offset = 0
-        // };
-        // // COLOR
-        // // TODO
-
-        // // TEX CORD
-        // // TODO
-
-        // vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
-        //     .pNext = nullptr,
-        //     .flags = {},
-        //     .vertexBindingDescriptionCount = 1,
-        //     .pVertexBindingDescriptions = &bindingDescription,
-        //     .vertexAttributeDescriptionCount = 1,
-        //     .pVertexAttributeDescriptions = &attributeDescription
-        // };
-        vk::PipelineVertexInputStateCreateInfo vertexInputInfo {};
 
         // ==== INPUT ASSEMBLY STAGE ====
         // "contains the configuration for what kind of topology will be drawn. 

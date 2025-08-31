@@ -22,10 +22,12 @@ namespace VRTR
 
         initSwapChain(window);
 
+        initVertexBuffer();
+
         initPipeline();
 
         initCommandBuffer();
-        
+
         createSyncObjects();
     }
 
@@ -320,6 +322,47 @@ namespace VRTR
         surfaceCapabilities = VRTR_SwapChain->getSurfaceCapabilities();
     }
 
+    uint32_t RTRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+    {
+        for (uint32_t i = 0; i < ctx.gpu.getMemoryProperties().memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (ctx.gpu.getMemoryProperties().memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+        throw std::runtime_error("Failed to find suitable memory type");
+    }
+
+    void RTRenderer::initVertexBuffer()
+    {
+        VRTR_DEBUG("Creating Vertex Buffer");
+        vk::BufferCreateInfo bufferInfo = 
+        {
+            .pNext=nullptr,
+            .flags={},
+            .size=sizeof(vertices[0]) * vertices.size(),
+            .usage=vk::BufferUsageFlagBits::eVertexBuffer,
+            .sharingMode=vk::SharingMode::eExclusive
+        };
+
+        ctx.vertex_buffer = vk::raii::Buffer(ctx.logicalDevice, bufferInfo);
+
+        vk::MemoryRequirements memRequirements = ctx.vertex_buffer.getMemoryRequirements();
+
+        uint32_t memoryType = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        vk::MemoryAllocateInfo memoryAllocateInfo = 
+        {
+            .allocationSize=memRequirements.size,
+            .memoryTypeIndex=memoryType
+        };
+
+        ctx.vertex_buffer_memory = vk::raii::DeviceMemory(ctx.logicalDevice, memoryAllocateInfo);
+        ctx.vertex_buffer.bindMemory(*ctx.vertex_buffer_memory, 0);
+
+        void *data = ctx.vertex_buffer_memory.mapMemory(0, bufferInfo.size);
+        memcpy(data, vertices.data(), bufferInfo.size);
+        ctx.vertex_buffer_memory.unmapMemory();
+    }
+
     void RTRenderer::initPipeline()
     {
         VRTR_DEBUG("CREATING PIPELINE");
@@ -399,13 +442,23 @@ namespace VRTR
 
         ctx.commandBuffers.at(currentFrame).beginRendering(renderingInfo);
         ctx.commandBuffers.at(currentFrame).bindPipeline(vk::PipelineBindPoint::eGraphics, ctx.pipeline);
+        ctx.commandBuffers.at(currentFrame).bindVertexBuffers(0, {ctx.vertex_buffer}, {0});
 
         // Setting dynamic states
-        ctx.commandBuffers.at(currentFrame).setViewport(0, vk::Viewport{0.0f, 0.0f,
-            static_cast<float>(surfaceCapabilities.extent.width),
-            static_cast<float>(surfaceCapabilities.extent.height), 0.0f, 1.0f});
+        ctx.commandBuffers.at(currentFrame).setViewport(
+            0, 
+            vk::Viewport
+            {
+                0.0f, 
+                0.0f,
+                static_cast<float>(surfaceCapabilities.extent.width),
+                static_cast<float>(surfaceCapabilities.extent.height), 
+                0.0f, 
+                1.0f
+            }    
+        );
         ctx.commandBuffers.at(currentFrame).setScissor(0, vk::Rect2D{{0, 0}, surfaceCapabilities.extent});
-        ctx.commandBuffers.at(currentFrame).draw(3, 1, 0, 0);
+        ctx.commandBuffers.at(currentFrame).draw(vertices.size(), 1, 0, 0);
 
         ctx.commandBuffers.at(currentFrame).endRendering();
 

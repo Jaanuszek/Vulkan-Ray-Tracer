@@ -36,6 +36,12 @@ namespace VRTR
                 vk::KHRSpirv14ExtensionName
             };
 
+            inline static const std::vector<Vertex> vertices = {
+                {{0.0f, -0.5f}, {1.0f, 0.2f, 0.0f}},
+                {{0.5f, 0.5f}, {0.3f, 1.0f, 0.0f}},
+                {{-0.5f, 0.5f}, {0.0f, 0.8f, 1.0f}}
+            };
+
             std::vector<const char*> getRequiredExtensions();
 
             // Check if selected extensions are supported by the instance
@@ -58,6 +64,10 @@ namespace VRTR
             void initLogicalDevice();
 
             void initSwapChain(GLFWwindow* window);
+
+            uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+
+            void initVertexBuffer();
 
             void initPipeline();
 
