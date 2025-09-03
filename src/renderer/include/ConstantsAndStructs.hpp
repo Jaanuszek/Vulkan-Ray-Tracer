@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include "buffer.hpp"
 
 namespace VRTR
 {
@@ -39,7 +40,8 @@ namespace VRTR
 
         vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
 
-        vk::raii::Buffer vertex_buffer{nullptr};
+        // vk::raii::Buffer vertex_buffer{nullptr};
+        std::unique_ptr<Buffer> vertex_buffer;
         
         vk::raii::DeviceMemory vertex_buffer_memory{nullptr};
 

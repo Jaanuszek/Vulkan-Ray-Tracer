@@ -5,6 +5,7 @@
 #include "RasterGraphicsPipeline.hpp"
 #include "CommandBuffer.hpp"
 #include "ConstantsAndStructs.hpp"
+#include "buffer.hpp"
 
 namespace VRTR
 {
@@ -71,8 +72,6 @@ namespace VRTR
 
             uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
-            void initVertexBuffer();
-
             void initPipeline();
 
             void initCommandBuffer();
@@ -84,6 +83,10 @@ namespace VRTR
             // ================== RAY TRACING ==================
 
             void initRayTracing();
+
+            void createBLAS();
+
+            void createTLAS();
 
         private:
             Context ctx;
