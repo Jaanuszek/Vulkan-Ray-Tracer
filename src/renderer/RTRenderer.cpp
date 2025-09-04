@@ -32,6 +32,8 @@ namespace VRTR
         initCommandBuffer();
 
         createSyncObjects();
+
+        createBLAS();
     }
 
     std::vector<const char*> RTRenderer::getRequiredExtensions()
@@ -286,7 +288,9 @@ namespace VRTR
                             vk::PhysicalDeviceVulkan11Features, 
                             vk::PhysicalDeviceVulkan13Features,
                             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-                            vk::PhysicalDeviceRayTracingPipelineFeaturesKHR> featuresChain
+                            vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
+                            vk::PhysicalDeviceBufferDeviceAddressFeatures
+                            > featuresChain
         {
             {},
             {.shaderDrawParameters = VK_TRUE},
@@ -295,7 +299,8 @@ namespace VRTR
                 .dynamicRendering = VK_TRUE
             },
             {.extendedDynamicState = VK_TRUE},
-            {.rayTracingPipeline = VK_TRUE}
+            {.rayTracingPipeline = VK_TRUE},
+            {.bufferDeviceAddress = VK_TRUE}
         };
 
         vk::DeviceQueueCreateInfo queueCreateInfo
@@ -462,6 +467,48 @@ namespace VRTR
 
     void RTRenderer::createBLAS()
     {
+        struct VertexRT
+        {
+            glm::vec3 pos;
+        };
+
+        std::vector<VertexRT> verticesRT = {
+            {{1.0f, 1.0f, 0.0f}},
+            {{-1.0f, 1.0f, 0.0f}},
+            {{0.0f, -1.0f, 0.0f}}
+        };
+        std::vector<uint32_t> indicesRT = {0, 1, 2};
+
+        size_t vertex_buffer_size = verticesRT.size() * sizeof(VertexRT);
+        size_t index_buffer_size = indicesRT.size() * sizeof(uint32_t);
+
+        const vk::BufferUsageFlags buffer_usage_flags = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        const vk::MemoryPropertyFlags memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+
+        vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, buffer_usage_flags, memory_property_flags);
+        vertex_buffer->Update(verticesRT.data(), vertex_buffer_size);
+
+        index_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, buffer_usage_flags, memory_property_flags);
+        index_buffer->Update(indicesRT.data(), index_buffer_size);
+
+        vk::TransformMatrixKHR transformMatrix{
+            std::array<std::array<float, 4>, 3>{
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 1.0f, 0.0f
+            }
+        };
+        std::unique_ptr<Buffer> transform_matrix_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vk::TransformMatrixKHR), vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        transform_matrix_buffer->Update(&transformMatrix, sizeof(vk::TransformMatrixKHR));
+
+        vk::DeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
+        vk::DeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
+        vk::DeviceOrHostAddressConstKHR transformMatrixDeviceAddress{};
+
+        vertexBufferDeviceAddress.deviceAddress = vertex_buffer->getDeviceAddress();
+        indexBufferDeviceAddress.deviceAddress = index_buffer->getDeviceAddress();
+        transformMatrixDeviceAddress.deviceAddress = transform_matrix_buffer->getDeviceAddress();
+
     }
 
     void RTRenderer::createTLAS()

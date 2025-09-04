@@ -99,6 +99,10 @@ namespace VRTR
 
             // ================== RAY TRACING ==================
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
+
+            std::unique_ptr<Buffer> vertex_buffer;
+            std::unique_ptr<Buffer> index_buffer;
+            std::unique_ptr<Buffer> transform_matrix_buffer;
     };
 
 

@@ -24,8 +24,15 @@ namespace VRTR
         vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
         uint32_t memoryType = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
 
+        // I will just hardcode it. I think I will always want to get device address
+        vk::MemoryAllocateFlagsInfo allocateFlagsInfo{
+            .pNext = nullptr,
+            .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
+            .deviceMask = 0
+        };
         vk::MemoryAllocateInfo memoryAllocateInfo = 
         {
+            .pNext=&allocateFlagsInfo,
             .allocationSize=memRequirements.size,
             .memoryTypeIndex=memoryType
         };
@@ -44,6 +51,13 @@ namespace VRTR
         void* mappedData = bufferMemory.mapMemory(offset, size);
         memcpy(mappedData, data, static_cast<size_t>(size));
         bufferMemory.unmapMemory();
+    }
+
+    vk::DeviceAddress Buffer::getDeviceAddress()
+    {
+        vk::BufferDeviceAddressInfo addrInfo{};
+        addrInfo.setBuffer(buffer);
+        return logDevice.getBufferAddress(addrInfo);
     }
 
     uint32_t Buffer::findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties)
