@@ -84,6 +84,8 @@ namespace VRTR
 
             void initRayTracing();
 
+            ScratchBuffer createScratchBuffer(vk::DeviceSize size);
+
             void createBLAS();
 
             void createTLAS();
@@ -102,7 +104,10 @@ namespace VRTR
 
             std::unique_ptr<Buffer> vertex_buffer;
             std::unique_ptr<Buffer> index_buffer;
-            std::unique_ptr<Buffer> transform_matrix_buffer;
+            // std::unique_ptr<Buffer> transform_matrix_buffer;
+            // std::unique_ptr<Buffer> blas_buffer;
+            AccelerationStructure blas_structure;
+            AccelerationStructure tlas_structure;
     };
 
 

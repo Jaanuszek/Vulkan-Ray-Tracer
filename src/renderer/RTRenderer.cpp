@@ -289,7 +289,8 @@ namespace VRTR
                             vk::PhysicalDeviceVulkan13Features,
                             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
                             vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
-                            vk::PhysicalDeviceBufferDeviceAddressFeatures
+                            vk::PhysicalDeviceBufferDeviceAddressFeatures,
+                            vk::PhysicalDeviceAccelerationStructureFeaturesKHR
                             > featuresChain
         {
             {},
@@ -300,7 +301,8 @@ namespace VRTR
             },
             {.extendedDynamicState = VK_TRUE},
             {.rayTracingPipeline = VK_TRUE},
-            {.bufferDeviceAddress = VK_TRUE}
+            {.bufferDeviceAddress = VK_TRUE},
+            {.accelerationStructure = VK_TRUE}
         };
 
         vk::DeviceQueueCreateInfo queueCreateInfo
@@ -465,6 +467,46 @@ namespace VRTR
         VRTR_DEBUG("RT vars {}", rtProps.maxRayRecursionDepth);
     }
 
+    ScratchBuffer RTRenderer::createScratchBuffer(vk::DeviceSize size)
+    {
+        ScratchBuffer scratchBuffer{};
+        
+        vk::BufferCreateInfo bufferCreateInfo
+        {
+            .size = size,
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
+        };
+        scratchBuffer.buffer = vk::raii::Buffer(ctx.logicalDevice, bufferCreateInfo);
+
+        vk::MemoryRequirements memRequirements = scratchBuffer.buffer.getMemoryRequirements();
+
+        vk::MemoryAllocateFlagsInfo allocateFlagsInfo
+        {
+            .pNext = nullptr,
+            .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
+        };
+
+        uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+        vk::MemoryAllocateInfo allocInfo
+        {
+            .pNext = &allocateFlagsInfo,
+            .allocationSize = memRequirements.size,
+            .memoryTypeIndex = memoryType
+        };
+        scratchBuffer.memory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
+        scratchBuffer.buffer.bindMemory(*scratchBuffer.memory, 0);
+
+        vk::BufferDeviceAddressInfo bufferDeviceAddressInfo
+        {
+            .buffer = scratchBuffer.buffer
+        };
+
+        scratchBuffer.device_address = ctx.logicalDevice.getBufferAddress(bufferDeviceAddressInfo);
+
+        return scratchBuffer;
+    }
+
     void RTRenderer::createBLAS()
     {
         struct VertexRT
@@ -509,6 +551,127 @@ namespace VRTR
         indexBufferDeviceAddress.deviceAddress = index_buffer->getDeviceAddress();
         transformMatrixDeviceAddress.deviceAddress = transform_matrix_buffer->getDeviceAddress();
 
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangles
+        {
+            .pNext = nullptr,
+            .vertexFormat = vk::Format::eR32G32B32Sfloat,
+            .vertexData = vertexBufferDeviceAddress,
+            .vertexStride = sizeof(VertexRT),
+            .maxVertex = static_cast<uint32_t>(verticesRT.size()),
+            .indexType = vk::IndexType::eUint32,
+            .indexData = indexBufferDeviceAddress,
+            .transformData = transformMatrixDeviceAddress
+        };
+
+        vk::AccelerationStructureGeometryKHR asGeometry
+        {
+            .pNext = nullptr,
+            .geometryType = vk::GeometryTypeKHR::eTriangles,
+            .geometry = triangles,
+            .flags = vk::GeometryFlagBitsKHR::eOpaque
+        };
+
+        vk::AccelerationStructureBuildRangeInfoKHR offsetInfo
+        {
+            .primitiveCount = 1,
+            .primitiveOffset = 0,
+            .firstVertex = 0,
+            .transformOffset = 0
+        };
+
+        // inicjacja struktury acceleration structure.
+
+        vk::AccelerationStructureBuildGeometryInfoKHR buildInfoStructure
+        {
+            .pNext = nullptr,
+            .type = vk::AccelerationStructureTypeKHR::eBottomLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+            .geometryCount = 1,
+            .pGeometries = &asGeometry,
+            .ppGeometries = nullptr,
+        };
+
+        vk::AccelerationStructureBuildSizesInfoKHR sizeInfo =
+            ctx.logicalDevice.getAccelerationStructureBuildSizesKHR(
+                vk::AccelerationStructureBuildTypeKHR::eDevice,
+                buildInfoStructure,
+                {offsetInfo.primitiveCount}
+            ); 
+        
+        blas_structure.buffer = std::make_unique<Buffer>(
+            ctx.logicalDevice, ctx.gpu, sizeInfo.accelerationStructureSize,
+            vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            vk::MemoryPropertyFlagBits::eDeviceLocal
+        );
+
+        vk::AccelerationStructureCreateInfoKHR asCreateInfo = 
+        {
+            .pNext = nullptr,
+            .createFlags = {},
+            .buffer = blas_structure.buffer->getBuffer(),
+            .offset = 0,
+            .size = sizeInfo.accelerationStructureSize,
+            .type = vk::AccelerationStructureTypeKHR::eBottomLevel,
+            .deviceAddress = 0
+        };
+        blas_structure.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, asCreateInfo);
+
+        ScratchBuffer scratchBuffer = createScratchBuffer(sizeInfo.buildScratchSize);
+
+        // Inicjacja juz docelowej struktury BLAS
+
+        vk::AccelerationStructureBuildGeometryInfoKHR buildInfo
+        {
+            .pNext = nullptr,
+            .type = vk::AccelerationStructureTypeKHR::eBottomLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+            .mode = vk::BuildAccelerationStructureModeKHR::eBuild,
+            .srcAccelerationStructure = nullptr,
+            .dstAccelerationStructure = *blas_structure.handle,
+            .geometryCount = 1,
+            .pGeometries = &asGeometry,
+            .ppGeometries = nullptr,
+            .scratchData = scratchBuffer.device_address
+        };
+
+        std::array<vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeInfos = {&offsetInfo};
+
+        // temp commandbuffer
+        // JAK COS BEDZIE NIE TAK TO TUTAJ SPRAWDZIC!!!
+        vk::CommandBufferAllocateInfo allocInfo
+        {
+            .commandPool = ctx.commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+
+        vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(allocInfo).front());
+        tmpCommandBuffer.begin({});
+        tmpCommandBuffer.buildAccelerationStructuresKHR(
+            {buildInfo},
+            buildRangeInfos
+        );
+        tmpCommandBuffer.end();
+        vk::SubmitInfo submitInfo
+        {
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*tmpCommandBuffer,
+        };
+
+        vk::raii::Fence fence = ctx.logicalDevice.createFence({});
+        ctx.queue.submit({submitInfo}, fence);
+        auto result = ctx.logicalDevice.waitForFences(*fence, VK_TRUE, UINT64_MAX);
+        if(result != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Failed to wait for fence after BLAS build!");
+        }
+
+        vk::AccelerationStructureDeviceAddressInfoKHR accelerationStructureDeviceAddressInfo
+        {
+            .pNext = nullptr,
+            .accelerationStructure = *blas_structure.handle
+        };
+        blas_structure.device_address = ctx.logicalDevice.getAccelerationStructureAddressKHR(accelerationStructureDeviceAddressInfo);
     }
 
     void RTRenderer::createTLAS()

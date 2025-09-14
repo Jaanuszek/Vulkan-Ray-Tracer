@@ -18,9 +18,8 @@ namespace VRTR
 
             vk::DeviceAddress getDeviceAddress();
             inline vk::raii::Buffer& getBuffer() { return buffer; }
-        private:
 
-            uint32_t findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+            static uint32_t findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
         private:
             vk::raii::Device& logDevice;

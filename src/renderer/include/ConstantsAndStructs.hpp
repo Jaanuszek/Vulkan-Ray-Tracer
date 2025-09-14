@@ -58,4 +58,18 @@ namespace VRTR
         glm::vec2 pos;
         glm::vec3 color;
     };
+
+    struct ScratchBuffer
+    {
+        vk::raii::Buffer buffer{nullptr};
+        vk::raii::DeviceMemory memory{nullptr};
+        uint64_t device_address;
+    };
+
+    struct AccelerationStructure
+    {
+        std::unique_ptr<Buffer> buffer;
+        vk::raii::AccelerationStructureKHR handle{nullptr};
+        uint64_t device_address;
+    };
 }
