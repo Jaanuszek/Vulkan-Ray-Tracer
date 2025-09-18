@@ -33,7 +33,7 @@ namespace VRTR
 
         createSyncObjects();
 
-        createBLAS();
+        createScene();
     }
 
     std::vector<const char*> RTRenderer::getRequiredExtensions()
@@ -676,7 +676,182 @@ namespace VRTR
 
     void RTRenderer::createTLAS()
     {
+        vk::TransformMatrixKHR transformMatrix{
+            std::array<std::array<float, 4>, 3>{
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 1.0f, 0.0f
+            }
+        };
 
+        vk::AccelerationStructureInstanceKHR ac_instance
+        {
+            .transform = transformMatrix,
+            .instanceCustomIndex = 0,
+            .mask = 0xFF,
+            .instanceShaderBindingTableRecordOffset = 0,
+            .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+            .accelerationStructureReference = blas_structure.device_address
+        };
+
+        std::unique_ptr<Buffer> instance_buffer = std::make_unique<Buffer>(ctx.logicalDevice, 
+                                ctx.gpu, 
+                                sizeof(vk::AccelerationStructureInstanceKHR), 
+                                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress, 
+                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        
+        instance_buffer->Update(&ac_instance, sizeof(vk::AccelerationStructureInstanceKHR));
+
+        vk::DeviceOrHostAddressConstKHR instanceDataDeviceAddress{};
+        instanceDataDeviceAddress.deviceAddress = instance_buffer->getDeviceAddress();
+
+        vk::AccelerationStructureGeometryKHR ASGeometry
+        {
+            .pNext = nullptr,
+            .geometryType = vk::GeometryTypeKHR::eInstances,
+            .geometry = vk::AccelerationStructureGeometryInstancesDataKHR{
+                .pNext = nullptr,
+                .arrayOfPointers = VK_FALSE,
+                .data = instanceDataDeviceAddress
+            },
+            .flags = vk::GeometryFlagBitsKHR::eOpaque
+        };
+
+        vk::AccelerationStructureBuildGeometryInfoKHR ASBuildGeometryInfo
+        {
+            .pNext = nullptr,
+            .type = vk::AccelerationStructureTypeKHR::eTopLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+            .geometryCount = 1,
+            .pGeometries = &ASGeometry,
+            .ppGeometries = nullptr
+        };
+
+        const uint32_t primitive_count = 1;
+
+        vk::AccelerationStructureBuildSizesInfoKHR ASBuildSizeInfo =
+            ctx.logicalDevice.getAccelerationStructureBuildSizesKHR(
+                vk::AccelerationStructureBuildTypeKHR::eDevice,
+                ASBuildGeometryInfo,
+                {primitive_count}
+            );
+
+        tlas_structure.buffer = std::make_unique<Buffer>(
+            ctx.logicalDevice, ctx.gpu,
+            ASBuildSizeInfo.accelerationStructureSize,
+            vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            vk::MemoryPropertyFlagBits::eDeviceLocal
+        );
+
+        vk::AccelerationStructureCreateInfoKHR ASCreateInfo
+        {
+            .pNext = nullptr,
+            .createFlags = {},
+            .buffer = tlas_structure.buffer->getBuffer(),
+            .offset = 0,
+            .size = ASBuildSizeInfo.accelerationStructureSize,
+            .type = vk::AccelerationStructureTypeKHR::eTopLevel,
+            .deviceAddress = 0
+        };
+
+        tlas_structure.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, ASCreateInfo);
+
+        ScratchBuffer scratchBuffer = createScratchBuffer(ASBuildSizeInfo.buildScratchSize);
+
+        vk::AccelerationStructureBuildGeometryInfoKHR destBuildInfo
+        {
+            .pNext = nullptr,
+            .type = vk::AccelerationStructureTypeKHR::eTopLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+            .mode = vk::BuildAccelerationStructureModeKHR::eBuild,
+            .srcAccelerationStructure = nullptr,
+            .dstAccelerationStructure = tlas_structure.handle,
+            .geometryCount = 1,
+            .pGeometries = &ASGeometry,
+            .scratchData = scratchBuffer.device_address
+        };
+
+        vk::AccelerationStructureBuildRangeInfoKHR offsetInfo
+        {
+            .primitiveCount = primitive_count,
+            .primitiveOffset = 0,
+            .firstVertex = 0,
+            .transformOffset = 0
+        };
+
+        std::array<vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeInfos = {&offsetInfo};
+
+        vk::CommandBufferAllocateInfo allocInfo
+        {
+            .commandPool = ctx.commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+
+        vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(allocInfo).front());
+        tmpCommandBuffer.begin({});
+        tmpCommandBuffer.buildAccelerationStructuresKHR(
+            {destBuildInfo},
+            buildRangeInfos
+        );
+        tmpCommandBuffer.end();
+        vk::SubmitInfo submitInfo
+        {
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*tmpCommandBuffer,
+        };
+
+        vk::raii::Fence fence = ctx.logicalDevice.createFence({});
+        ctx.queue.submit({submitInfo}, fence);
+        auto result = ctx.logicalDevice.waitForFences(*fence, VK_TRUE, UINT64_MAX);
+        if(result != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Failed to wait for fence after BLAS build!");
+        }
+
+        vk::AccelerationStructureDeviceAddressInfoKHR accelerationStructureDeviceAddressInfo
+        {
+            .pNext = nullptr,
+            .accelerationStructure = tlas_structure.handle
+        };
+        tlas_structure.device_address = ctx.logicalDevice.getAccelerationStructureAddressKHR(accelerationStructureDeviceAddressInfo);
+    }
+
+    void RTRenderer::createScene()
+    {
+        createBLAS();
+        createTLAS();
+    }
+
+    void RTRenderer::createDescriptorSets()
+    {
+
+    }
+
+    void RTRenderer::createShaderBindingTable()
+    {
+        const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
+        const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
+        const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
+        const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size());
+        const uint32_t sbt_size = group_count * handle_size_aligned;
+        const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
+                                                            vk::BufferUsageFlagBits::eTransferSrc | 
+                                                            vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
+                                                                  vk::MemoryPropertyFlagBits::eHostCoherent;
+                                                                  
+        raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        
+        std::vector<uint8_t> shader_handle_storage(sbt_size);
+        shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
+
+
+        // TODO COME BACK HERE LATER
+
+        // uint8_t *data = static_cast<uint8_t*>(raygen_shader_binding_table->map());
     }
 
     void RTRenderer::drawFrame(GLFWwindow* window)
