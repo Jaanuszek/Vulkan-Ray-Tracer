@@ -72,4 +72,13 @@ namespace VRTR
         vk::raii::AccelerationStructureKHR handle{nullptr};
         uint64_t device_address;
     };
+
+    struct StorageImage
+    {
+        uint32_t width;
+        uint32_t height;
+        vk::raii::Image image{nullptr};
+        vk::raii::ImageView imageView{nullptr};
+        vk::raii::DeviceMemory memory{nullptr};
+    };
 }

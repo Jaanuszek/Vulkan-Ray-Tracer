@@ -92,11 +92,14 @@ namespace VRTR
 
             void createScene();
 
-            void createDescruotirSets();
+            void createStorageImage();
+
+            void createDescriptorSets();
 
             void createShaderBindingTable();
 
         private:
+            int width, height;
             Context ctx;
             std::unique_ptr<SwapChainManager> swapChainManager;
             SurfaceCapabilities surfaceCapabilities;
@@ -115,6 +118,11 @@ namespace VRTR
             AccelerationStructure blas_structure;
             AccelerationStructure tlas_structure;
 
+            StorageImage storageImage;
+            // DESCRIPTOR SETS
+            vk::raii::DescriptorPool descriptorPool{nullptr};
+            vk::raii::DescriptorSet descriptorSet{nullptr};
+            vk::raii::DescriptorSetLayout descriptorSetLayout{nullptr};
 
             std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
             // Shader Binding Table

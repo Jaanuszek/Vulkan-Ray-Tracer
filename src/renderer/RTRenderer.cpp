@@ -12,6 +12,8 @@ namespace VRTR
     {
         VRTR_DEBUG("RTRENDERER INIT");
 
+        glfwGetFramebufferSize(window, &width, &height);
+
         initInstance();
 
         initValidationLayers();
@@ -823,9 +825,122 @@ namespace VRTR
         createTLAS();
     }
 
+    void RTRenderer::createStorageImage()
+    {
+        storageImage.width = static_cast<uint32_t>(width);
+        storageImage.height = static_cast<uint32_t>(height);
+
+        vk::ImageCreateInfo imgCreateInfo
+        {
+            .imageType = vk::ImageType::e2D,
+            .format = vk::Format::eB8G8R8A8Unorm,
+            .extent = vk::Extent3D{storageImage.width, storageImage.height, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = vk::SampleCountFlagBits::e1,
+            .tiling = vk::ImageTiling::eOptimal,
+            .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc,
+            .sharingMode = vk::SharingMode::eExclusive,
+            .initialLayout = vk::ImageLayout::eUndefined
+        };
+        storageImage.image = vk::raii::Image(ctx.logicalDevice, imgCreateInfo);
+
+        vk::MemoryRequirements memRequirements = storageImage.image.getMemoryRequirements();
+        vk::MemoryAllocateInfo allocInfo
+        {
+            .allocationSize = memRequirements.size,
+            .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)
+        };
+        storageImage.memory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
+        storageImage.image.bindMemory(*storageImage.memory, 0);
+
+        vk::ImageViewCreateInfo viewCreateInfo
+        {
+            .image = *storageImage.image,
+            .viewType = vk::ImageViewType::e2D,
+            .format = vk::Format::eB8G8R8A8Unorm,
+            .components = {
+                vk::ComponentSwizzle::eIdentity, // it has to be identity inside storageImage
+                vk::ComponentSwizzle::eIdentity,
+                vk::ComponentSwizzle::eIdentity,
+                vk::ComponentSwizzle::eIdentity
+            },
+            .subresourceRange = {
+                vk::ImageAspectFlagBits::eColor,
+                0, 1, 0, 1
+            }
+        };
+        storageImage.imageView = vk::raii::ImageView(ctx.logicalDevice, viewCreateInfo);
+
+        // TODO OGARNAC TE TYMCZASOWE COMMAND BUFFERY
+        vk::CommandBufferAllocateInfo cmdBufferAllocInfo
+        {
+            .commandPool = ctx.commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+
+        vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
+
+    }
+
     void RTRenderer::createDescriptorSets()
     {
+        uint32_t maxSets = 1; // one for now, but later we will need more
+        std::vector<vk::DescriptorPoolSize> poolSizes=
+        {
+            {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
+            {vk::DescriptorType::eStorageImage, maxSets}, // umozliwienie zapisywania wyniku shaderow do storage image
+            {vk::DescriptorType::eUniformBuffer, maxSets} // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
+        };
 
+        // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
+        vk::DescriptorPoolCreateInfo poolInfo
+        {
+            .flags = {},
+            .maxSets = maxSets,
+            .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+            .pPoolSizes = poolSizes.data()
+        };
+        descriptorPool = vk::raii::DescriptorPool(ctx.logicalDevice, poolInfo);
+
+        // Descriptor set - opis zasobów używanych przez shadery, 
+        // czyli layouty, bindingi ktore potem sie wykorzystujew shaderach
+        vk::DescriptorSetAllocateInfo allocInfo
+        {
+            .descriptorPool = descriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &*descriptorSetLayout
+        };
+
+        // A little workaround here, because Its not possible to create a single descriptor set in hpp vulkan
+        // So I create descriptorSets (NOTE S on the end) and then move the first one to descriptorSet
+        // https://github.com/KhronosGroup/Vulkan-Hpp/blob/938a2c36d2d3886a293c63c9a26417d6b0e2bc2d/vk_raii_ProgrammingGuide.md#09-create-a-vkraiidescriptorpool-and-vkraiidescriptorsets
+
+        vk::raii::DescriptorSets tempDescriptorSets = vk::raii::DescriptorSets(ctx.logicalDevice, allocInfo);
+        descriptorSet = std::move(tempDescriptorSets.front());
+
+        vk::WriteDescriptorSetAccelerationStructureKHR descriptorASInfo
+        {
+            .pNext = nullptr,
+            .accelerationStructureCount = 1,
+            .pAccelerationStructures = &*tlas_structure.handle
+        };
+
+        vk::WriteDescriptorSet ASWrite
+        {
+            .pNext = &descriptorASInfo,
+            .dstSet = *descriptorSet,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+        };
+
+        vk::DescriptorImageInfo imageInfo
+        {
+
+        }
     }
 
     void RTRenderer::createShaderBindingTable()
