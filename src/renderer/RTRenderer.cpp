@@ -35,6 +35,8 @@ namespace VRTR
 
         createSyncObjects();
 
+        createStorageImage();
+
         createScene();
     }
 
@@ -879,9 +881,47 @@ namespace VRTR
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1
         };
-
         vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
+        tmpCommandBuffer.begin({});
 
+        // Transition image to GENERAL layout
+
+        // VRTR_CommandBuffer->transition_image_layout
+        // (
+        //     {storageImage.image}, 
+        //     vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+        //     vk::AccessFlagBits2::eNone, vk::AccessFlagBits2::eShaderWrite,
+        //     vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eRayTracingShaderKHR,
+        //     tmpCommandBuffer
+        // );
+        VRTR_CommandBuffer->transition_image_layout
+        (
+            tmpCommandBuffer,
+            storageImage.image, 
+            vk::ImageLayout::eUndefined, 
+            vk::ImageLayout::eGeneral, // it's basicaly storage image flag - we can do everything with it copy/write/read
+            vk::AccessFlagBits2::eNone, 
+            vk::AccessFlagBits2::eShaderWrite, // ?????????
+            vk::PipelineStageFlagBits2::eAllCommands, // CHANGE IT LATER. It's very slow since GPU has to wait for all previous commands to finish 
+            vk::PipelineStageFlagBits2::eAllCommands // CHANGE IT LATER
+        );
+
+        // flush commandbuffer:
+        tmpCommandBuffer.end();
+        vk::SubmitInfo submitInfo
+        {
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*tmpCommandBuffer,
+        };
+
+        vk::raii::Fence tmpFence = ctx.logicalDevice.createFence({});
+        ctx.queue.submit({submitInfo}, tmpFence);
+        auto result = ctx.logicalDevice.waitForFences(*tmpFence, VK_TRUE, UINT64_MAX);
+        if(result != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Failed to wait for fence after storage image layout transition!");
+            abort();
+        }
     }
 
     void RTRenderer::createDescriptorSets()
@@ -940,28 +980,28 @@ namespace VRTR
         vk::DescriptorImageInfo imageInfo
         {
 
-        }
+        };
     }
 
     void RTRenderer::createShaderBindingTable()
     {
-        const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
-        const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
-        const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
-        const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size());
-        const uint32_t sbt_size = group_count * handle_size_aligned;
-        const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
-                                                            vk::BufferUsageFlagBits::eTransferSrc | 
-                                                            vk::BufferUsageFlagBits::eShaderDeviceAddress;
-        const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
-                                                                  vk::MemoryPropertyFlagBits::eHostCoherent;
+        // const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
+        // const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
+        // const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
+        // const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size());
+        // const uint32_t sbt_size = group_count * handle_size_aligned;
+        // const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
+        //                                                     vk::BufferUsageFlagBits::eTransferSrc | 
+        //                                                     vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        // const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
+        //                                                           vk::MemoryPropertyFlagBits::eHostCoherent;
                                                                   
-        raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
-        miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
-        hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        // raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        // miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        // hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
         
-        std::vector<uint8_t> shader_handle_storage(sbt_size);
-        shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
+        // std::vector<uint8_t> shader_handle_storage(sbt_size);
+        // shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
 
 
         // TODO COME BACK HERE LATER
