@@ -14,6 +14,12 @@ namespace VRTR
 
         glfwGetFramebufferSize(window, &width, &height);
 
+        //  TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
+        camera = std::make_unique<Camera>();
+        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
+        camera->setTranslation(glm::vec3(0.0f, 0.0f, -2.0f));
+        camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+
         initInstance();
 
         initValidationLayers();
@@ -23,6 +29,11 @@ namespace VRTR
         initRayTracing();
 
         initLogicalDevice();
+
+        // TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
+        uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData), 
+                                            vk::BufferUsageFlagBits::eUniformBuffer, 
+                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
         initSwapChain(window);
 
@@ -791,27 +802,14 @@ namespace VRTR
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1
         };
+        vk::raii::CommandBuffer tmpCommandBuffer = CommandBuffer::createTempCommandBuffer(ctx, vk::CommandBufferLevel::ePrimary, true);
 
-        vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(allocInfo).front());
-        tmpCommandBuffer.begin({});
         tmpCommandBuffer.buildAccelerationStructuresKHR(
             {destBuildInfo},
             buildRangeInfos
         );
-        tmpCommandBuffer.end();
-        vk::SubmitInfo submitInfo
-        {
-            .commandBufferCount = 1,
-            .pCommandBuffers = &*tmpCommandBuffer,
-        };
 
-        vk::raii::Fence fence = ctx.logicalDevice.createFence({});
-        ctx.queue.submit({submitInfo}, fence);
-        auto result = ctx.logicalDevice.waitForFences(*fence, VK_TRUE, UINT64_MAX);
-        if(result != vk::Result::eSuccess)
-        {
-            VRTR_CRITICAL("Failed to wait for fence after BLAS build!");
-        }
+        CommandBuffer::flushTempCommandBuffer(ctx, tmpCommandBuffer);
 
         vk::AccelerationStructureDeviceAddressInfoKHR accelerationStructureDeviceAddressInfo
         {
@@ -881,22 +879,12 @@ namespace VRTR
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1
         };
-        vk::raii::CommandBuffer tmpCommandBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
-        tmpCommandBuffer.begin({});
 
-        // Transition image to GENERAL layout
+        vk::raii::CommandBuffer tmpCmdBuffer = CommandBuffer::createTempCommandBuffer(ctx, vk::CommandBufferLevel::ePrimary, true);
 
-        // VRTR_CommandBuffer->transition_image_layout
-        // (
-        //     {storageImage.image}, 
-        //     vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
-        //     vk::AccessFlagBits2::eNone, vk::AccessFlagBits2::eShaderWrite,
-        //     vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eRayTracingShaderKHR,
-        //     tmpCommandBuffer
-        // );
         VRTR_CommandBuffer->transition_image_layout
         (
-            tmpCommandBuffer,
+            tmpCmdBuffer,
             storageImage.image, 
             vk::ImageLayout::eUndefined, 
             vk::ImageLayout::eGeneral, // it's basicaly storage image flag - we can do everything with it copy/write/read
@@ -906,22 +894,7 @@ namespace VRTR
             vk::PipelineStageFlagBits2::eAllCommands // CHANGE IT LATER
         );
 
-        // flush commandbuffer:
-        tmpCommandBuffer.end();
-        vk::SubmitInfo submitInfo
-        {
-            .commandBufferCount = 1,
-            .pCommandBuffers = &*tmpCommandBuffer,
-        };
-
-        vk::raii::Fence tmpFence = ctx.logicalDevice.createFence({});
-        ctx.queue.submit({submitInfo}, tmpFence);
-        auto result = ctx.logicalDevice.waitForFences(*tmpFence, VK_TRUE, UINT64_MAX);
-        if(result != vk::Result::eSuccess)
-        {
-            VRTR_CRITICAL("Failed to wait for fence after storage image layout transition!");
-            abort();
-        }
+        VRTR::CommandBuffer::flushTempCommandBuffer(ctx, tmpCmdBuffer);
     }
 
     void RTRenderer::createDescriptorSets()
@@ -979,8 +952,46 @@ namespace VRTR
 
         vk::DescriptorImageInfo imageInfo
         {
-
+            .sampler = {},
+            .imageView = *storageImage.imageView,
+            .imageLayout = vk::ImageLayout::eGeneral
         };
+
+        vk::DescriptorBufferInfo bufferInfo
+        {
+            .buffer = uniform_buffer->getBuffer(),
+            .offset = 0,
+            .range = vk::WholeSize
+        };
+
+        vk::WriteDescriptorSet resultImageWrite
+        {
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 1,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .pImageInfo = &imageInfo
+        };
+
+        vk::WriteDescriptorSet uniformBufferWrite
+        {
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 2,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .pBufferInfo = &bufferInfo
+        };
+
+        std::array<vk::WriteDescriptorSet, 3> WriteDescriptorSets = {
+            ASWrite,
+            resultImageWrite,
+            uniformBufferWrite
+        };
+        ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
     void RTRenderer::createShaderBindingTable()

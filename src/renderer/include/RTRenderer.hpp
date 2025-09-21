@@ -6,6 +6,7 @@
 #include "CommandBuffer.hpp"
 #include "ConstantsAndStructs.hpp"
 #include "buffer.hpp"
+#include "Camera.hpp"
 
 namespace VRTR
 {
@@ -108,11 +109,15 @@ namespace VRTR
             std::unique_ptr<RasterGraphicsPipeline> VRTR_RasterGraphicsPipeline;
             std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
 
+            std::unique_ptr<Camera> camera;
+
             // ================== RAY TRACING ==================
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
 
             std::unique_ptr<Buffer> vertex_buffer;
             std::unique_ptr<Buffer> index_buffer;
+            std::unique_ptr<Buffer> uniform_buffer;
+            UniformData uniform_data{};
             // std::unique_ptr<Buffer> transform_matrix_buffer;
             // std::unique_ptr<Buffer> blas_buffer;
             AccelerationStructure blas_structure;

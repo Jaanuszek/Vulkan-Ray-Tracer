@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} SHARED
     Shader.cpp
     CommandBuffer.cpp
     buffer.cpp
+    Camera.cpp
 )
 
 include(GenerateExportHeader)

@@ -131,4 +131,52 @@ namespace VRTR
 
         commandBuffer.pipelineBarrier2(dependencyInfo);
     }
+
+    vk::raii::CommandBuffer CommandBuffer::createTempCommandBuffer(Context& ctx, vk::CommandBufferLevel level, bool begin)
+    {
+        vk::CommandBufferAllocateInfo cmdBufferAllocInfo
+        {
+            .commandPool = ctx.commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+        vk::raii::CommandBuffer cmdBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
+
+        if(begin)
+        {
+            cmdBuffer.begin({});
+        }
+
+        return cmdBuffer;
+    }
+
+    void CommandBuffer::flushTempCommandBuffer(Context& ctx, 
+                                vk::raii::CommandBuffer& commandBuffer, 
+                                vk::raii::Queue* queue)
+    {
+        commandBuffer.end();
+        vk::SubmitInfo submitInfo
+        {
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*commandBuffer,
+        };
+
+        vk::raii::Fence tmpFence = ctx.logicalDevice.createFence({});
+
+        if(queue)
+        {
+            queue->submit({submitInfo}, tmpFence);
+        }
+        else
+        {
+            ctx.queue.submit({submitInfo}, tmpFence);
+        }
+
+        auto result = ctx.logicalDevice.waitForFences(*tmpFence, VK_TRUE, UINT64_MAX);
+        if(result != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Failed to wait for fence after storage image layout transition!");
+            abort();
+        }
+    }
 }

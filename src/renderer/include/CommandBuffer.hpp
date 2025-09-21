@@ -48,6 +48,11 @@ namespace VRTR
                                             uint32_t baseMipLevel = 0,
                                             uint32_t levelCount = 1);
 
+            static vk::raii::CommandBuffer createTempCommandBuffer(Context& ctx, vk::CommandBufferLevel level, bool begin = true);
+
+            static void flushTempCommandBuffer(Context& ctx, 
+                                               vk::raii::CommandBuffer& commandBuffer,
+                                               vk::raii::Queue* queue = nullptr);
 
         private:
             Context& ctx;

@@ -59,6 +59,12 @@ namespace VRTR
         glm::vec3 color;
     };
 
+    struct UniformData
+    {
+        glm::mat4 view_inverse;
+        glm::mat4 proj_inverse;
+    };
+
     struct ScratchBuffer
     {
         vk::raii::Buffer buffer{nullptr};
