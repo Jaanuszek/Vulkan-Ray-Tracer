@@ -97,6 +97,8 @@ namespace VRTR
 
             void createDescriptorSets();
 
+            void createRayTracingPipeline();
+
             void createShaderBindingTable();
 
         private:
@@ -113,13 +115,12 @@ namespace VRTR
 
             // ================== RAY TRACING ==================
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
+            vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
 
             std::unique_ptr<Buffer> vertex_buffer;
             std::unique_ptr<Buffer> index_buffer;
             std::unique_ptr<Buffer> uniform_buffer;
             UniformData uniform_data{};
-            // std::unique_ptr<Buffer> transform_matrix_buffer;
-            // std::unique_ptr<Buffer> blas_buffer;
             AccelerationStructure blas_structure;
             AccelerationStructure tlas_structure;
 
@@ -134,6 +135,14 @@ namespace VRTR
             std::unique_ptr<Buffer> raygen_shader_binding_table;
             std::unique_ptr<Buffer> miss_shader_binding_table;
             std::unique_ptr<Buffer> hit_shader_binding_table;
+
+            struct UniformData
+            {
+                glm::mat4 view_inverse;
+                glm::mat4 proj_inverse;
+            }uniformData;
+
+            void updateUniformBuffer();
     };
 
 

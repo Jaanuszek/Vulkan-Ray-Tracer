@@ -468,6 +468,11 @@ namespace VRTR
         ctx.commandBuffers.at(currentFrame).end();
     }
 
+    void RTRenderer::updateUniformBuffer()
+    {
+        // TODO!!!!!!!!!!!!!!!!!!!1
+    }
+    
     void RTRenderer::initRayTracing()
     {
         vk::PhysicalDeviceProperties2 properties2
@@ -992,6 +997,63 @@ namespace VRTR
             uniformBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
+    }
+
+    void RTRenderer::createRayTracingPipeline()
+    {
+        vk::DescriptorSetLayoutBinding ASLayout
+        {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr
+        };
+
+        vk::DescriptorSetLayoutBinding storageImageLayout
+        {
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr
+        };
+
+        vk::DescriptorSetLayoutBinding uniformBufferLayout
+        {
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr
+        };
+
+        std::array<vk::DescriptorSetLayoutBinding, 3> bindings = 
+        {
+            ASLayout,
+            storageImageLayout,
+            uniformBufferLayout
+        };
+
+        vk::DescriptorSetLayoutCreateInfo layoutInfo
+        {
+            .flags = {},
+            .bindingCount = static_cast<uint32_t>(bindings.size()),
+            .pBindings = bindings.data()
+        };
+        descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
+
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo
+        {
+            .flags = {},
+            .setLayoutCount = 1,
+            .pSetLayouts = &*descriptorSetLayout,
+            .pushConstantRangeCount = 0,
+            .pPushConstantRanges = nullptr
+        };
+        rayTracingPipelineLayout = vk::raii::PipelineLayout(ctx.logicalDevice, pipelineLayoutInfo);
+
+        std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;rayTracingPipelineLayout;
     }
 
     void RTRenderer::createShaderBindingTable()
