@@ -74,3 +74,13 @@ docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/ven
 ```bash
 docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/venv:/app/venv:rw -v $(pwd)/:/app/:ro --rm --entrypoint /bin/bash test:latest
 ```
+
+### Compiling HLSL Shaders
+
+```bash
+~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/rayGen.hlsl   -Fo shaders/raygen.spv   -spirv 
+```
+
+```bash
+~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/rayGen.hlsl   -Fo shaders/raygen.spv   -spirv -fvk-use-scalar-layout
+```
