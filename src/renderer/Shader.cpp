@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    std::vector<char> Shader::readFile(const std::string& filename)
+    std::vector<char> Shader::readFile(const std::string& filename) const
     {
         VRTR_DEBUG("Reading shader file: {}", filename);
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -33,5 +33,21 @@ namespace VRTR
         };
 
         return vk::raii::ShaderModule{device, createInfo};
+    }
+
+    vk::PipelineShaderStageCreateInfo Shader::createShaderStageInfo(vk::raii::Device& device,
+                                                                    const std::string& filename,
+                                                                    vk::ShaderStageFlagBits stage) const
+    {
+        std::vector<char> shaderCode = readFile(filename);
+        auto shaderModule = createShaderModule(device, shaderCode);
+        vk::PipelineShaderStageCreateInfo shaderStageInfo
+        {
+            .stage = stage,
+            .module = shaderModule,
+            .pName = "main"
+        };
+
+        return shaderStageInfo;
     }
 }

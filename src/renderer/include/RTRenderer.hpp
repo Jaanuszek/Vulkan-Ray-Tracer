@@ -115,6 +115,7 @@ namespace VRTR
 
             // ================== RAY TRACING ==================
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
+            vk::raii::Pipeline rayTracingPipeline{nullptr};
             vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
 
             std::unique_ptr<Buffer> vertex_buffer;
@@ -130,7 +131,7 @@ namespace VRTR
             vk::raii::DescriptorSet descriptorSet{nullptr};
             vk::raii::DescriptorSetLayout descriptorSetLayout{nullptr};
 
-            std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
+            std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups{};
             // Shader Binding Table
             std::unique_ptr<Buffer> raygen_shader_binding_table;
             std::unique_ptr<Buffer> miss_shader_binding_table;

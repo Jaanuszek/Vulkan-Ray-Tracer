@@ -14,7 +14,7 @@ cbuffer camera : register(b2) //b# - stale dane (CONSTANT BUFFER VIEW)
 
 struct Payload
 {
-    [[vk::location(0)]] float3 color; // do layout 0 zapisujemy kolor
+    [[vk::location(0)]] float3 hitValue; // do layout 0 zapisujemy kolor
 };
 
 [shader("raygeneration")] // to musi byc, explicit mowimy ze to jest rayGen shader
@@ -38,5 +38,5 @@ void main()
 
     Payload payload;
     TraceRay(rs, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload); // RAY_FLAG_FORCE_OPAQUE - ignoruje shader any hit
-    image[int2(launchIndex.xy)] = float4(payload.color, 0.0);
+    image[int2(launchIndex.xy)] = float4(payload.hitValue, 0.0);
 }

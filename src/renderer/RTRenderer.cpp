@@ -1053,7 +1053,67 @@ namespace VRTR
         };
         rayTracingPipelineLayout = vk::raii::PipelineLayout(ctx.logicalDevice, pipelineLayoutInfo);
 
-        std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;rayTracingPipelineLayout;
+        std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
+        Shader shader;
+
+        // Raygen shader
+        {
+            shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/raygen.spv", vk::ShaderStageFlagBits::eRaygenKHR));
+            vk::RayTracingShaderGroupCreateInfoKHR raygenGroup
+            {
+                .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
+                .generalShader = 0, // first entry in shaderStages
+                .closestHitShader = VK_SHADER_UNUSED_KHR,
+                .anyHitShader = VK_SHADER_UNUSED_KHR,
+                .intersectionShader = VK_SHADER_UNUSED_KHR
+            };
+            shaderGroups.push_back(raygenGroup);
+        }
+
+        // Miss shader
+        {
+            shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/miss.spv", vk::ShaderStageFlagBits::eMissKHR));
+            vk::RayTracingShaderGroupCreateInfoKHR missGroup
+            {
+                .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
+                .generalShader = 1, // second entry in shaderStages
+                .closestHitShader = VK_SHADER_UNUSED_KHR,
+                .anyHitShader = VK_SHADER_UNUSED_KHR,
+                .intersectionShader = VK_SHADER_UNUSED_KHR
+            };
+            shaderGroups.push_back(missGroup);
+        }
+
+        // Closest hit shader
+        {
+            shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/closesthit.spv", vk::ShaderStageFlagBits::eClosestHitKHR));
+            vk::RayTracingShaderGroupCreateInfoKHR hitGroup
+            {
+                .type = vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup,
+                .generalShader = VK_SHADER_UNUSED_KHR,
+                .closestHitShader = 2, // third entry in shaderStages
+                .anyHitShader = VK_SHADER_UNUSED_KHR,
+                .intersectionShader = VK_SHADER_UNUSED_KHR
+            };
+            shaderGroups.push_back(hitGroup);
+        }
+        vk::RayTracingPipelineCreateInfoKHR pipelineInfo
+        {
+            .pNext = nullptr,
+            .flags = {},
+            .stageCount = static_cast<uint32_t>(shaderStages.size()),
+            .pStages = shaderStages.data(),
+            .groupCount = static_cast<uint32_t>(shaderGroups.size()),
+            .pGroups = shaderGroups.data(),
+            .maxPipelineRayRecursionDepth = 1,
+            .pLibraryInfo = nullptr,
+            .pLibraryInterface = nullptr,
+            .pDynamicState = nullptr,
+            .layout = rayTracingPipelineLayout,
+            .basePipelineHandle = nullptr,
+            .basePipelineIndex = -1
+        };
+        rayTracingPipeline = ctx.logicalDevice.createRayTracingPipelineKHR(nullptr, nullptr, pipelineInfo, nullptr);
     }
 
     void RTRenderer::createShaderBindingTable()
