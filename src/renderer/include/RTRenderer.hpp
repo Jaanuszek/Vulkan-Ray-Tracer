@@ -36,6 +36,7 @@ namespace VRTR
             {
                 vk::KHRSwapchainExtensionName,
                 vk::KHRSpirv14ExtensionName,
+                vk::KHRRayQueryExtensionName,
 
                 vk::KHRAccelerationStructureExtensionName,
                 vk::KHRRayTracingPipelineExtensionName,
@@ -101,6 +102,8 @@ namespace VRTR
 
             void createShaderBindingTable();
 
+            void buildRTCommandBuffers();
+
         private:
             int width, height;
             Context ctx;
@@ -136,12 +139,6 @@ namespace VRTR
             std::unique_ptr<Buffer> raygen_shader_binding_table;
             std::unique_ptr<Buffer> miss_shader_binding_table;
             std::unique_ptr<Buffer> hit_shader_binding_table;
-
-            struct UniformData
-            {
-                glm::mat4 view_inverse;
-                glm::mat4 proj_inverse;
-            }uniformData;
 
             void updateUniformBuffer();
     };

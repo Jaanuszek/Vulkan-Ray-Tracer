@@ -40,7 +40,7 @@ namespace VRTR
         ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         ctx.vertex_buffer->Update(vertices.data(), sizeof(vertices[0]) * vertices.size());
 
-        initPipeline();
+        // initPipeline();
 
         initCommandBuffer();
 
@@ -49,6 +49,14 @@ namespace VRTR
         createStorageImage();
 
         createScene();
+
+        createRayTracingPipeline();
+
+        createShaderBindingTable();
+
+        createDescriptorSets();
+
+        buildRTCommandBuffers();
     }
 
     std::vector<const char*> RTRenderer::getRequiredExtensions()
@@ -304,6 +312,7 @@ namespace VRTR
                             vk::PhysicalDeviceVulkan13Features,
                             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
                             vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
+                            vk::PhysicalDeviceRayQueryFeaturesKHR,
                             vk::PhysicalDeviceBufferDeviceAddressFeatures,
                             vk::PhysicalDeviceAccelerationStructureFeaturesKHR
                             > featuresChain
@@ -316,6 +325,7 @@ namespace VRTR
             },
             {.extendedDynamicState = VK_TRUE},
             {.rayTracingPipeline = VK_TRUE},
+            {.rayQuery = VK_TRUE},
             {.bufferDeviceAddress = VK_TRUE},
             {.accelerationStructure = VK_TRUE}
         };
@@ -529,6 +539,7 @@ namespace VRTR
 
     void RTRenderer::createBLAS()
     {
+        VRTR_DEBUG("Creating BLAS");
         struct VertexRT
         {
             glm::vec3 pos;
@@ -696,6 +707,7 @@ namespace VRTR
 
     void RTRenderer::createTLAS()
     {
+        VRTR_DEBUG("Creating TLAS");
         vk::TransformMatrixKHR transformMatrix{
             std::array<std::array<float, 4>, 3>{
                 1.0f, 0.0f, 0.0f, 0.0f,
@@ -826,12 +838,14 @@ namespace VRTR
 
     void RTRenderer::createScene()
     {
+        VRTR_DEBUG("Creating scene");
         createBLAS();
         createTLAS();
     }
 
     void RTRenderer::createStorageImage()
     {
+        VRTR_DEBUG("Creating storage image");
         storageImage.width = static_cast<uint32_t>(width);
         storageImage.height = static_cast<uint32_t>(height);
 
@@ -1057,7 +1071,7 @@ namespace VRTR
         Shader shader;
 
         // Raygen shader
-        {
+        // {
             shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/raygen.spv", vk::ShaderStageFlagBits::eRaygenKHR));
             vk::RayTracingShaderGroupCreateInfoKHR raygenGroup
             {
@@ -1068,10 +1082,10 @@ namespace VRTR
                 .intersectionShader = VK_SHADER_UNUSED_KHR
             };
             shaderGroups.push_back(raygenGroup);
-        }
+        // }
 
         // Miss shader
-        {
+        // {
             shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/miss.spv", vk::ShaderStageFlagBits::eMissKHR));
             vk::RayTracingShaderGroupCreateInfoKHR missGroup
             {
@@ -1082,10 +1096,10 @@ namespace VRTR
                 .intersectionShader = VK_SHADER_UNUSED_KHR
             };
             shaderGroups.push_back(missGroup);
-        }
+        // }
 
         // Closest hit shader
-        {
+        // {
             shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, "shaders/closesthit.spv", vk::ShaderStageFlagBits::eClosestHitKHR));
             vk::RayTracingShaderGroupCreateInfoKHR hitGroup
             {
@@ -1096,7 +1110,7 @@ namespace VRTR
                 .intersectionShader = VK_SHADER_UNUSED_KHR
             };
             shaderGroups.push_back(hitGroup);
-        }
+        // }
         vk::RayTracingPipelineCreateInfoKHR pipelineInfo
         {
             .pNext = nullptr,
@@ -1118,28 +1132,180 @@ namespace VRTR
 
     void RTRenderer::createShaderBindingTable()
     {
-        // const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
-        // const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
-        // const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
-        // const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size());
-        // const uint32_t sbt_size = group_count * handle_size_aligned;
-        // const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
-        //                                                     vk::BufferUsageFlagBits::eTransferSrc | 
-        //                                                     vk::BufferUsageFlagBits::eShaderDeviceAddress;
-        // const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
-        //                                                           vk::MemoryPropertyFlagBits::eHostCoherent;
+        const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
+        const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
+        const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment); // rozmiar wyrownania
+        const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size()); // licza shaderow
+        const uint32_t sbt_size = group_count * handle_size_aligned; // calkowity rozmiar SBT - ile bajtow potrzeba zeby zmieniscic wszystkie uchryty shaderow
+        const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
+                                                            vk::BufferUsageFlagBits::eTransferSrc | 
+                                                            vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
+                                                                  vk::MemoryPropertyFlagBits::eHostCoherent;
                                                                   
-        // raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
-        // miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
-        // hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags, rayTracingPipelineProperties);
+        raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
+        miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
+        hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
         
-        // std::vector<uint8_t> shader_handle_storage(sbt_size);
-        // shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
+        std::vector<uint8_t> shader_handle_storage(sbt_size);
+        shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
 
+        // KOPIOWANIE DANYCH Z CPU DO GPU:
+        // najpierw mapujemy pamiec, zeby uzyskac wskaznik do pamieciu CPU z ktorego 
+        // Dane będą kopiowane do pamieci GPU
+        // Potem kopiujemy dane do pamieci CPU
+        // Na koniec odmapowujemy pamiec
+        // Bawimy sie handle_size_aligned, zeby uzyskiwac konrketne bajty w pamieci CPU,
+        // kazdy shader jest zapisany w odpowieniej, stałej odleglosci od poczatku pamieci CPU - handle_size_aligned
+        // unmap - odmapowanie pamieci - explicit zakończenie kopiowania danych
 
-        // TODO COME BACK HERE LATER
+        // RAYGEN shader
+        uint8_t *data = static_cast<uint8_t*>(raygen_shader_binding_table->map(handle_size, 0));
+        memcpy(data, shader_handle_storage.data(), handle_size);
+        raygen_shader_binding_table->unmap();
 
-        // uint8_t *data = static_cast<uint8_t*>(raygen_shader_binding_table->map());
+        // MISS shader
+        data = static_cast<uint8_t*>(miss_shader_binding_table->map(handle_size, 0));
+        memcpy(data, shader_handle_storage.data() + handle_size_aligned, handle_size);
+        miss_shader_binding_table->unmap();
+
+        // HIT shader
+        data = static_cast<uint8_t*>(hit_shader_binding_table->map(handle_size, 0));
+        memcpy(data, shader_handle_storage.data() + 2 * handle_size_aligned, handle_size);
+        hit_shader_binding_table->unmap();
+    }
+
+    void RTRenderer::buildRTCommandBuffers()
+    {
+        // TODO dodać zmiane rozmiaru okienka!!!
+
+        vk::CommandBufferBeginInfo beginInfo
+        {
+            .flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse,
+            .pInheritanceInfo = nullptr
+        };
+
+        // vk::ImageSubresourceRange subresourceRange
+        // {
+        //     .aspectMask = vk::ImageAspectFlagBits::eColor,
+        //     .baseMipLevel = 0,
+        //     .levelCount = 1,
+        //     .baseArrayLayer = 0,
+        //     .layerCount = 1
+        // };
+
+        for(int32_t i = 0; i < ctx.commandBuffers.size(); i++)
+        {
+            ctx.commandBuffers.at(i).begin(beginInfo);
+
+            const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
+            const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
+            const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
+
+            vk::StridedDeviceAddressRegionKHR raygenShaderSBTEntry
+            {
+                .deviceAddress = raygen_shader_binding_table->getDeviceAddress(),
+                .stride = handle_size_aligned,
+                .size = handle_size_aligned
+            };
+
+            vk::StridedDeviceAddressRegionKHR missShaderSBTEntry
+            {
+                .deviceAddress = miss_shader_binding_table->getDeviceAddress(),
+                .stride = handle_size_aligned,
+                .size = handle_size_aligned
+            };
+
+            vk::StridedDeviceAddressRegionKHR hitShaderSBTEntry
+            {
+                .deviceAddress = hit_shader_binding_table->getDeviceAddress(),
+                .stride = handle_size_aligned,
+                .size = handle_size_aligned
+            };
+
+            vk::StridedDeviceAddressRegionKHR callableShaderSBTEntry{};
+
+            ctx.commandBuffers.at(i).bindPipeline(
+                vk::PipelineBindPoint::eRayTracingKHR, 
+                rayTracingPipeline
+            );
+
+            ctx.commandBuffers.at(i).bindDescriptorSets(
+                vk::PipelineBindPoint::eRayTracingKHR, 
+                *rayTracingPipelineLayout, 
+                0, 
+                {*descriptorSet}, 
+                {}
+            );
+
+            ctx.commandBuffers.at(i).traceRaysKHR(
+                raygenShaderSBTEntry,
+                missShaderSBTEntry,
+                hitShaderSBTEntry,
+                callableShaderSBTEntry,
+                width,
+                height,
+                1
+            );
+
+            VRTR_CommandBuffer->transition_image_layout
+            (
+                ctx.commandBuffers.at(i),
+                ctx.swapChainImages.at(i), 
+                vk::ImageLayout::eUndefined, 
+                vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
+                {},
+                {},
+                {}, 
+                {}
+            );
+
+            VRTR_CommandBuffer->transition_image_layout
+            (
+                ctx.commandBuffers.at(i),
+                storageImage.image, 
+                vk::ImageLayout::eGeneral, 
+                vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
+                {}, 
+                vk::AccessFlagBits2::eTransferRead,
+                vk::PipelineStageFlagBits2::eAllCommands,
+                vk::PipelineStageFlagBits2::eTransfer
+            );
+
+            vk::ImageCopy copyRegion
+            {
+                .srcSubresource = vk::ImageSubresourceLayers{
+                    vk::ImageAspectFlagBits::eColor,
+                    0, 0, 1
+                },
+                .srcOffset = vk::Offset3D{0, 0, 0},
+                .dstSubresource = vk::ImageSubresourceLayers{
+                    vk::ImageAspectFlagBits::eColor,
+                    0, 0, 1
+                },
+                .dstOffset = vk::Offset3D{0, 0, 0},
+                .extent = vk::Extent3D{storageImage.width, storageImage.height, 1}
+            };
+
+            ctx.commandBuffers.at(i).copyImage(
+                *storageImage.image, vk::ImageLayout::eTransferSrcOptimal,
+                ctx.swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
+                {copyRegion}
+            );
+
+            VRTR_CommandBuffer->transition_image_layout
+            (
+                ctx.commandBuffers.at(i),
+                ctx.swapChainImages.at(i), 
+                vk::ImageLayout::eTransferDstOptimal, 
+                vk::ImageLayout::ePresentSrcKHR,
+                {},
+                {},
+                {},
+                {}
+            );
+            ctx.commandBuffers.at(i).end();
+        }
     }
 
     void RTRenderer::drawFrame(GLFWwindow* window)

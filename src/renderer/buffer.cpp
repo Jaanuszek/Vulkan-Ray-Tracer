@@ -53,6 +53,16 @@ namespace VRTR
         bufferMemory.unmapMemory();
     }
 
+    void* Buffer::map(vk::DeviceSize size, vk::DeviceSize offset)
+    {
+        return bufferMemory.mapMemory(offset, size);
+    }
+
+    void Buffer::unmap()
+    {
+        bufferMemory.unmapMemory();
+    }
+
     vk::DeviceAddress Buffer::getDeviceAddress()
     {
         vk::BufferDeviceAddressInfo addrInfo{};

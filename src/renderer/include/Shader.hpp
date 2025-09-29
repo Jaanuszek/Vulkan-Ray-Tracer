@@ -13,11 +13,12 @@ namespace VRTR
             std::vector<char> readFile(const std::string& filename) const;
 
             [[nodiscard]]  vk::raii::ShaderModule createShaderModule(vk::raii::Device& device,
-                                                                    const std::vector<char>& code) const;
+                                                                    const std::vector<char>& code);
 
-            static vk::PipelineShaderStageCreateInfo createShaderStageInfo(vk::raii::Device& device,
+            vk::PipelineShaderStageCreateInfo createShaderStageInfo(vk::raii::Device& device,
                                                                     const std::string& filename,
                                                                     vk::ShaderStageFlagBits stage);
         private:
+            std::vector<vk::raii::ShaderModule> shaderModules;
     };
 }

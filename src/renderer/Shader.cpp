@@ -25,7 +25,7 @@ namespace VRTR
     }
 
     [[nodiscard]] vk::raii::ShaderModule Shader::createShaderModule(vk::raii::Device& device,
-                                                                    const std::vector<char>& code) const
+                                                                    const std::vector<char>& code)
     {
         vk::ShaderModuleCreateInfo createInfo{
             .codeSize = code.size() * sizeof(char),
@@ -37,14 +37,15 @@ namespace VRTR
 
     vk::PipelineShaderStageCreateInfo Shader::createShaderStageInfo(vk::raii::Device& device,
                                                                     const std::string& filename,
-                                                                    vk::ShaderStageFlagBits stage) const
+                                                                    vk::ShaderStageFlagBits stage)
     {
         std::vector<char> shaderCode = readFile(filename);
         auto shaderModule = createShaderModule(device, shaderCode);
+        shaderModules.push_back(std::move(shaderModule)); // przechowuje w vektorze, zeby ten wskaznik nie zniknal po wyjsciu z funkcji
         vk::PipelineShaderStageCreateInfo shaderStageInfo
         {
             .stage = stage,
-            .module = shaderModule,
+            .module = shaderModules.back(),
             .pName = "main"
         };
 

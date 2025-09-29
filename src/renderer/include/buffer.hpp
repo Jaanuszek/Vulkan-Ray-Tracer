@@ -17,6 +17,8 @@ namespace VRTR
             void Update(const void* data, vk::DeviceSize size, vk::DeviceSize offset=0);
 
             vk::DeviceAddress getDeviceAddress();
+            void* map(vk::DeviceSize size, vk::DeviceSize offset=0);
+            void unmap();
             inline vk::raii::Buffer& getBuffer() { return buffer; }
 
             static uint32_t findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
