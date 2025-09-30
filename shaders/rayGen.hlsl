@@ -1,5 +1,5 @@
 RaytracingAccelerationStructure rs : register(t0); //t# - tylko odczty (SHADER RESOURCE VIEW    )
-RWTexture2D<float4> image : register(u1); //u# - odczyt i zapis (UNORDERED ACCESS VIEW)
+[[vk::image_format("rgba8")]]RWTexture2D<float4> image : register(u1); //u# - odczyt i zapis (UNORDERED ACCESS VIEW)
 
 struct Matrices
 {

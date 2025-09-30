@@ -98,7 +98,7 @@ namespace VRTR
             .imageColorSpace = surfaceFormat.colorSpace,
             .imageExtent = extent,
             .imageArrayLayers = 1,
-            .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+            .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst, // TransferSRC - ustawienie bitu ktory mowi ze mozemy zmienic layout danego vk::Image na VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
             .imageSharingMode = vk::SharingMode::eExclusive,
             .preTransform = VK_capabilities.currentTransform,
             .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,

@@ -485,16 +485,10 @@ namespace VRTR
     
     void RTRenderer::initRayTracing()
     {
-        vk::PhysicalDeviceProperties2 properties2
-        {
-            .pNext = &rayTracingPipelineProperties
-        };
         auto prop = ctx.gpu.getProperties2<vk::PhysicalDeviceProperties2,
             vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 
-        auto rtProps = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
-
-        VRTR_DEBUG("RT vars {}", rtProps.maxRayRecursionDepth);
+        rayTracingPipelineProperties = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
     }
 
     ScratchBuffer RTRenderer::createScratchBuffer(vk::DeviceSize size)
@@ -852,7 +846,7 @@ namespace VRTR
         vk::ImageCreateInfo imgCreateInfo
         {
             .imageType = vk::ImageType::e2D,
-            .format = vk::Format::eB8G8R8A8Unorm,
+            .format = vk::Format::eR8G8B8A8Unorm,
             .extent = vk::Extent3D{storageImage.width, storageImage.height, 1},
             .mipLevels = 1,
             .arrayLayers = 1,
@@ -877,7 +871,7 @@ namespace VRTR
         {
             .image = *storageImage.image,
             .viewType = vk::ImageViewType::e2D,
-            .format = vk::Format::eB8G8R8A8Unorm,
+            .format = vk::Format::eR8G8B8A8Unorm,
             .components = {
                 vk::ComponentSwizzle::eIdentity, // it has to be identity inside storageImage
                 vk::ComponentSwizzle::eIdentity,
@@ -918,6 +912,7 @@ namespace VRTR
 
     void RTRenderer::createDescriptorSets()
     {
+        VRTR_DEBUG("Creating Descriptor Sets");
         uint32_t maxSets = 1; // one for now, but later we will need more
         std::vector<vk::DescriptorPoolSize> poolSizes=
         {
@@ -1015,6 +1010,7 @@ namespace VRTR
 
     void RTRenderer::createRayTracingPipeline()
     {
+        VRTR_DEBUG("Creating Ray Tracing Pipeline");
         vk::DescriptorSetLayoutBinding ASLayout
         {
             .binding = 0,
@@ -1132,6 +1128,7 @@ namespace VRTR
 
     void RTRenderer::createShaderBindingTable()
     {
+        VRTR_DEBUG("Creating Shader Binding Table");
         const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
         const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
         const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment); // rozmiar wyrownania
@@ -1142,13 +1139,12 @@ namespace VRTR
                                                             vk::BufferUsageFlagBits::eShaderDeviceAddress;
         const vk::MemoryPropertyFlags sbt_memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | 
                                                                   vk::MemoryPropertyFlagBits::eHostCoherent;
-                                                                  
+        
         raygen_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
         miss_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
         hit_shader_binding_table = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, handle_size, sbt_buffer_usage_flags, sbt_memory_property_flags);
-        
         std::vector<uint8_t> shader_handle_storage(sbt_size);
-        shader_handle_storage = ctx.pipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
+        shader_handle_storage = rayTracingPipeline.getRayTracingShaderGroupHandlesKHR<uint8_t>(0, group_count, sbt_size);
 
         // KOPIOWANIE DANYCH Z CPU DO GPU:
         // najpierw mapujemy pamiec, zeby uzyskac wskaznik do pamieciu CPU z ktorego 
@@ -1163,7 +1159,6 @@ namespace VRTR
         uint8_t *data = static_cast<uint8_t*>(raygen_shader_binding_table->map(handle_size, 0));
         memcpy(data, shader_handle_storage.data(), handle_size);
         raygen_shader_binding_table->unmap();
-
         // MISS shader
         data = static_cast<uint8_t*>(miss_shader_binding_table->map(handle_size, 0));
         memcpy(data, shader_handle_storage.data() + handle_size_aligned, handle_size);
@@ -1253,7 +1248,7 @@ namespace VRTR
                 ctx.commandBuffers.at(i),
                 ctx.swapChainImages.at(i), 
                 vk::ImageLayout::eUndefined, 
-                vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
+                vk::ImageLayout::eTransferDstOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
                 {},
                 {}, 
@@ -1319,7 +1314,7 @@ namespace VRTR
         {
             auto [result, imageIndex] = ctx.swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(semaphoreIndex), nullptr);
 
-        recordCommandBuffer(imageIndex);
+        // recordCommandBuffer(imageIndex);
         ctx.logicalDevice.resetFences({ctx.drawFences[currentFrame]});
 
         vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
