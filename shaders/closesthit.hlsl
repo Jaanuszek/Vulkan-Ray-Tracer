@@ -11,7 +11,7 @@ struct Payload
 // in Attribs jest obliczane przez vulkan
 // współrzędne barycentryczne to taka interpolacja jak w fragment shaderze, tylko że ręcznie
 [shader("closesthit")]
-void main(inout Payload p, in Attribs attrib)
+void main(inout Payload p, in BuiltInTriangleIntersectionAttributes attr)
 {
     // Współrzędne barycentryczne to jakby waga każdego z wierzchołków trójkąta
     // Mówią w jakich proporcjach danego trójkąta trafiliśmy promieniem
@@ -25,11 +25,11 @@ void main(inout Payload p, in Attribs attrib)
     //       V1, V2, V3 - wierzchołki trójkąta
     //       b1, b2, b3 - współrzędne barycentryczne
 
-    const float3 barycentricCoords = float3(
-        1.0f - attrib.barycentric.x - attrib.barycentric.y,
-        attrib.barycentric.x, 
-        attrib.barycentric.y
+    float3 barycentricCoords = float3(
+        1.0 - attr.barycentrics.x - attr.barycentrics.y,
+        attr.barycentrics.x,
+        attr.barycentrics.y
     );
 
-    p.hitValue = barycentricCoords; 
+    p.hitValue = barycentricCoords;
 }

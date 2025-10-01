@@ -35,6 +35,10 @@ namespace VRTR
                                             vk::BufferUsageFlagBits::eUniformBuffer, 
                                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
+        uniform_data.proj_inverse = glm::inverse(camera->matrices.perspective);
+        uniform_data.view_inverse = glm::inverse(camera->matrices.view);
+        uniform_buffer->Update(&uniform_data, sizeof(UniformData));
+
         initSwapChain(window);
 
         ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -1233,6 +1237,18 @@ namespace VRTR
                 {}
             );
 
+            VRTR_CommandBuffer->transition_image_layout
+            (
+                ctx.commandBuffers.at(i),
+                storageImage.image, 
+                vk::ImageLayout::eUndefined, 
+                vk::ImageLayout::eGeneral,
+                {},
+                vk::AccessFlagBits2::eShaderWrite,
+                vk::PipelineStageFlagBits2::eTopOfPipe,
+                vk::PipelineStageFlagBits2::eRayTracingShaderKHR
+            );
+
             ctx.commandBuffers.at(i).traceRaysKHR(
                 raygenShaderSBTEntry,
                 missShaderSBTEntry,
@@ -1314,36 +1330,37 @@ namespace VRTR
         {
             auto [result, imageIndex] = ctx.swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(semaphoreIndex), nullptr);
 
-        // recordCommandBuffer(imageIndex);
-        ctx.logicalDevice.resetFences({ctx.drawFences[currentFrame]});
+            // recordCommandBuffer(imageIndex);
+            ctx.logicalDevice.resetFences({ctx.drawFences[currentFrame]});
 
-        vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
-        const vk::SubmitInfo submitInfo
-        {
-            .pNext = nullptr,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*ctx.presentCompleteSemaphores.at(semaphoreIndex),
-            .pWaitDstStageMask = &waitDestinationStageMask,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &*ctx.commandBuffers.at(currentFrame),
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &*ctx.renderCompleteSemaphores.at(currentFrame)
-        };
-        ctx.queue.submit({submitInfo}, *ctx.drawFences.at(currentFrame));
-        const vk::PresentInfoKHR presentInfoKHR{
-            .pNext = nullptr,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(currentFrame),
-            .swapchainCount = 1,
-            .pSwapchains = &*ctx.swapChain,
-            .pImageIndices = &imageIndex,
-            .pResults = nullptr
-        };
+            vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eAllCommands );
+            const vk::SubmitInfo submitInfo
+            {
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &*ctx.presentCompleteSemaphores.at(semaphoreIndex),
+                .pWaitDstStageMask = &waitDestinationStageMask,
+                .commandBufferCount = 1,
+                .pCommandBuffers = &*ctx.commandBuffers.at(imageIndex),
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = &*ctx.renderCompleteSemaphores.at(currentFrame)
+            };
+            ctx.queue.submit({submitInfo}, *ctx.drawFences.at(currentFrame));
 
-        result = ctx.queue.presentKHR(presentInfoKHR);
+            const vk::PresentInfoKHR presentInfoKHR{
+                .pNext = nullptr,
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(currentFrame),
+                .swapchainCount = 1,
+                .pSwapchains = &*ctx.swapChain,
+                .pImageIndices = &imageIndex,
+                .pResults = nullptr
+            };
 
-        VRTR::semaphoreIndex = (VRTR::semaphoreIndex + 1) % ctx.presentCompleteSemaphores.size();
-        VRTR::currentFrame = (VRTR::currentFrame + 1) % VRTR::MAX_FRAMES_IN_FLIGHT;
+            result = ctx.queue.presentKHR(presentInfoKHR);
+
+            VRTR::semaphoreIndex = (VRTR::semaphoreIndex + 1) % ctx.presentCompleteSemaphores.size();
+            VRTR::currentFrame = (VRTR::currentFrame + 1) % VRTR::MAX_FRAMES_IN_FLIGHT;
 
         }
         catch (const vk::OutOfDateKHRError& e)
