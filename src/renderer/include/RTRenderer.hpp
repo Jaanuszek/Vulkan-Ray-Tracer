@@ -74,13 +74,9 @@ namespace VRTR
 
             uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
-            void initPipeline();
-
             void initCommandBuffer();
 
             void createSyncObjects();
-
-            void recordCommandBuffer(uint32_t imageIndex);
 
             // ================== RAY TRACING ==================
 

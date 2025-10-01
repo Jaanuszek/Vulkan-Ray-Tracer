@@ -17,7 +17,7 @@ namespace VRTR
         //  TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
         camera = std::make_unique<Camera>();
         camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
-        camera->setTranslation(glm::vec3(0.0f, 0.0f, -2.0f));
+        camera->setTranslation(glm::vec3(0.0f, 0.0f, -3.0f));
         camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 
         initInstance();
@@ -35,16 +35,12 @@ namespace VRTR
                                             vk::BufferUsageFlagBits::eUniformBuffer, 
                                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-        uniform_data.proj_inverse = glm::inverse(camera->matrices.perspective);
-        uniform_data.view_inverse = glm::inverse(camera->matrices.view);
-        uniform_buffer->Update(&uniform_data, sizeof(UniformData));
+        updateUniformBuffer();
 
         initSwapChain(window);
 
         ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         ctx.vertex_buffer->Update(vertices.data(), sizeof(vertices[0]) * vertices.size());
-
-        // initPipeline();
 
         initCommandBuffer();
 
@@ -373,13 +369,6 @@ namespace VRTR
         throw std::runtime_error("Failed to find suitable memory type");
     }
 
-    void RTRenderer::initPipeline()
-    {
-        VRTR_DEBUG("CREATING PIPELINE");
-        VRTR_RasterGraphicsPipeline = std::make_unique<RasterGraphicsPipeline>(ctx);
-        VRTR_RasterGraphicsPipeline->createPipeline(surfaceCapabilities.surfaceFormat.format);
-    }
-
     void RTRenderer::initCommandBuffer()
     {
         VRTR_CommandBuffer = std::make_unique<CommandBuffer>(ctx);
@@ -413,78 +402,11 @@ namespace VRTR
         }
     }
 
-    void RTRenderer::recordCommandBuffer(uint32_t imageIndex)
-    {
-        // TODO think about updating only necessary things inside surfaceCapabilities
-        // I think it will be only window size and extent???
-        surfaceCapabilities = VRTR_SwapChain->getSurfaceCapabilities();
-        ctx.commandBuffers.at(currentFrame).begin({});
-        VRTR_CommandBuffer->transition_image_layout
-        (
-            ctx.swapChainImages, imageIndex,
-            vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal,
-            vk::AccessFlagBits2::eNone, vk::AccessFlagBits2::eColorAttachmentWrite,
-            vk::PipelineStageFlagBits2::eTopOfPipe, vk::PipelineStageFlagBits2::eColorAttachmentOutput
-        ); 
-
-        vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
-        vk::RenderingAttachmentInfo attachmentInfo = 
-        {
-            .imageView = ctx.swapChainImageViews.at(currentFrame),
-            .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .resolveMode = vk::ResolveModeFlagBits::eNone,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = clearColor
-        };
-
-        vk::RenderingInfo renderingInfo = 
-        {
-            .flags = {},
-            .renderArea = {.offset = {0, 0}, .extent = surfaceCapabilities.extent},
-            .layerCount = 1,
-            .viewMask = 0,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &attachmentInfo,
-            .pDepthAttachment = nullptr,
-            .pStencilAttachment = nullptr
-        };
-
-        ctx.commandBuffers.at(currentFrame).beginRendering(renderingInfo);
-        ctx.commandBuffers.at(currentFrame).bindPipeline(vk::PipelineBindPoint::eGraphics, ctx.pipeline);
-        ctx.commandBuffers.at(currentFrame).bindVertexBuffers(0, {ctx.vertex_buffer->getBuffer()}, {0});
-
-        // Setting dynamic states
-        ctx.commandBuffers.at(currentFrame).setViewport(
-            0, 
-            vk::Viewport
-            {
-                0.0f, 
-                0.0f,
-                static_cast<float>(surfaceCapabilities.extent.width),
-                static_cast<float>(surfaceCapabilities.extent.height), 
-                0.0f, 
-                1.0f
-            }    
-        );
-        ctx.commandBuffers.at(currentFrame).setScissor(0, vk::Rect2D{{0, 0}, surfaceCapabilities.extent});
-        ctx.commandBuffers.at(currentFrame).draw(vertices.size(), 1, 0, 0);
-
-        ctx.commandBuffers.at(currentFrame).endRendering();
-
-        VRTR_CommandBuffer->transition_image_layout(
-            ctx.swapChainImages, imageIndex,
-            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-            vk::AccessFlagBits2::eColorAttachmentWrite, vk::AccessFlagBits2::eNone,
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eNone
-        );
-
-        ctx.commandBuffers.at(currentFrame).end();
-    }
-
     void RTRenderer::updateUniformBuffer()
     {
-        // TODO!!!!!!!!!!!!!!!!!!!1
+        uniform_data.proj_inverse = glm::inverse(camera->matrices.perspective);
+        uniform_data.view_inverse = glm::inverse(camera->matrices.view);
+        uniform_buffer->Update(&uniform_data, sizeof(UniformData));
     }
     
     void RTRenderer::initRayTracing()
@@ -928,7 +850,7 @@ namespace VRTR
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
         vk::DescriptorPoolCreateInfo poolInfo
         {
-            .flags = {},
+            .flags = {vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet},
             .maxSets = maxSets,
             .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
             .pPoolSizes = poolSizes.data()
