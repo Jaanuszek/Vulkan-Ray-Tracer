@@ -59,6 +59,17 @@ namespace VRTR
         glm::vec3 color;
     };
 
+    struct VertexRT
+    {
+        glm::vec3 pos;
+    };
+
+    struct primitiveBuffers
+    {
+        std::unique_ptr<Buffer> vertexBuffer;
+        std::unique_ptr<Buffer> indexBuffer;
+    };
+
     struct UniformData
     {
         glm::mat4 view_inverse;

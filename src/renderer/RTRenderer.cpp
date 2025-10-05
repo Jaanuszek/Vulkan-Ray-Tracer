@@ -460,10 +460,6 @@ namespace VRTR
     void RTRenderer::createBLAS()
     {
         VRTR_DEBUG("Creating BLAS");
-        struct VertexRT
-        {
-            glm::vec3 pos;
-        };
 
         std::vector<VertexRT> verticesRT = {
             {{1.0f, 1.0f, 0.0f}},
@@ -478,57 +474,19 @@ namespace VRTR
         const vk::BufferUsageFlags buffer_usage_flags = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
         const vk::MemoryPropertyFlags memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
 
-        vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, buffer_usage_flags, memory_property_flags);
-        vertex_buffer->Update(verticesRT.data(), vertex_buffer_size);
+        primitive_buffers = std::make_shared<primitiveBuffers>();
+        
+        primitive_buffers->vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, buffer_usage_flags, memory_property_flags);
+        primitive_buffers->vertexBuffer->Update(verticesRT.data(), vertex_buffer_size);
 
-        index_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, buffer_usage_flags, memory_property_flags);
-        index_buffer->Update(indicesRT.data(), index_buffer_size);
+        primitive_buffers->indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, buffer_usage_flags, memory_property_flags);
+        primitive_buffers->indexBuffer->Update(indicesRT.data(), index_buffer_size);
 
-        vk::TransformMatrixKHR transformMatrix{
-            std::array<std::array<float, 4>, 3>{
-                1.0f, 0.0f, 0.0f, 0.0f,
-                0.0f, 1.0f, 0.0f, 0.0f,
-                0.0f, 0.0f, 1.0f, 0.0f
-            }
-        };
-        std::unique_ptr<Buffer> transform_matrix_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vk::TransformMatrixKHR), vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-        transform_matrix_buffer->Update(&transformMatrix, sizeof(vk::TransformMatrixKHR));
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangles{};
+        vk::AccelerationStructureGeometryKHR asGeometry{};
+        vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
 
-        vk::DeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-        vk::DeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
-        vk::DeviceOrHostAddressConstKHR transformMatrixDeviceAddress{};
-
-        vertexBufferDeviceAddress.deviceAddress = vertex_buffer->getDeviceAddress();
-        indexBufferDeviceAddress.deviceAddress = index_buffer->getDeviceAddress();
-        transformMatrixDeviceAddress.deviceAddress = transform_matrix_buffer->getDeviceAddress();
-
-        vk::AccelerationStructureGeometryTrianglesDataKHR triangles
-        {
-            .pNext = nullptr,
-            .vertexFormat = vk::Format::eR32G32B32Sfloat,
-            .vertexData = vertexBufferDeviceAddress,
-            .vertexStride = sizeof(VertexRT),
-            .maxVertex = static_cast<uint32_t>(verticesRT.size()),
-            .indexType = vk::IndexType::eUint32,
-            .indexData = indexBufferDeviceAddress,
-            .transformData = transformMatrixDeviceAddress
-        };
-
-        vk::AccelerationStructureGeometryKHR asGeometry
-        {
-            .pNext = nullptr,
-            .geometryType = vk::GeometryTypeKHR::eTriangles,
-            .geometry = triangles,
-            .flags = vk::GeometryFlagBitsKHR::eOpaque
-        };
-
-        vk::AccelerationStructureBuildRangeInfoKHR offsetInfo
-        {
-            .primitiveCount = 1,
-            .primitiveOffset = 0,
-            .firstVertex = 0,
-            .transformOffset = 0
-        };
+        AS::primitiveToGeometry(verticesRT, indicesRT, primitive_buffers, asGeometry, offsetInfo);
 
         // inicjacja struktury acceleration structure.
 

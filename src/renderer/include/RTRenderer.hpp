@@ -7,6 +7,7 @@
 #include "ConstantsAndStructs.hpp"
 #include "buffer.hpp"
 #include "Camera.hpp"
+#include "AccelerationStructureUtils.hpp"
 
 namespace VRTR
 {
@@ -117,8 +118,9 @@ namespace VRTR
             vk::raii::Pipeline rayTracingPipeline{nullptr};
             vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
 
-            std::unique_ptr<Buffer> vertex_buffer;
-            std::unique_ptr<Buffer> index_buffer;
+            // std::unique_ptr<Buffer> vertex_buffer;
+            // std::unique_ptr<Buffer> index_buffer;
+            std::shared_ptr<primitiveBuffers> primitive_buffers;
             std::unique_ptr<Buffer> uniform_buffer;
             UniformData uniform_data{};
             AccelerationStructure blas_structure;
