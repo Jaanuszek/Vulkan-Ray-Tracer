@@ -15,5 +15,12 @@ namespace VRTR
                                  vk::AccelerationStructureBuildRangeInfoKHR& offsetInfo,
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,
                                  vk::IndexType indexType = vk::IndexType::eUint32);
+
+        void createAccelerationStructure(Context& ctx,
+                                         vk::AccelerationStructureTypeKHR asType,
+                                         VRTR::AccelerationStructure& as,
+                                         vk::AccelerationStructureGeometryKHR& asGeometry,
+                                         vk::AccelerationStructureBuildRangeInfoKHR& asBuildRangeInfo,
+                                         vk::BuildAccelerationStructureFlagsKHR flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
     }
 }

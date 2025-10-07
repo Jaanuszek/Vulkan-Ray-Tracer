@@ -412,9 +412,13 @@ namespace VRTR
     void RTRenderer::initRayTracing()
     {
         auto prop = ctx.gpu.getProperties2<vk::PhysicalDeviceProperties2,
-            vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+            vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
+            vk::PhysicalDeviceAccelerationStructurePropertiesKHR>();
 
         rayTracingPipelineProperties = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+
+        ctx.rtPipelineProperties = rayTracingPipelineProperties; // I am not a big fan of this, but Will think about it later
+        ctx.asProperties = prop.get<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>();
     }
 
     ScratchBuffer RTRenderer::createScratchBuffer(vk::DeviceSize size)
@@ -482,7 +486,6 @@ namespace VRTR
         primitive_buffers->indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, buffer_usage_flags, memory_property_flags);
         primitive_buffers->indexBuffer->Update(indicesRT.data(), index_buffer_size);
 
-        vk::AccelerationStructureGeometryTrianglesDataKHR triangles{};
         vk::AccelerationStructureGeometryKHR asGeometry{};
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
 
@@ -1013,9 +1016,9 @@ namespace VRTR
     void RTRenderer::createShaderBindingTable()
     {
         VRTR_DEBUG("Creating Shader Binding Table");
-        const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
-        const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
-        const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment); // rozmiar wyrownania
+        const uint32_t handle_size = ctx.rtPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
+        const uint32_t handle_alignment = ctx.rtPipelineProperties.shaderGroupHandleAlignment;
+        const uint32_t handle_size_aligned = utils::aligned_size(handle_size, handle_alignment); // rozmiar wyrownania
         const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size()); // licza shaderow
         const uint32_t sbt_size = group_count * handle_size_aligned; // calkowity rozmiar SBT - ile bajtow potrzeba zeby zmieniscic wszystkie uchryty shaderow
         const vk::BufferUsageFlags sbt_buffer_usage_flags = vk::BufferUsageFlagBits::eShaderBindingTableKHR | 
@@ -1079,7 +1082,7 @@ namespace VRTR
 
             const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
             const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
-            const uint32_t handle_size_aligned = aligned_size(handle_size, handle_alignment);
+            const uint32_t handle_size_aligned = utils::aligned_size(handle_size, handle_alignment);
 
             vk::StridedDeviceAddressRegionKHR raygenShaderSBTEntry
             {

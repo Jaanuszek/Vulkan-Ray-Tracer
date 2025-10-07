@@ -39,3 +39,31 @@ void VRTR::AS::primitiveToGeometry(const std::vector<VertexRT>& vertices,
         .transformOffset = 0
     };
 }
+
+void VRTR::AS::createAccelerationStructure(Context& ctx,
+                                           vk::AccelerationStructureTypeKHR asType,
+                                           VRTR::AccelerationStructure& as,
+                                           vk::AccelerationStructureGeometryKHR& asGeometry,
+                                           vk::AccelerationStructureBuildRangeInfoKHR& asBuildRangeInfo,
+                                           vk::BuildAccelerationStructureFlagsKHR flags)
+{
+    vk::AccelerationStructureBuildGeometryInfoKHR asBuildInfo
+    {
+        .type = asType,
+        .flags = flags,
+        .mode = vk::BuildAccelerationStructureModeKHR::eBuild,
+        .geometryCount = 1,
+        .pGeometries = &asGeometry,
+    };
+    std::vector<uint32_t> maxPrimCount(1);
+    maxPrimCount.at(0) = asBuildRangeInfo.primitiveCount;
+
+    vk::AccelerationStructureBuildSizesInfoKHR asSizeInfo = ctx.logicalDevice.getAccelerationStructureBuildSizesKHR(
+        vk::AccelerationStructureBuildTypeKHR::eDevice,
+        asBuildInfo,
+        maxPrimCount
+    );
+
+    vk::DeviceSize scratchSize = asSizeInfo.buildScratchSize;
+    vk::DeviceSize minAsScratchOffsetAlignment = ctx.asProperties.minAccelerationStructureScratchOffsetAlignment;
+}
