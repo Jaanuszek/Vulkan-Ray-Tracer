@@ -32,14 +32,16 @@ namespace VRTR
 
         // TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData), 
-                                            vk::BufferUsageFlagBits::eUniformBuffer, 
-                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+                                            vk::BufferUsageFlagBits{}, 
+                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                            vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
 
         updateUniformBuffer();
 
         initSwapChain(window);
 
-        ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits{}, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                                    vk::BufferUsageFlagBits2::eVertexBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
         ctx.vertex_buffer->Update(vertices.data(), sizeof(vertices[0]) * vertices.size());
 
         initCommandBuffer();
@@ -421,46 +423,6 @@ namespace VRTR
         ctx.asProperties = prop.get<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>();
     }
 
-    ScratchBuffer RTRenderer::createScratchBuffer(vk::DeviceSize size)
-    {
-        ScratchBuffer scratchBuffer{};
-        
-        vk::BufferCreateInfo bufferCreateInfo
-        {
-            .size = size,
-            .usage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
-        };
-        scratchBuffer.buffer = vk::raii::Buffer(ctx.logicalDevice, bufferCreateInfo);
-
-        vk::MemoryRequirements memRequirements = scratchBuffer.buffer.getMemoryRequirements();
-
-        vk::MemoryAllocateFlagsInfo allocateFlagsInfo
-        {
-            .pNext = nullptr,
-            .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
-        };
-
-        uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-        vk::MemoryAllocateInfo allocInfo
-        {
-            .pNext = &allocateFlagsInfo,
-            .allocationSize = memRequirements.size,
-            .memoryTypeIndex = memoryType
-        };
-        scratchBuffer.memory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
-        scratchBuffer.buffer.bindMemory(*scratchBuffer.memory, 0);
-
-        vk::BufferDeviceAddressInfo bufferDeviceAddressInfo
-        {
-            .buffer = scratchBuffer.buffer
-        };
-
-        scratchBuffer.device_address = ctx.logicalDevice.getBufferAddress(bufferDeviceAddressInfo);
-
-        return scratchBuffer;
-    }
-
     void RTRenderer::createBLAS()
     {
         VRTR_DEBUG("Creating BLAS");
@@ -475,22 +437,20 @@ namespace VRTR
         size_t vertex_buffer_size = verticesRT.size() * sizeof(VertexRT);
         size_t index_buffer_size = indicesRT.size() * sizeof(uint32_t);
 
-        const vk::BufferUsageFlags buffer_usage_flags = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        const vk::BufferUsageFlags2 buffer_usage_flags = vk::BufferUsageFlagBits2::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits2::eShaderDeviceAddress;
         const vk::MemoryPropertyFlags memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
 
         primitive_buffers = std::make_shared<primitiveBuffers>();
         
-        primitive_buffers->vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, buffer_usage_flags, memory_property_flags);
+        primitive_buffers->vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
         primitive_buffers->vertexBuffer->Update(verticesRT.data(), vertex_buffer_size);
 
-        primitive_buffers->indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, buffer_usage_flags, memory_property_flags);
+        primitive_buffers->indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
         primitive_buffers->indexBuffer->Update(indicesRT.data(), index_buffer_size);
 
         vk::AccelerationStructureGeometryKHR asGeometry{};
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
-
         AS::primitiveToGeometry(verticesRT, indicesRT, primitive_buffers, asGeometry, offsetInfo);
-
         // inicjacja struktury acceleration structure.
 
         vk::AccelerationStructureBuildGeometryInfoKHR buildInfoStructure
@@ -510,10 +470,14 @@ namespace VRTR
                 {offsetInfo.primitiveCount}
             ); 
         
+        vk::BufferUsageFlags2 bufferUsage = vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits2::eShaderDeviceAddress;
+        vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+
         blas_structure.buffer = std::make_unique<Buffer>(
             ctx.logicalDevice, ctx.gpu, sizeInfo.accelerationStructureSize,
-            vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            vk::MemoryPropertyFlagBits::eDeviceLocal
+            vk::BufferUsageFlags{},
+            memoryProperties,
+            bufferUsage
         );
 
         vk::AccelerationStructureCreateInfoKHR asCreateInfo = 
@@ -528,7 +492,9 @@ namespace VRTR
         };
         blas_structure.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, asCreateInfo);
 
-        ScratchBuffer scratchBuffer = createScratchBuffer(sizeInfo.buildScratchSize);
+        vk::DeviceSize scratchSize = sizeInfo.buildScratchSize;
+        Buffer scratchBuffer(ctx, BufferType::SCRATCH, scratchSize);
+        VRTR_DEBUG("Scratch buffer size for BLAS: {}. Device addr: {}", scratchSize, scratchBuffer.getDeviceAddress());
 
         // Inicjacja juz docelowej struktury BLAS
 
@@ -543,7 +509,7 @@ namespace VRTR
             .geometryCount = 1,
             .pGeometries = &asGeometry,
             .ppGeometries = nullptr,
-            .scratchData = scratchBuffer.device_address
+            .scratchData = scratchBuffer.getDeviceAddress()
         };
 
         std::array<vk::AccelerationStructureBuildRangeInfoKHR*, 1> buildRangeInfos = {&offsetInfo};
@@ -649,11 +615,15 @@ namespace VRTR
                 {primitive_count}
             );
 
+        vk::BufferUsageFlags2 bufferUsage = vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits2::eShaderDeviceAddress;
+        vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+
         tlas_structure.buffer = std::make_unique<Buffer>(
             ctx.logicalDevice, ctx.gpu,
             ASBuildSizeInfo.accelerationStructureSize,
-            vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            vk::MemoryPropertyFlagBits::eDeviceLocal
+            vk::BufferUsageFlags{},
+            memoryProperties,
+            bufferUsage
         );
 
         vk::AccelerationStructureCreateInfoKHR ASCreateInfo
@@ -669,7 +639,8 @@ namespace VRTR
 
         tlas_structure.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, ASCreateInfo);
 
-        ScratchBuffer scratchBuffer = createScratchBuffer(ASBuildSizeInfo.buildScratchSize);
+        vk::DeviceSize scratchSize = ASBuildSizeInfo.buildScratchSize;
+        Buffer scratchBuffer(ctx, BufferType::SCRATCH, scratchSize);
 
         vk::AccelerationStructureBuildGeometryInfoKHR destBuildInfo
         {
@@ -681,7 +652,7 @@ namespace VRTR
             .dstAccelerationStructure = tlas_structure.handle,
             .geometryCount = 1,
             .pGeometries = &ASGeometry,
-            .scratchData = scratchBuffer.device_address
+            .scratchData = scratchBuffer.getDeviceAddress()
         };
 
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo

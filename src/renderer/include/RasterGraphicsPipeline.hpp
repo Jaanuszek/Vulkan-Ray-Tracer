@@ -10,13 +10,13 @@ namespace VRTR
     class RasterGraphicsPipeline
     {
         public:
-            RasterGraphicsPipeline(Context& ctx);
+            RasterGraphicsPipeline(VULKAN_CONTEXT& ctx);
             ~RasterGraphicsPipeline() = default;
 
         void createPipeline(vk::Format& format);
 
         private:
-            Context& ctx;
+            VULKAN_CONTEXT& ctx;
             Shader shaderHandler;
     };
 }

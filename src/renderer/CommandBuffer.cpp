@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    CommandBuffer::CommandBuffer(Context& ctx)
+    CommandBuffer::CommandBuffer(VULKAN_CONTEXT& ctx)
         : ctx(ctx)
     {}
 
@@ -132,7 +132,7 @@ namespace VRTR
         commandBuffer.pipelineBarrier2(dependencyInfo);
     }
 
-    vk::raii::CommandBuffer CommandBuffer::createTempCommandBuffer(Context& ctx, vk::CommandBufferLevel level, bool begin)
+    vk::raii::CommandBuffer CommandBuffer::createTempCommandBuffer(VULKAN_CONTEXT& ctx, vk::CommandBufferLevel level, bool begin)
     {
         vk::CommandBufferAllocateInfo cmdBufferAllocInfo
         {
@@ -150,7 +150,7 @@ namespace VRTR
         return cmdBuffer;
     }
 
-    void CommandBuffer::flushTempCommandBuffer(Context& ctx, 
+    void CommandBuffer::flushTempCommandBuffer(VULKAN_CONTEXT& ctx, 
                                 vk::raii::CommandBuffer& commandBuffer, 
                                 vk::raii::Queue* queue)
     {

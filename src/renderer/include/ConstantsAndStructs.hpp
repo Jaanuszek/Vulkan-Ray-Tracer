@@ -1,6 +1,5 @@
 #pragma once
 #include "pch.h"
-#include "buffer.hpp"
 
 namespace VRTR
 {
@@ -8,7 +7,9 @@ namespace VRTR
     inline uint32_t currentFrame = 0;
     inline uint32_t semaphoreIndex = 0;
 
-    struct Context
+    class Buffer;
+
+    struct VULKAN_CONTEXT
     {
         vk::raii::Context context;
 
@@ -80,18 +81,11 @@ namespace VRTR
         glm::mat4 proj_inverse;
     };
 
-    struct ScratchBuffer
-    {
-        vk::raii::Buffer buffer{nullptr};
-        vk::raii::DeviceMemory memory{nullptr};
-        uint64_t device_address;
-    };
-
     struct AccelerationStructure
     {
-        std::unique_ptr<Buffer> buffer;
+        std::unique_ptr<Buffer> buffer; // to raczej niepotrzebne
         vk::raii::AccelerationStructureKHR handle{nullptr};
-        vk::DeviceAddress device_address; // vk::DeviceAddress??
+        vk::DeviceAddress device_address;
     };
 
     struct StorageImage
@@ -102,22 +96,4 @@ namespace VRTR
         vk::raii::ImageView imageView{nullptr};
         vk::raii::DeviceMemory memory{nullptr};
     };
-
-    namespace utils
-    {
-        // zaokrągla value do najbliższej wielokrotności alignment
-        // value + alignment - 1 zaokrągla w górę
-        // ~(alignment - 1) neguje bity alignment -1 przez co zerująy się bity mniejsze niż alignment -1
-        // operacja & zostawia tylko bity większe lub równe alignment
-        // np. value = 13 alignment = 8
-        // 13 + 8 - 1 = 20 = 00010100
-        // 8 - 1 = 7 = 00000111
-        // ~7 = 11111000
-        // 20 & 11111000 = 16 = 00010000
-        // wynik to 16 czyli najbliższa wielokrotność 8 większa lub równa 13
-        inline uint32_t aligned_size(uint32_t value, uint32_t alignment)
-        {
-            return (value + alignment - 1) & ~(alignment - 1);
-        }
-    }
 }

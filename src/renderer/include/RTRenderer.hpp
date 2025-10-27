@@ -8,6 +8,7 @@
 #include "buffer.hpp"
 #include "Camera.hpp"
 #include "AccelerationStructureUtils.hpp"
+#include "Utils.hpp"
 
 namespace VRTR
 {
@@ -83,8 +84,6 @@ namespace VRTR
 
             void initRayTracing();
 
-            ScratchBuffer createScratchBuffer(vk::DeviceSize size);
-
             void createBLAS();
 
             void createTLAS();
@@ -103,7 +102,7 @@ namespace VRTR
 
         private:
             int width, height;
-            Context ctx;
+            VULKAN_CONTEXT ctx;
             std::unique_ptr<SwapChainManager> swapChainManager;
             SurfaceCapabilities surfaceCapabilities;
 

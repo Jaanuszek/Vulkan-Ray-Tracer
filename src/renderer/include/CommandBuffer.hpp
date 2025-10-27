@@ -7,7 +7,7 @@ namespace VRTR
     class CommandBuffer
     {
         public:
-            CommandBuffer(Context& ctx);
+            CommandBuffer(VULKAN_CONTEXT& ctx);
             ~CommandBuffer() = default;
 
             void createCommandPool();
@@ -48,13 +48,13 @@ namespace VRTR
                                             uint32_t baseMipLevel = 0,
                                             uint32_t levelCount = 1);
 
-            static vk::raii::CommandBuffer createTempCommandBuffer(Context& ctx, vk::CommandBufferLevel level, bool begin = true);
+            static vk::raii::CommandBuffer createTempCommandBuffer(VULKAN_CONTEXT& ctx, vk::CommandBufferLevel level, bool begin = true);
 
-            static void flushTempCommandBuffer(Context& ctx, 
+            static void flushTempCommandBuffer(VULKAN_CONTEXT& ctx, 
                                                vk::raii::CommandBuffer& commandBuffer,
                                                vk::raii::Queue* queue = nullptr);
 
         private:
-            Context& ctx;
+            VULKAN_CONTEXT& ctx;
     };
 }

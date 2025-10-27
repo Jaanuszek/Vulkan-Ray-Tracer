@@ -1,6 +1,9 @@
 #pragma once
 #include <Logger.hpp>
 #include "ConstantsAndStructs.hpp"
+#include "Utils.hpp"
+#include "CommandBuffer.hpp"
+#include "buffer.hpp"
 
 namespace VRTR
 {
@@ -16,7 +19,7 @@ namespace VRTR
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,
                                  vk::IndexType indexType = vk::IndexType::eUint32);
 
-        void createAccelerationStructure(Context& ctx,
+        void createAccelerationStructure(VRTR::VULKAN_CONTEXT& ctx,
                                          vk::AccelerationStructureTypeKHR asType,
                                          VRTR::AccelerationStructure& as,
                                          vk::AccelerationStructureGeometryKHR& asGeometry,

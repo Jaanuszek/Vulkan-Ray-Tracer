@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    SwapChainManager::SwapChainManager(Context& ctx) : ctx(ctx)
+    SwapChainManager::SwapChainManager(VULKAN_CONTEXT& ctx) : ctx(ctx)
     {
 
     }

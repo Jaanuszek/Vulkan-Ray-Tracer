@@ -4,7 +4,7 @@
 
 namespace VRTR
 {
-    RasterGraphicsPipeline::RasterGraphicsPipeline(Context& ctx) : ctx(ctx)
+    RasterGraphicsPipeline::RasterGraphicsPipeline(VULKAN_CONTEXT& ctx) : ctx(ctx)
     {}
 
     void RasterGraphicsPipeline::createPipeline(vk::Format& format)
