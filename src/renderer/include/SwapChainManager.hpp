@@ -26,7 +26,7 @@ namespace VRTR
             void createSwapChain(GLFWwindow* window);
             void createImageViews();
             void cleanupSwapChain();
-            void recreateSwapChain(GLFWwindow* window);
+            void recreateSwapChain(GLFWwindow* window, int& w, int& h);
         private:            
             SurfaceCapabilities surfaceCapabilities;
 

@@ -15,11 +15,11 @@ void VRTR::AS::primitiveToGeometry(const std::vector<VertexRT>& vertices,
     {
         .pNext = nullptr,
         .vertexFormat = vertexFormat,
-        .vertexData = buffers->vertexBuffer->getDeviceAddress(),
+        .vertexData = vk::DeviceOrHostAddressConstKHR{ buffers->vertexBuffer->getDeviceAddress() },
         .vertexStride = sizeof(VertexRT),
         .maxVertex = static_cast<uint32_t>(vertices.size() - 1),
         .indexType = indexType,
-        .indexData = buffers->indexBuffer->getDeviceAddress(),
+        .indexData = vk::DeviceOrHostAddressConstKHR{ buffers->indexBuffer->getDeviceAddress() },
         .transformData = {}
     };
 
@@ -76,11 +76,18 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT& ctx,
 
     Buffer scratchBuffer(ctx, BufferType::SCRATCH, scratchSize);
 
+    // we need also a buffer that will hold the acceleration structure
+    as.buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, asSizeInfo.accelerationStructureSize,
+                      vk::BufferUsageFlags{}, vk::MemoryPropertyFlagBits::eDeviceLocal,
+                      vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR |
+                      vk::BufferUsageFlagBits2::eShaderDeviceAddress
+        );
+
     vk::AccelerationStructureCreateInfoKHR asCreateInfo
     {
         .pNext = nullptr,
         .createFlags = {},
-        .buffer = scratchBuffer.getBuffer(),
+        .buffer = as.buffer->getBuffer(),
         .offset = 0,
         .size = asSizeInfo.accelerationStructureSize,
         .type = asType,
@@ -91,11 +98,17 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT& ctx,
     // temp cmd buffer
     auto tempCmdBuffer = CommandBuffer::createTempCommandBuffer(ctx, vk::CommandBufferLevel::ePrimary, true);
 
-    asBuildInfo.dstAccelerationStructure = as.handle;
+    asBuildInfo.dstAccelerationStructure = *as.handle;
     asBuildInfo.scratchData = scratchBuffer.getDeviceAddress();
 
-    std::array<vk::AccelerationStructureBuildRangeInfoKHR, 1> BuildRangeInfos = { asBuildRangeInfo };
-    tempCmdBuffer.buildAccelerationStructuresKHR({asBuildInfo}, BuildRangeInfos.data());
+    std::array<vk::AccelerationStructureBuildRangeInfoKHR*, 1> BuildRangeInfos = { &asBuildRangeInfo };
+    tempCmdBuffer.buildAccelerationStructuresKHR({asBuildInfo}, BuildRangeInfos);
 
     CommandBuffer::flushTempCommandBuffer(ctx, tempCmdBuffer);
+
+    as.device_address = ctx.logicalDevice.getAccelerationStructureAddressKHR(
+        vk::AccelerationStructureDeviceAddressInfoKHR{ 
+            .accelerationStructure = *as.handle 
+        }
+    );
 }

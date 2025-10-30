@@ -170,8 +170,10 @@ namespace VRTR
         ctx.swapChain = nullptr;
     }
 
-    void SwapChainManager::recreateSwapChain(GLFWwindow* window)
+    void SwapChainManager::recreateSwapChain(GLFWwindow* window, int& w, int& h)
     {
+        ctx.logicalDevice.waitIdle();
+
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
         while (width == 0 || height == 0) {
@@ -179,7 +181,8 @@ namespace VRTR
             glfwWaitEvents();
         }
 
-        ctx.logicalDevice.waitIdle();
+        w = width;
+        h = height;
 
         cleanupSwapChain();
 
