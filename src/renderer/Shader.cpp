@@ -3,12 +3,12 @@
 
 namespace VRTR
 {
-    std::vector<char> Shader::readFile(const std::string& filename) const
+    std::vector<char> Shader::readFile(const std::string &filename) const
     {
         VRTR_DEBUG("Reading shader file: {}", filename);
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-        if(!file.is_open())
+        if (!file.is_open())
         {
             VRTR_ERROR("Failed to open file: {}", filename);
             throw std::runtime_error("Failed to open file: " + filename);
@@ -24,30 +24,27 @@ namespace VRTR
         return buffer;
     }
 
-    [[nodiscard]] vk::raii::ShaderModule Shader::createShaderModule(vk::raii::Device& device,
-                                                                    const std::vector<char>& code)
+    [[nodiscard]] vk::raii::ShaderModule Shader::createShaderModule(vk::raii::Device &device,
+                                                                    const std::vector<char> &code)
     {
         vk::ShaderModuleCreateInfo createInfo{
             .codeSize = code.size() * sizeof(char),
-            .pCode = reinterpret_cast<const uint32_t*>(code.data())
-        };
+            .pCode = reinterpret_cast<const uint32_t *>(code.data())};
 
         return vk::raii::ShaderModule{device, createInfo};
     }
 
-    vk::PipelineShaderStageCreateInfo Shader::createShaderStageInfo(vk::raii::Device& device,
-                                                                    const std::string& filename,
+    vk::PipelineShaderStageCreateInfo Shader::createShaderStageInfo(vk::raii::Device &device,
+                                                                    const std::string &filename,
                                                                     vk::ShaderStageFlagBits stage)
     {
         std::vector<char> shaderCode = readFile(filename);
         auto shaderModule = createShaderModule(device, shaderCode);
         shaderModules.push_back(std::move(shaderModule)); // przechowuje w vektorze, zeby ten wskaznik nie zniknal po wyjsciu z funkcji
-        vk::PipelineShaderStageCreateInfo shaderStageInfo
-        {
+        vk::PipelineShaderStageCreateInfo shaderStageInfo{
             .stage = stage,
             .module = shaderModules.back(),
-            .pName = "main"
-        };
+            .pName = "main"};
 
         return shaderStageInfo;
     }

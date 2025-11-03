@@ -155,6 +155,13 @@ namespace VRTR
         createInfo.enabledExtensionCount = extensionsCount;
         createInfo.ppEnabledExtensionNames = extensions.data();
         createInfo.pNext = &debugCI;
+#else
+        vk::InstanceCreateInfo createInfo{};
+        createInfo.pApplicationInfo = &appInfo;
+        createInfo.enabledLayerCount = 0;
+        createInfo.ppEnabledLayerNames = nullptr;
+        createInfo.enabledExtensionCount = extensionsCount;
+        createInfo.ppEnabledExtensionNames = extensions.data();
 #endif
 
         try
@@ -172,8 +179,6 @@ namespace VRTR
             throw;
         }
     }
-
-#ifndef NDEBUG
 
     vk::DebugUtilsMessengerCreateInfoEXT RTRenderer::populateDebugMessengerCreateInfo()
     {
@@ -214,7 +219,6 @@ namespace VRTR
 
         ctx.debugMessenger = ctx.instance.createDebugUtilsMessengerEXT(debugCI, nullptr);
     }
-#endif
 
     bool RTRenderer::isDeviceSuitable(const vk::raii::PhysicalDevice &device)
     {
@@ -585,6 +589,7 @@ namespace VRTR
             .maxSets = maxSets,
             .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
             .pPoolSizes = poolSizes.data()};
+
         descriptorPool = vk::raii::DescriptorPool(ctx.logicalDevice, poolInfo);
 
         // Descriptor set - opis zasobów używanych przez shadery,
@@ -620,11 +625,6 @@ namespace VRTR
             .imageView = *storageImage.imageView,
             .imageLayout = vk::ImageLayout::eGeneral};
 
-        vk::DescriptorBufferInfo bufferInfo{
-            .buffer = uniform_buffer->getBuffer(),
-            .offset = 0,
-            .range = vk::WholeSize};
-
         vk::WriteDescriptorSet resultImageWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
@@ -633,6 +633,11 @@ namespace VRTR
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageImage,
             .pImageInfo = &imageInfo};
+
+        vk::DescriptorBufferInfo bufferInfo{
+            .buffer = uniform_buffer->getBuffer(),
+            .offset = 0,
+            .range = vk::WholeSize};
 
         vk::WriteDescriptorSet uniformBufferWrite{
             .pNext = nullptr,
@@ -647,6 +652,25 @@ namespace VRTR
             ASWrite,
             resultImageWrite,
             uniformBufferWrite};
+        ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
+    }
+
+    void RTRenderer::updateDescriptorSets()
+    {
+        vk::DescriptorImageInfo imageInfo{
+            .sampler = {},
+            .imageView = *storageImage.imageView,
+            .imageLayout = vk::ImageLayout::eGeneral};
+
+        vk::WriteDescriptorSet resultImageWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 1,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .pImageInfo = &imageInfo};
+        std::array<vk::WriteDescriptorSet, 1> WriteDescriptorSets{resultImageWrite};
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
@@ -686,6 +710,12 @@ namespace VRTR
             .pBindings = bindings.data()};
         descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
 
+        // nei wiem co to xdd
+        // const vk::PushConstantRange pushConstantRange{
+        //     .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+        //     .offset = 0,
+        //     .size = sizeof(PushConstantData)};
+
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
             .flags = {},
             .setLayoutCount = 1,
@@ -698,7 +728,6 @@ namespace VRTR
         Shader shader;
 
         // Raygen shader
-        // {
         shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "raygen.spv", vk::ShaderStageFlagBits::eRaygenKHR));
         vk::RayTracingShaderGroupCreateInfoKHR raygenGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
@@ -707,10 +736,8 @@ namespace VRTR
             .anyHitShader = VK_SHADER_UNUSED_KHR,
             .intersectionShader = VK_SHADER_UNUSED_KHR};
         shaderGroups.push_back(raygenGroup);
-        // }
 
         // Miss shader
-        // {
         shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "miss.spv", vk::ShaderStageFlagBits::eMissKHR));
         vk::RayTracingShaderGroupCreateInfoKHR missGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
@@ -719,10 +746,8 @@ namespace VRTR
             .anyHitShader = VK_SHADER_UNUSED_KHR,
             .intersectionShader = VK_SHADER_UNUSED_KHR};
         shaderGroups.push_back(missGroup);
-        // }
 
         // Closest hit shader
-        // {
         shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "closesthit.spv", vk::ShaderStageFlagBits::eClosestHitKHR));
         vk::RayTracingShaderGroupCreateInfoKHR hitGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup,
@@ -731,7 +756,7 @@ namespace VRTR
             .anyHitShader = VK_SHADER_UNUSED_KHR,
             .intersectionShader = VK_SHADER_UNUSED_KHR};
         shaderGroups.push_back(hitGroup);
-        // }
+
         vk::RayTracingPipelineCreateInfoKHR pipelineInfo{
             .pNext = nullptr,
             .flags = {},
@@ -956,7 +981,7 @@ namespace VRTR
         {
             VRTR_SwapChain->recreateSwapChain(window, width, height);
             createStorageImage();
-            createDescriptorSets();
+            updateDescriptorSets();
             buildRTCommandBuffers();
             return;
         }

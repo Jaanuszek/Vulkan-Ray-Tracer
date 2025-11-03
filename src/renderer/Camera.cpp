@@ -13,13 +13,13 @@ namespace VRTR
         // matrices.perspective[1][1] *= -1; // Invert Y for Vulkan
     }
 
-    void Camera::setRotation(const glm::vec3& rotation)
+    void Camera::setRotation(const glm::vec3 &rotation)
     {
         this->rotation = rotation;
         updateViewMatrix();
     }
 
-    void Camera::setTranslation(const glm::vec3& translation)
+    void Camera::setTranslation(const glm::vec3 &translation)
     {
         this->translation = translation;
         updateViewMatrix();

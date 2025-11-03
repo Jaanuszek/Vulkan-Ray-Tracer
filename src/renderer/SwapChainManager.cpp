@@ -3,12 +3,11 @@
 
 namespace VRTR
 {
-    SwapChainManager::SwapChainManager(VULKAN_CONTEXT& ctx) : ctx(ctx)
+    SwapChainManager::SwapChainManager(VULKAN_CONTEXT &ctx) : ctx(ctx)
     {
-
     }
 
-    SurfaceCapabilities SwapChainManager::generateSurfaceCapabilities(GLFWwindow* window)
+    SurfaceCapabilities SwapChainManager::generateSurfaceCapabilities(GLFWwindow *window)
     {
         // VRTR_DEBUG("GENERATING SURFACE CAPABILITIES");
 
@@ -27,11 +26,11 @@ namespace VRTR
         return capabilities;
     }
 
-    vk::SurfaceFormatKHR SwapChainManager::chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
+    vk::SurfaceFormatKHR SwapChainManager::chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
     {
-        for(const auto& format : availableFormats)
+        for (const auto &format : availableFormats)
         {
-            if(format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+            if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
             {
                 // VRTR_DEBUG("Using B8G8R8A8_SRGB format with SRGB nonlinear color space");
                 return format;
@@ -41,11 +40,11 @@ namespace VRTR
         return availableFormats[0];
     }
 
-    vk::PresentModeKHR SwapChainManager::choosePresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
+    vk::PresentModeKHR SwapChainManager::choosePresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes)
     {
-        for(const auto& presentMode : availablePresentModes)
+        for (const auto &presentMode : availablePresentModes)
         {
-            if(presentMode == vk::PresentModeKHR::eMailbox)
+            if (presentMode == vk::PresentModeKHR::eMailbox)
             {
                 // VRTR_DEBUG("Using Mailbox present mode");
                 return presentMode; // Prefer mailbox for lower latency
@@ -55,40 +54,38 @@ namespace VRTR
         return vk::PresentModeKHR::eFifo; // Fallback to FIFO
     }
 
-    vk::Extent2D SwapChainManager::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window)
+    vk::Extent2D SwapChainManager::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, GLFWwindow *window)
     {
         // If currentExtent is not set to special uint32_t max value,
         // then we need to use it
-        if(capabilities.currentExtent.width != UINT32_MAX)
+        if (capabilities.currentExtent.width != UINT32_MAX)
         {
             return capabilities.currentExtent;
         }
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
 
-        return vk::Extent2D{ 
-            std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width), 
-            std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height) 
-        };
+        return vk::Extent2D{
+            std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+            std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
     }
 
-
-    void SwapChainManager::createSwapChain(GLFWwindow* window)
+    void SwapChainManager::createSwapChain(GLFWwindow *window)
     {
         VRTR_DEBUG("CREATING SWAP CHAIN");
         surfaceCapabilities = generateSurfaceCapabilities(window);
-        vk::SurfaceFormatKHR  surfaceFormat = surfaceCapabilities.surfaceFormat;
+        vk::SurfaceFormatKHR surfaceFormat = surfaceCapabilities.surfaceFormat;
         vk::PresentModeKHR presentMode = surfaceCapabilities.presentMode;
         vk::Extent2D extent = surfaceCapabilities.extent;
 
         vk::SurfaceCapabilitiesKHR VK_capabilities = surfaceCapabilities.capabilities;
 
-        auto minImageCount = std::max( 2u, VK_capabilities.minImageCount);
+        auto minImageCount = std::max(2u, VK_capabilities.minImageCount);
 
         // if maxImageCount is 0 it means there is no limit
-        minImageCount = (VK_capabilities.maxImageCount > 0
-                        && minImageCount > VK_capabilities.maxImageCount)
-                        ? VK_capabilities.maxImageCount : minImageCount;
+        minImageCount = (VK_capabilities.maxImageCount > 0 && minImageCount > VK_capabilities.maxImageCount)
+                            ? VK_capabilities.maxImageCount
+                            : minImageCount;
 
         vk::SwapchainCreateInfoKHR createInfo{
             .flags = vk::SwapchainCreateFlagsKHR{},
@@ -104,8 +101,7 @@ namespace VRTR
             .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
             .presentMode = presentMode,
             .clipped = VK_TRUE,
-            .oldSwapchain = nullptr
-        };
+            .oldSwapchain = nullptr};
 
         // (!!!!!!!!!!!!!!!!!!!)
         // If I ever need to support multiple queue families, I will need to set the imageSharingMode to eConcurrent
@@ -134,8 +130,7 @@ namespace VRTR
 
         auto format = surfaceCapabilities.surfaceFormat.format;
 
-        vk::ImageViewCreateInfo createInfo
-        {
+        vk::ImageViewCreateInfo createInfo{
             .pNext = nullptr,
             .flags = {},
             .image = {},
@@ -146,17 +141,9 @@ namespace VRTR
                 .r = vk::ComponentSwizzle::eIdentity,
                 .g = vk::ComponentSwizzle::eIdentity,
                 .b = vk::ComponentSwizzle::eIdentity,
-                .a = vk::ComponentSwizzle::eIdentity
-            },
-            .subresourceRange = {
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            }
-        };
-        for (const auto& image : ctx.swapChainImages)
+                .a = vk::ComponentSwizzle::eIdentity},
+            .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1}};
+        for (const auto &image : ctx.swapChainImages)
         {
             createInfo.image = image;
             // constructing ImageView from vk::raii::ImageView
@@ -170,13 +157,14 @@ namespace VRTR
         ctx.swapChain = nullptr;
     }
 
-    void SwapChainManager::recreateSwapChain(GLFWwindow* window, int& w, int& h)
+    void SwapChainManager::recreateSwapChain(GLFWwindow *window, int &w, int &h)
     {
         ctx.logicalDevice.waitIdle();
 
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
-        while (width == 0 || height == 0) {
+        while (width == 0 || height == 0)
+        {
             glfwGetFramebufferSize(window, &width, &height);
             glfwWaitEvents();
         }
