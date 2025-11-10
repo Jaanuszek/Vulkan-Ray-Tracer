@@ -3,7 +3,8 @@
 
 void VRTR::AS::primitiveToGeometry(const std::vector<VertexRT> &vertices,
                                    const std::vector<uint32_t> &indices,
-                                   std::shared_ptr<primitiveBuffers> buffers,
+                                   std::unique_ptr<Buffer> &vertexBuffer,
+                                   std::unique_ptr<Buffer> &indexBuffer,
                                    vk::AccelerationStructureGeometryKHR &geometry,
                                    vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
                                    vk::Format vertexFormat,
@@ -14,11 +15,11 @@ void VRTR::AS::primitiveToGeometry(const std::vector<VertexRT> &vertices,
     vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
         .pNext = nullptr,
         .vertexFormat = vertexFormat,
-        .vertexData = vk::DeviceOrHostAddressConstKHR{buffers->vertexBuffer->getDeviceAddress()},
+        .vertexData = vk::DeviceOrHostAddressConstKHR{vertexBuffer->getDeviceAddress()},
         .vertexStride = sizeof(VertexRT),
         .maxVertex = static_cast<uint32_t>(vertices.size() - 1),
         .indexType = indexType,
-        .indexData = vk::DeviceOrHostAddressConstKHR{buffers->indexBuffer->getDeviceAddress()},
+        .indexData = vk::DeviceOrHostAddressConstKHR{indexBuffer->getDeviceAddress()},
         .transformData = {}};
 
     geometry = vk::AccelerationStructureGeometryKHR{

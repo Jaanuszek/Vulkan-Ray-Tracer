@@ -14,12 +14,6 @@ namespace VRTR
 
         glfwGetFramebufferSize(window, &width, &height);
 
-        //  TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
-        camera = std::make_unique<Camera>();
-        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
-        camera->setTranslation(glm::vec3(0.0f, 0.0f, -3.0f));
-        camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
-
         initInstance();
 
         initValidationLayers();
@@ -30,19 +24,7 @@ namespace VRTR
 
         initLogicalDevice();
 
-        // TODO Przeniesc to do jakies funkcji ktora ustawia wszystko
-        uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
-                                                  vk::BufferUsageFlagBits{},
-                                                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-                                                  vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
-
-        updateUniformBuffer();
-
         initSwapChain(window);
-
-        ctx.vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(vertices[0]) * vertices.size(), vk::BufferUsageFlagBits{}, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-                                                     vk::BufferUsageFlagBits2::eVertexBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
-        ctx.vertex_buffer->Update(vertices.data(), sizeof(vertices[0]) * vertices.size());
 
         initCommandBuffer();
 
@@ -432,17 +414,15 @@ namespace VRTR
         const vk::BufferUsageFlags2 buffer_usage_flags = vk::BufferUsageFlagBits2::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits2::eShaderDeviceAddress;
         const vk::MemoryPropertyFlags memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
 
-        primitive_buffers = std::make_shared<primitiveBuffers>();
+        vertex_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
+        vertex_buffer->Update(verticesRT.data(), vertex_buffer_size);
 
-        primitive_buffers->vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
-        primitive_buffers->vertexBuffer->Update(verticesRT.data(), vertex_buffer_size);
-
-        primitive_buffers->indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
-        primitive_buffers->indexBuffer->Update(indicesRT.data(), index_buffer_size);
+        index_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
+        index_buffer->Update(indicesRT.data(), index_buffer_size);
 
         vk::AccelerationStructureGeometryKHR asGeometry{};
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
-        AS::primitiveToGeometry(verticesRT, indicesRT, primitive_buffers, asGeometry, offsetInfo);
+        AS::primitiveToGeometry(verticesRT, indicesRT, vertex_buffer, index_buffer, asGeometry, offsetInfo);
         // inicjacja struktury acceleration structure.
 
         AS::createAccelerationStructure(ctx,
@@ -508,6 +488,19 @@ namespace VRTR
     void RTRenderer::createScene()
     {
         VRTR_DEBUG("Creating scene");
+
+        camera = std::make_unique<Camera>();
+        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
+        camera->setTranslation(glm::vec3(0.0f, 0.0f, -3.0f));
+        camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+
+        uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
+                                                  vk::BufferUsageFlagBits{},
+                                                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                                  vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
+
+        updateUniformBuffer();
+
         createBLAS();
         createTLAS();
     }

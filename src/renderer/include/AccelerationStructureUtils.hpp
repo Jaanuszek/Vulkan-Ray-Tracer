@@ -13,7 +13,8 @@ namespace VRTR
         // W przyszłości dodac tu moze jakąs templatke, zeby mozna bylo dawac rozne struktury, nie tylko VertexRT
         void primitiveToGeometry(const std::vector<VertexRT> &vertices,
                                  const std::vector<uint32_t> &indices,
-                                 std::shared_ptr<primitiveBuffers> buffers,
+                                 std::unique_ptr<Buffer> &vertexBuffer,
+                                 std::unique_ptr<Buffer> &indexBuffer,
                                  vk::AccelerationStructureGeometryKHR &geometry,
                                  vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,

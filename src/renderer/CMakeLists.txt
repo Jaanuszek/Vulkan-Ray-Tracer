@@ -12,7 +12,6 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 add_library(${PROJECT_NAME} SHARED
     RTRenderer.cpp
     SwapChainManager.cpp
-    RasterGraphicsPipeline.cpp
     Shader.cpp
     CommandBuffer.cpp
     buffer.cpp

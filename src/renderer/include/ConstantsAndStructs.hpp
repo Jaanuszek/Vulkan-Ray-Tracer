@@ -31,20 +31,11 @@ namespace VRTR
 
         std::vector<vk::raii::ImageView> swapChainImageViews;
 
-        vk::raii::PipelineLayout pipelineLayout{nullptr};
-
-        vk::raii::Pipeline pipeline{nullptr};
-
         vk::raii::CommandPool commandPool{nullptr};
 
         std::vector<vk::raii::CommandBuffer> commandBuffers;
 
         vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
-
-        // vk::raii::Buffer vertex_buffer{nullptr};
-        std::unique_ptr<Buffer> vertex_buffer;
-
-        vk::raii::DeviceMemory vertex_buffer_memory{nullptr};
 
         // SYNC VARIABLES
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
@@ -67,12 +58,6 @@ namespace VRTR
     struct VertexRT
     {
         glm::vec3 pos;
-    };
-
-    struct primitiveBuffers
-    {
-        std::unique_ptr<Buffer> vertexBuffer;
-        std::unique_ptr<Buffer> indexBuffer;
     };
 
     struct UniformData

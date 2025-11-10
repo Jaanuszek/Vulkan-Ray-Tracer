@@ -2,12 +2,12 @@
 
 #include "renderer_export.h"
 #include "SwapChainManager.hpp"
-#include "RasterGraphicsPipeline.hpp"
 #include "CommandBuffer.hpp"
 #include "ConstantsAndStructs.hpp"
 #include "buffer.hpp"
 #include "Camera.hpp"
 #include "AccelerationStructureUtils.hpp"
+#include "Shader.hpp"
 #include "Utils.hpp"
 
 namespace VRTR
@@ -37,15 +37,11 @@ namespace VRTR
 
                 vk::KHRAccelerationStructureExtensionName,
                 vk::KHRRayTracingPipelineExtensionName,
-                vk::KHRDeferredHostOperationsExtensionName};
+                vk::KHRDeferredHostOperationsExtensionName
+            };
 
         inline static std::vector<const char *> validationLayers{
             "VK_LAYER_KHRONOS_validation"};
-
-        inline static const std::vector<Vertex> vertices = {
-            {{0.0f, -0.5f}, {1.0f, 0.2f, 0.0f}},
-            {{0.5f, 0.5f}, {0.3f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f}, {0.0f, 0.8f, 1.0f}}};
 
         std::vector<const char *> getRequiredExtensions();
 
@@ -103,7 +99,6 @@ namespace VRTR
         SurfaceCapabilities surfaceCapabilities;
 
         std::unique_ptr<SwapChainManager> VRTR_SwapChain;
-        std::unique_ptr<RasterGraphicsPipeline> VRTR_RasterGraphicsPipeline;
         std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
 
         std::unique_ptr<Camera> camera;
@@ -113,9 +108,9 @@ namespace VRTR
         vk::raii::Pipeline rayTracingPipeline{nullptr};
         vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
 
-        // std::unique_ptr<Buffer> vertex_buffer;
-        // std::unique_ptr<Buffer> index_buffer;
-        std::shared_ptr<primitiveBuffers> primitive_buffers;
+        // std::shared_ptr<primitiveBuffers> primitive_buffers;
+        std::unique_ptr<Buffer> vertex_buffer;
+        std::unique_ptr<Buffer> index_buffer;
         std::unique_ptr<Buffer> uniform_buffer;
         UniformData uniform_data{};
         AccelerationStructure blas_structure;
