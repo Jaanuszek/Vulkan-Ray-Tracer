@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    CommandBuffer::CommandBuffer(Context& ctx)
+    CommandBuffer::CommandBuffer(VULKAN_CONTEXT& ctx)
         : ctx(ctx)
     {}
 
@@ -83,5 +83,100 @@ namespace VRTR
         };
 
         ctx.commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
+    }
+
+    void CommandBuffer::transition_image_layout(vk::raii::CommandBuffer& commandBuffer,
+                                                const vk::Image& image, 
+                                                vk::ImageLayout oldLayout, 
+                                                vk::ImageLayout newLayout,
+                                                vk::AccessFlags2 srcAccessMask,
+                                                vk::AccessFlags2 dstAccessMask,
+                                                vk::PipelineStageFlags2 srcStageMask,
+                                                vk::PipelineStageFlags2 dstStageMask,
+                                                uint32_t baseMipLevel,
+                                                uint32_t levelCount)
+    {
+        vk::ImageMemoryBarrier2 barrier
+        {
+            .pNext = nullptr,
+            .srcStageMask = srcStageMask,
+            .srcAccessMask = srcAccessMask,
+            .dstStageMask = dstStageMask,
+            .dstAccessMask = dstAccessMask,
+            .oldLayout = oldLayout,
+            .newLayout = newLayout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image,
+            .subresourceRange = {
+                .aspectMask = vk::ImageAspectFlagBits::eColor, 
+                .baseMipLevel = baseMipLevel,
+                .levelCount = levelCount,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            }
+        };
+
+        vk::DependencyInfo dependencyInfo
+        {
+            .pNext = nullptr,
+            .dependencyFlags = {},
+            .memoryBarrierCount = 0,
+            .pMemoryBarriers = nullptr,
+            .bufferMemoryBarrierCount = 0,
+            .pBufferMemoryBarriers = nullptr,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &barrier
+        };
+
+        commandBuffer.pipelineBarrier2(dependencyInfo);
+    }
+
+    vk::raii::CommandBuffer CommandBuffer::createTempCommandBuffer(VULKAN_CONTEXT& ctx, vk::CommandBufferLevel level, bool begin)
+    {
+        vk::CommandBufferAllocateInfo cmdBufferAllocInfo
+        {
+            .commandPool = ctx.commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = 1
+        };
+        vk::raii::CommandBuffer cmdBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
+
+        if(begin)
+        {
+            cmdBuffer.begin({});
+        }
+
+        return cmdBuffer;
+    }
+
+    void CommandBuffer::flushTempCommandBuffer(VULKAN_CONTEXT& ctx, 
+                                vk::raii::CommandBuffer& commandBuffer, 
+                                vk::raii::Queue* queue)
+    {
+        commandBuffer.end();
+        vk::SubmitInfo submitInfo
+        {
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*commandBuffer,
+        };
+
+        vk::raii::Fence tmpFence = ctx.logicalDevice.createFence({});
+
+        if(queue)
+        {
+            queue->submit({submitInfo}, tmpFence);
+        }
+        else
+        {
+            ctx.queue.submit({submitInfo}, tmpFence);
+        }
+
+        auto result = ctx.logicalDevice.waitForFences(*tmpFence, VK_TRUE, UINT64_MAX);
+        if(result != vk::Result::eSuccess)
+        {
+            VRTR_CRITICAL("Failed to wait for fence after storage image layout transition!");
+            abort();
+        }
     }
 }

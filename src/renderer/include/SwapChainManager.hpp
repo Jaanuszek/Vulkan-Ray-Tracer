@@ -18,7 +18,7 @@ namespace VRTR
     class SwapChainManager
     {
         public:
-            SwapChainManager(Context& ctx);
+            SwapChainManager(VULKAN_CONTEXT& ctx);
             ~SwapChainManager() = default;
 
             inline SurfaceCapabilities getSurfaceCapabilities() { return surfaceCapabilities; }
@@ -26,7 +26,7 @@ namespace VRTR
             void createSwapChain(GLFWwindow* window);
             void createImageViews();
             void cleanupSwapChain();
-            void recreateSwapChain(GLFWwindow* window);
+            void recreateSwapChain(GLFWwindow* window, int& w, int& h);
         private:            
             SurfaceCapabilities surfaceCapabilities;
 
@@ -39,6 +39,6 @@ namespace VRTR
             vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
         
         private:
-            Context& ctx;
+            VULKAN_CONTEXT& ctx;
     };
 }
