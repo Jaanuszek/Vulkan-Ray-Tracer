@@ -4,6 +4,9 @@
 
 namespace VRTR
 {
+
+    constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
     class CommandBuffer
     {
     public:
@@ -54,7 +57,16 @@ namespace VRTR
                                            vk::raii::CommandBuffer &commandBuffer,
                                            vk::raii::Queue *queue = nullptr);
 
+        // Temporary
+        // bede chcial to przechowywac w oddzielnej klasie zajmującej się syncrhonizacją
+        inline uint32_t getCurrentFrame() const { return currentFrame; }
+        inline uint32_t getSemaphoreIndex() const { return semaphoreIndex; }
+        inline void setCurrentFrame(uint32_t frame) { currentFrame = frame; }
+        inline void setSemaphoreIndex(uint32_t index) { semaphoreIndex = index; }
+
     private:
         VULKAN_CONTEXT &ctx;
+        uint32_t currentFrame = 0;
+        uint32_t semaphoreIndex = 0;
     };
 }

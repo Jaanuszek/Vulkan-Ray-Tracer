@@ -3,10 +3,6 @@
 
 namespace VRTR
 {
-    constexpr int MAX_FRAMES_IN_FLIGHT = 2;
-    inline uint32_t currentFrame = 0;
-    inline uint32_t semaphoreIndex = 0;
-
     class Buffer;
 
     struct VULKAN_CONTEXT
@@ -35,7 +31,7 @@ namespace VRTR
 
         std::vector<vk::raii::CommandBuffer> commandBuffers;
 
-        vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
+        vk::raii::DebugUtilsMessengerEXT debugMessenger{nullptr};
 
         // SYNC VARIABLES
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;

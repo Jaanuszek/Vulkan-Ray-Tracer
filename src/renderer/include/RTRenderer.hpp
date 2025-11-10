@@ -4,6 +4,8 @@
 #include "SwapChainManager.hpp"
 #include "CommandBuffer.hpp"
 #include "ConstantsAndStructs.hpp"
+#include "RendererContext.hpp"
+#include "InstanceManager.hpp"
 #include "buffer.hpp"
 #include "Camera.hpp"
 #include "AccelerationStructureUtils.hpp"
@@ -12,12 +14,6 @@
 
 namespace VRTR
 {
-#ifndef NDEBUG
-    constexpr bool enableValidationLayers = true;
-#else
-    constexpr bool enableValidationLayers = false;
-#endif
-
     class RENDERER_EXPORT RTRenderer
     {
     public:
@@ -39,20 +35,6 @@ namespace VRTR
                 vk::KHRRayTracingPipelineExtensionName,
                 vk::KHRDeferredHostOperationsExtensionName
             };
-
-        inline static std::vector<const char *> validationLayers{
-            "VK_LAYER_KHRONOS_validation"};
-
-        std::vector<const char *> getRequiredExtensions();
-
-        // Check if selected extensions are supported by the instance
-        bool checkExtensionsSupport(const std::vector<const char *> &glfwExtensions,
-                                    const std::vector<vk::ExtensionProperties> &extensionsProperties);
-
-        void initInstance();
-
-        void initValidationLayers();
-        vk::DebugUtilsMessengerCreateInfoEXT populateDebugMessengerCreateInfo();
 
         bool isDeviceSuitable(const vk::raii::PhysicalDevice &device);
 
@@ -95,6 +77,9 @@ namespace VRTR
     private:
         int width, height;
         VULKAN_CONTEXT ctx;
+        // TODO replace VULKAN_CONTEXT with RendererContext
+        RendererContext rendererContext;
+
         std::unique_ptr<SwapChainManager> swapChainManager;
         SurfaceCapabilities surfaceCapabilities;
 
@@ -108,7 +93,6 @@ namespace VRTR
         vk::raii::Pipeline rayTracingPipeline{nullptr};
         vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
 
-        // std::shared_ptr<primitiveBuffers> primitive_buffers;
         std::unique_ptr<Buffer> vertex_buffer;
         std::unique_ptr<Buffer> index_buffer;
         std::unique_ptr<Buffer> uniform_buffer;
@@ -131,10 +115,6 @@ namespace VRTR
         void updateUniformBuffer();
     };
 
-    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
-                                                          vk::DebugUtilsMessageTypeFlagsEXT type,
-                                                          const vk::DebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                                                          void *);
     inline static void framebufferResizeCallback(GLFWwindow *window, int width, int height)
     {
         auto app = reinterpret_cast<RTRenderer *>(glfwGetWindowUserPointer(window));
