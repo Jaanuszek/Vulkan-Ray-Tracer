@@ -3,27 +3,124 @@
 
 namespace VRTR
 {
-    SwapChainManager::SwapChainManager(VULKAN_CONTEXT &ctx) : ctx(ctx)
+    SwapChainManager::SwapChainManager(vk::raii::Device &device, vk::raii::PhysicalDevice &gpu, vk::raii::SurfaceKHR &surface)
+        : device(device), gpu(gpu), surface(surface) {}
+
+    void SwapChainManager::init(GLFWwindow *window)
     {
+        createSwapChain(window);
+        createImageViews();
     }
 
-    SurfaceCapabilities SwapChainManager::generateSurfaceCapabilities(GLFWwindow *window)
+    void SwapChainManager::recreateSwapChain(GLFWwindow *window, int &w, int &h)
     {
-        // VRTR_DEBUG("GENERATING SURFACE CAPABILITIES");
+        device.waitIdle();
 
-        SurfaceCapabilities capabilities;
-        auto surfaceCapabilities = ctx.gpu.getSurfaceCapabilitiesKHR(ctx.surface);
-        auto availableFormats = ctx.gpu.getSurfaceFormatsKHR(ctx.surface);
-        auto availablePresentModes = ctx.gpu.getSurfacePresentModesKHR(ctx.surface);
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
 
-        capabilities.capabilities = surfaceCapabilities;
-        capabilities.availableFormats = availableFormats;
-        capabilities.availablePresentModes = availablePresentModes;
-        capabilities.surfaceFormat = SwapChainManager::chooseSurfaceFormat(availableFormats);
-        capabilities.presentMode = SwapChainManager::choosePresentMode(availablePresentModes);
-        capabilities.extent = SwapChainManager::chooseSwapExtent(surfaceCapabilities, window);
+        w = width;
+        h = height;
 
-        return capabilities;
+        cleanupSwapChain();
+
+        createSwapChain(window);
+        createImageViews();
+    }
+
+    void SwapChainManager::createSwapChain(GLFWwindow *window)
+    {
+        VRTR_DEBUG("CREATING SWAP CHAIN");
+
+        auto surfaceCapabilities = gpu.getSurfaceCapabilitiesKHR(surface);
+        auto availableFormats = gpu.getSurfaceFormatsKHR(surface);
+        auto availablePresentModes = gpu.getSurfacePresentModesKHR(surface);
+
+        surfaceFormat = SwapChainManager::chooseSurfaceFormat(availableFormats);
+        imageFormat = surfaceFormat.format;
+        presentMode = SwapChainManager::choosePresentMode(availablePresentModes);
+        extent = SwapChainManager::chooseSwapExtent(surfaceCapabilities, window);
+
+        auto minImageCount = std::max(2u, surfaceCapabilities.minImageCount);
+
+        // if maxImageCount is 0 it means there is no limit
+        minImageCount = (surfaceCapabilities.maxImageCount > 0 && minImageCount > surfaceCapabilities.maxImageCount)
+                            ? surfaceCapabilities.maxImageCount
+                            : minImageCount;
+
+        vk::SwapchainCreateInfoKHR createInfo{
+            .flags = vk::SwapchainCreateFlagsKHR{},
+            .surface = surface,
+            .minImageCount = minImageCount,
+            .imageFormat = imageFormat,
+            .imageColorSpace = surfaceFormat.colorSpace,
+            .imageExtent = extent,
+            .imageArrayLayers = 1,
+            .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst, // TransferSRC - ustawienie bitu ktory mowi ze mozemy zmienic layout danego vk::Image na VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+            .imageSharingMode = vk::SharingMode::eExclusive,
+            .preTransform = surfaceCapabilities.currentTransform,
+            .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+            .presentMode = presentMode,
+            .clipped = VK_TRUE,
+            .oldSwapchain = nullptr};
+
+        // (!!!!!!!!!!!!!!!!!!!)
+        // If I ever need to support multiple queue families, I will need to set the imageSharingMode to eConcurrent
+
+        // uint32_t queueFamilyIndices[] = {graphicsFamily, presentFamily};
+
+        // if (graphicsFamily != presentFamily) {
+        //     swapChainCreateInfo.imageSharingMode = vk::SharingMode::eConcurrent;
+        //     swapChainCreateInfo.queueFamilyIndexCount = 2;
+        //     swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+        // } else {
+        //     swapChainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
+        //     swapChainCreateInfo.queueFamilyIndexCount = 0; // Optional
+        //     swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
+        // }
+
+        swapChain = vk::raii::SwapchainKHR(device, createInfo);
+        swapChainImages = swapChain.getImages();
+    }
+
+    void SwapChainManager::createImageViews()
+    {
+        VRTR_DEBUG("CREATING IMAGE VIEWS");
+        swapChainImageViews.clear();
+        swapChainImageViews.reserve(swapChainImages.size());
+
+        auto format = gpu.getSurfaceCapabilitiesKHR(surface);
+
+        vk::ImageViewCreateInfo createInfo{
+            .pNext = nullptr,
+            .flags = {},
+            .image = {},
+            .viewType = vk::ImageViewType::e2D,
+            .format = imageFormat,
+            .components = {
+                // Identity swizzle - default color components
+                .r = vk::ComponentSwizzle::eIdentity,
+                .g = vk::ComponentSwizzle::eIdentity,
+                .b = vk::ComponentSwizzle::eIdentity,
+                .a = vk::ComponentSwizzle::eIdentity},
+            .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1}};
+        for (const auto &image : swapChainImages)
+        {
+            createInfo.image = image;
+            // constructing ImageView from vk::raii::ImageView
+            swapChainImageViews.emplace_back(device, createInfo);
+        }
+    }
+
+    void SwapChainManager::cleanupSwapChain()
+    {
+        swapChainImageViews.clear();
+        swapChain = nullptr;
     }
 
     vk::SurfaceFormatKHR SwapChainManager::chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
@@ -68,113 +165,5 @@ namespace VRTR
         return vk::Extent2D{
             std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
             std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
-    }
-
-    void SwapChainManager::createSwapChain(GLFWwindow *window)
-    {
-        VRTR_DEBUG("CREATING SWAP CHAIN");
-        surfaceCapabilities = generateSurfaceCapabilities(window);
-        vk::SurfaceFormatKHR surfaceFormat = surfaceCapabilities.surfaceFormat;
-        vk::PresentModeKHR presentMode = surfaceCapabilities.presentMode;
-        vk::Extent2D extent = surfaceCapabilities.extent;
-
-        vk::SurfaceCapabilitiesKHR VK_capabilities = surfaceCapabilities.capabilities;
-
-        auto minImageCount = std::max(2u, VK_capabilities.minImageCount);
-
-        // if maxImageCount is 0 it means there is no limit
-        minImageCount = (VK_capabilities.maxImageCount > 0 && minImageCount > VK_capabilities.maxImageCount)
-                            ? VK_capabilities.maxImageCount
-                            : minImageCount;
-
-        vk::SwapchainCreateInfoKHR createInfo{
-            .flags = vk::SwapchainCreateFlagsKHR{},
-            .surface = ctx.surface,
-            .minImageCount = minImageCount,
-            .imageFormat = surfaceFormat.format,
-            .imageColorSpace = surfaceFormat.colorSpace,
-            .imageExtent = extent,
-            .imageArrayLayers = 1,
-            .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst, // TransferSRC - ustawienie bitu ktory mowi ze mozemy zmienic layout danego vk::Image na VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-            .imageSharingMode = vk::SharingMode::eExclusive,
-            .preTransform = VK_capabilities.currentTransform,
-            .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-            .presentMode = presentMode,
-            .clipped = VK_TRUE,
-            .oldSwapchain = nullptr};
-
-        // (!!!!!!!!!!!!!!!!!!!)
-        // If I ever need to support multiple queue families, I will need to set the imageSharingMode to eConcurrent
-
-        // uint32_t queueFamilyIndices[] = {graphicsFamily, presentFamily};
-
-        // if (graphicsFamily != presentFamily) {
-        //     swapChainCreateInfo.imageSharingMode = vk::SharingMode::eConcurrent;
-        //     swapChainCreateInfo.queueFamilyIndexCount = 2;
-        //     swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
-        // } else {
-        //     swapChainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
-        //     swapChainCreateInfo.queueFamilyIndexCount = 0; // Optional
-        //     swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
-        // }
-
-        ctx.swapChain = vk::raii::SwapchainKHR(ctx.logicalDevice, createInfo);
-        ctx.swapChainImages = ctx.swapChain.getImages();
-    }
-
-    void SwapChainManager::createImageViews()
-    {
-        VRTR_DEBUG("CREATING IMAGE VIEWS");
-        ctx.swapChainImageViews.clear();
-        ctx.swapChainImageViews.reserve(ctx.swapChainImages.size());
-
-        auto format = surfaceCapabilities.surfaceFormat.format;
-
-        vk::ImageViewCreateInfo createInfo{
-            .pNext = nullptr,
-            .flags = {},
-            .image = {},
-            .viewType = vk::ImageViewType::e2D,
-            .format = format,
-            .components = {
-                // Identity swizzle - default color components
-                .r = vk::ComponentSwizzle::eIdentity,
-                .g = vk::ComponentSwizzle::eIdentity,
-                .b = vk::ComponentSwizzle::eIdentity,
-                .a = vk::ComponentSwizzle::eIdentity},
-            .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1}};
-        for (const auto &image : ctx.swapChainImages)
-        {
-            createInfo.image = image;
-            // constructing ImageView from vk::raii::ImageView
-            ctx.swapChainImageViews.emplace_back(ctx.logicalDevice, createInfo);
-        }
-    }
-
-    void SwapChainManager::cleanupSwapChain()
-    {
-        ctx.swapChainImageViews.clear();
-        ctx.swapChain = nullptr;
-    }
-
-    void SwapChainManager::recreateSwapChain(GLFWwindow *window, int &w, int &h)
-    {
-        ctx.logicalDevice.waitIdle();
-
-        int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
-        while (width == 0 || height == 0)
-        {
-            glfwGetFramebufferSize(window, &width, &height);
-            glfwWaitEvents();
-        }
-
-        w = width;
-        h = height;
-
-        cleanupSwapChain();
-
-        createSwapChain(window);
-        createImageViews();
     }
 }

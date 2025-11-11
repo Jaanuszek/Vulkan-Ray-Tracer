@@ -5,6 +5,7 @@
 #include "RTRenderer.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+static vk::detail::DynamicLoader dl;
 
 constexpr unsigned int WIDTH = 800;
 constexpr unsigned int HEIGHT = 600;
@@ -13,6 +14,14 @@ int main()
 {
     try
     {
+        // #if defined(_HPP_VULKAN_LIBRARY)
+        //         static vk::detail::DynamicLoader dl(_HPP_VULKAN_LIBRARY);
+        // #else
+        //         static vk::detail::DynamicLoader dl;
+        // #endif
+        PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
+
         VRTR::Logger::init();
         glfwInit();
 

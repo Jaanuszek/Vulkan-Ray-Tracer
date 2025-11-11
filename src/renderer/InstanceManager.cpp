@@ -31,14 +31,6 @@ namespace VRTR
 
     vk::raii::Instance InstanceManager::createInstance(vk::raii::Context& ctx, vk::raii::DebugUtilsMessengerEXT& debugMessenger)
     {
-#if defined(_HPP_VULKAN_LIBRARY)
-        static vk::detail::DynamicLoader dl(_HPP_VULKAN_LIBRARY);
-#else
-        static vk::detail::DynamicLoader dl;
-#endif
-        PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-        VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
-
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if (glfwVulkanSupported() != GLFW_TRUE)
         {

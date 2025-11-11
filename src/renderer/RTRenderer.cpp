@@ -18,13 +18,29 @@ namespace VRTR
         // TODO replace it with
         // rendererContext.instance = InstanceManager::createInstance(rendererContext.context, rendererContext.debugMessenger);
 
-        initPhysicalDeviceAndSurface(window);
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Instance>(*ctx.instance));
+
+        DeviceProperties deviceProps = DeviceManager::initDevice(window, ctx.instance);
+        ctx.gpu = std::move(deviceProps.physicalDevice);
+        ctx.surface = std::move(deviceProps.surface);
+        ctx.logicalDevice = std::move(deviceProps.logicalDevice);
+        ctx.queue = std::move(deviceProps.graphicsQueue);
+        ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
+        // TODO replace VULKAN_CONTEXT with RendererContext
+        // rendererContext.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
+        // rendererContext.gpu = std::move(deviceProps.physicalDevice);
+        // rendererContext.surface = std::move(deviceProps.surface);
+        // rendererContext.logicalDevice = std::move(deviceProps.logicalDevice);
+        // rendererContext.queue = std::move(deviceProps.graphicsQueue);
+
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Device>(*ctx.logicalDevice));
 
         initRayTracing();
 
-        initLogicalDevice();
-
-        initSwapChain(window);
+        swapChainManager = std::make_unique<SwapChainManager>(ctx.logicalDevice, ctx.gpu, ctx.surface);
+        swapChainManager->init(window);
+        // TODO replace VULKAN_CONTEXT with RendererContext
+        // swapChainManager = std::make_unique<SwapChainManager>(rendererContext.logicalDevice, rendererContext.gpu, rendererContext.surface);
 
         initCommandBuffer();
 
@@ -41,140 +57,6 @@ namespace VRTR
         createDescriptorSets();
 
         buildRTCommandBuffers();
-    }
-
-    bool RTRenderer::isDeviceSuitable(const vk::raii::PhysicalDevice &device)
-    {
-        bool isSuitable = false;
-        vk::PhysicalDeviceProperties properties = device.getProperties();
-        std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
-        std::vector<vk::ExtensionProperties> availableExtensions = device.enumerateDeviceExtensionProperties();
-
-        // Physical device needs to support Vulkan 1.4 or higher
-        isSuitable = properties.apiVersion >= VK_API_VERSION_1_4;
-
-        const auto &qfpIt = std::ranges::find_if(queueFamilies,
-                                                 [](const vk::QueueFamilyProperties &qfp)
-                                                 {
-                                                     return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlagBits>(0);
-                                                 });
-
-        // Check if the device has at least one queue family that supports graphics operations
-        isSuitable = isSuitable && (qfpIt != queueFamilies.end());
-
-        bool foundExtensions = true;
-        for (auto const &extension : deviceExtensions)
-        {
-            auto extensionIter = std::ranges::find_if(availableExtensions,
-                                                      [extension](const vk::ExtensionProperties &ep)
-                                                      {
-                                                          return std::strcmp(ep.extensionName, extension) == 0;
-                                                      });
-
-            foundExtensions = foundExtensions && (extensionIter != availableExtensions.end());
-        }
-
-        // Check if the device supports the required extensions
-        isSuitable = isSuitable && foundExtensions;
-
-        return isSuitable;
-    }
-
-    uint32_t RTRenderer::findQueueFamilies()
-    {
-        std::vector<vk::QueueFamilyProperties> queueFamilies = ctx.gpu.getQueueFamilyProperties();
-        uint32_t index = 0;
-
-        for (const auto &queueFamily : queueFamilies)
-        {
-            // As of now, I will just look for a queue family that supports both graphics and presentation
-            // I will need to update it later
-            if ((queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) &&
-                (ctx.gpu.getSurfaceSupportKHR(static_cast<uint32_t>(index), *ctx.surface)))
-            {
-                VRTR_DEBUG("Found graphics queue family that supports both graphics and presentation at index: {}", index);
-                return index;
-            }
-            index++;
-        }
-        VRTR_CRITICAL("No suitable graphics queue family found!");
-        throw std::runtime_error("No suitable graphics queue family found!");
-    }
-
-    void RTRenderer::initPhysicalDeviceAndSurface(GLFWwindow *window)
-    {
-        VRTR_DEBUG("Selecting Physical Device");
-        std::vector<vk::raii::PhysicalDevice> gpus = ctx.instance.enumeratePhysicalDevices();
-
-        for (const auto &gpu : gpus)
-        {
-            if (isDeviceSuitable(gpu))
-            {
-                ctx.gpu = gpu;
-                VRTR_DEBUG("Physical device selected: {}", ctx.gpu.getProperties().deviceName.data());
-                break;
-            }
-        }
-
-        VkSurfaceKHR tempSurface;
-        if (glfwCreateWindowSurface(*ctx.instance, window, nullptr, &tempSurface) != VK_SUCCESS)
-        {
-            VRTR_ERROR("Failed to create window surface");
-            throw std::runtime_error("Failed to create window surface");
-        }
-        ctx.surface = vk::raii::SurfaceKHR(ctx.instance, tempSurface);
-        ctx.graphics_queue_index = findQueueFamilies();
-    }
-
-    void RTRenderer::initLogicalDevice()
-    {
-        VRTR_DEBUG("CREATING LOGICAL DEVICE");
-
-        std::vector<vk::QueueFamilyProperties> queueFamilyProperties = ctx.gpu.getQueueFamilyProperties();
-        float queuePriority = 0.0f;
-
-        vk::StructureChain<vk::PhysicalDeviceFeatures2,
-                           vk::PhysicalDeviceVulkan11Features,
-                           vk::PhysicalDeviceVulkan13Features,
-                           vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-                           vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
-                           vk::PhysicalDeviceRayQueryFeaturesKHR,
-                           vk::PhysicalDeviceBufferDeviceAddressFeatures,
-                           vk::PhysicalDeviceAccelerationStructureFeaturesKHR>
-            featuresChain{
-                {},
-                {.shaderDrawParameters = VK_TRUE},
-                {.synchronization2 = VK_TRUE,
-                 .dynamicRendering = VK_TRUE},
-                {.extendedDynamicState = VK_TRUE},
-                {.rayTracingPipeline = VK_TRUE},
-                {.rayQuery = VK_TRUE},
-                {.bufferDeviceAddress = VK_TRUE},
-                {.accelerationStructure = VK_TRUE}};
-
-        vk::DeviceQueueCreateInfo queueCreateInfo{
-            .queueFamilyIndex = static_cast<uint32_t>(ctx.graphics_queue_index),
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority};
-
-        // enabledLayerCount and ppEnabledLayersNames are not used in Vulkan 1.4
-        vk::DeviceCreateInfo deviceCreateInfo{
-            .pNext = &featuresChain.get<vk::PhysicalDeviceFeatures2>(),
-            .queueCreateInfoCount = 1,
-            .pQueueCreateInfos = &queueCreateInfo,
-            .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
-            .ppEnabledExtensionNames = deviceExtensions.data()};
-
-        ctx.logicalDevice = vk::raii::Device(ctx.gpu, deviceCreateInfo);
-        ctx.queue = vk::raii::Queue(ctx.logicalDevice, static_cast<uint32_t>(ctx.graphics_queue_index), 0);
-    }
-
-    void RTRenderer::initSwapChain(GLFWwindow *window)
-    {
-        VRTR_SwapChain = std::make_unique<SwapChainManager>(ctx);
-        VRTR_SwapChain->createSwapChain(window);
-        VRTR_SwapChain->createImageViews();
-        surfaceCapabilities = VRTR_SwapChain->getSurfaceCapabilities();
     }
 
     uint32_t RTRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
@@ -654,8 +536,6 @@ namespace VRTR
 
     void RTRenderer::buildRTCommandBuffers()
     {
-        // TODO dodać zmiane rozmiaru okienka!!!
-
         vk::CommandBufferBeginInfo beginInfo{
             .flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse,
             .pInheritanceInfo = nullptr};
@@ -668,6 +548,17 @@ namespace VRTR
         //     .baseArrayLayer = 0,
         //     .layerCount = 1
         // };
+
+
+        //TODO tu mogą byc problemy, bo pobieram kopie, a nie referencje do obrazow swapchain
+        // te komendy transition_image_layout nic nei robią z tymi obiektami (CHYBA)
+        // ale warto miec to na uwadze
+        auto swapChainImages = swapChainManager->getSwapChainImages();
+
+        if (ctx.commandBuffers.size() != swapChainImages.size()) {
+            VRTR_CRITICAL("Mismatch between command buffer count ({}) and swapchain image count ({})",
+                        ctx.commandBuffers.size(), swapChainImages.size());
+        }
 
         for (int32_t i = 0; i < ctx.commandBuffers.size(); i++)
         {
@@ -707,7 +598,7 @@ namespace VRTR
 
             VRTR_CommandBuffer->transition_image_layout(
                 ctx.commandBuffers.at(i),
-                storageImage.image,
+                *storageImage.image,
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eGeneral,
                 {},
@@ -726,7 +617,7 @@ namespace VRTR
 
             VRTR_CommandBuffer->transition_image_layout(
                 ctx.commandBuffers.at(i),
-                ctx.swapChainImages.at(i),
+                swapChainImages.at(i),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eTransferDstOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
@@ -736,7 +627,7 @@ namespace VRTR
 
             VRTR_CommandBuffer->transition_image_layout(
                 ctx.commandBuffers.at(i),
-                storageImage.image,
+                *storageImage.image,
                 vk::ImageLayout::eGeneral,
                 vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
@@ -755,12 +646,12 @@ namespace VRTR
 
             ctx.commandBuffers.at(i).copyImage(
                 *storageImage.image, vk::ImageLayout::eTransferSrcOptimal,
-                ctx.swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
+                swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
                 {copyRegion});
 
             VRTR_CommandBuffer->transition_image_layout(
                 ctx.commandBuffers.at(i),
-                ctx.swapChainImages.at(i),
+                swapChainImages.at(i),
                 vk::ImageLayout::eTransferDstOptimal,
                 vk::ImageLayout::ePresentSrcKHR,
                 {},
@@ -773,6 +664,7 @@ namespace VRTR
 
     void RTRenderer::drawFrame(GLFWwindow *window)
     {
+        vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
         while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*ctx.drawFences.at(VRTR_CommandBuffer->getCurrentFrame()), VK_TRUE, UINT64_MAX))
             ;
 
@@ -780,11 +672,9 @@ namespace VRTR
         // I cant disable it, because i am using vk::raii and it requires exceptions to be enabled :(
         try
         {
-            auto [result, imageIndex] = ctx.swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(VRTR_CommandBuffer->getSemaphoreIndex()), nullptr);
-
+            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(VRTR_CommandBuffer->getSemaphoreIndex()), nullptr);
             // recordCommandBuffer(imageIndex);
             ctx.logicalDevice.resetFences({ctx.drawFences[VRTR_CommandBuffer->getCurrentFrame()]});
-
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
@@ -802,7 +692,7 @@ namespace VRTR
                 .waitSemaphoreCount = 1,
                 .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(VRTR_CommandBuffer->getCurrentFrame()),
                 .swapchainCount = 1,
-                .pSwapchains = &*ctx.swapChain,
+                .pSwapchains = &*swapChain,
                 .pImageIndices = &imageIndex,
                 .pResults = nullptr};
 
@@ -813,7 +703,7 @@ namespace VRTR
         }
         catch (const vk::OutOfDateKHRError &e)
         {
-            VRTR_SwapChain->recreateSwapChain(window, width, height);
+            swapChainManager->recreateSwapChain(window, width, height);
             createStorageImage();
             updateDescriptorSets();
             buildRTCommandBuffers();

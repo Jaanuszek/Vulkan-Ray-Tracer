@@ -6,6 +6,7 @@
 #include "ConstantsAndStructs.hpp"
 #include "RendererContext.hpp"
 #include "InstanceManager.hpp"
+#include "DeviceManager.hpp"
 #include "buffer.hpp"
 #include "Camera.hpp"
 #include "AccelerationStructureUtils.hpp"
@@ -25,25 +26,6 @@ namespace VRTR
         void drawFrame(GLFWwindow *window);
 
     private:
-        inline static std::vector<const char *> deviceExtensions // gpu logical device extensions
-            {
-                vk::KHRSwapchainExtensionName,
-                vk::KHRSpirv14ExtensionName,
-                vk::KHRRayQueryExtensionName,
-
-                vk::KHRAccelerationStructureExtensionName,
-                vk::KHRRayTracingPipelineExtensionName,
-                vk::KHRDeferredHostOperationsExtensionName
-            };
-
-        bool isDeviceSuitable(const vk::raii::PhysicalDevice &device);
-
-        uint32_t findQueueFamilies();
-
-        void initPhysicalDeviceAndSurface(GLFWwindow *window);
-
-        void initLogicalDevice();
-
         void initSwapChain(GLFWwindow *window);
 
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
@@ -81,9 +63,6 @@ namespace VRTR
         RendererContext rendererContext;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
-        SurfaceCapabilities surfaceCapabilities;
-
-        std::unique_ptr<SwapChainManager> VRTR_SwapChain;
         std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
 
         std::unique_ptr<Camera> camera;

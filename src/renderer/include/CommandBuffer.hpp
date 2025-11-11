@@ -68,5 +68,8 @@ namespace VRTR
         VULKAN_CONTEXT &ctx;
         uint32_t currentFrame = 0;
         uint32_t semaphoreIndex = 0;
+
+        // vk::raii::CommandPool commandPool{nullptr};
+
     };
 }
