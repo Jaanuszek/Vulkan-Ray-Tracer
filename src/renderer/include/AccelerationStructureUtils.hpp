@@ -2,7 +2,7 @@
 #include <Logger.hpp>
 #include "ConstantsAndStructs.hpp"
 #include "Utils.hpp"
-#include "CommandBuffer.hpp"
+#include "CommandBufferManager.hpp"
 #include "buffer.hpp"
 
 namespace VRTR

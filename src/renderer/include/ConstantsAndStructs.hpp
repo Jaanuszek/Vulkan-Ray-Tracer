@@ -21,12 +21,6 @@ namespace VRTR
 
         vk::raii::SurfaceKHR surface{nullptr};
 
-        // vk::raii::SwapchainKHR swapChain{nullptr};
-
-        // std::vector<vk::Image> swapChainImages;
-
-        // std::vector<vk::raii::ImageView> swapChainImageViews;
-
         vk::raii::CommandPool commandPool{nullptr};
 
         std::vector<vk::raii::CommandBuffer> commandBuffers;

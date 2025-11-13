@@ -85,18 +85,17 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
         .deviceAddress = 0};
     as.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, asCreateInfo);
 
-    // temp cmd buffer
-    auto tempCmdBuffer = CommandBuffer::createTempCommandBuffer(ctx, vk::CommandBufferLevel::ePrimary, true);
-
     asBuildInfo.dstAccelerationStructure = *as.handle;
     asBuildInfo.scratchData = scratchBuffer.getDeviceAddress();
+
+    std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
+    vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
 
     std::array<vk::AccelerationStructureBuildRangeInfoKHR *, 1> BuildRangeInfos = {&asBuildRangeInfo};
     tempCmdBuffer.buildAccelerationStructuresKHR({asBuildInfo}, BuildRangeInfos);
 
-    CommandBuffer::flushTempCommandBuffer(ctx, tempCmdBuffer);
-
     as.device_address = ctx.logicalDevice.getAccelerationStructureAddressKHR(
         vk::AccelerationStructureDeviceAddressInfoKHR{
             .accelerationStructure = *as.handle});
+    tempCmdBufferManager->submitAndWaitTempCmdBuffer();
 }

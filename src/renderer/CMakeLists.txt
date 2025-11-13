@@ -14,7 +14,7 @@ add_library(${PROJECT_NAME} SHARED
     InstanceManager.cpp
     SwapChainManager.cpp
     Shader.cpp
-    CommandBuffer.cpp
+    CommandBufferManager.cpp
     buffer.cpp
     Camera.cpp
     AccelerationStructureUtils.cpp

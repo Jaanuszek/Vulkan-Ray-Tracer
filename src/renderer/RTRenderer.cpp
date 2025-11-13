@@ -42,7 +42,10 @@ namespace VRTR
         // TODO replace VULKAN_CONTEXT with RendererContext
         // swapChainManager = std::make_unique<SwapChainManager>(rendererContext.logicalDevice, rendererContext.gpu, rendererContext.surface);
 
-        initCommandBuffer();
+        commandBufferManager = std::make_unique<CommandBufferManager>(ctx.logicalDevice, ctx.graphics_queue_index);
+        // TODO replace VULKAN_CONTEXT with RendererContext
+        // commandBuffermanager = std::make_unique<CommandBufferManager>(rendererContext.logical
+        commandBufferManager->init();
 
         createSyncObjects();
 
@@ -69,13 +72,6 @@ namespace VRTR
             }
         }
         throw std::runtime_error("Failed to find suitable memory type");
-    }
-
-    void RTRenderer::initCommandBuffer()
-    {
-        VRTR_CommandBuffer = std::make_unique<CommandBuffer>(ctx);
-        VRTR_CommandBuffer->createCommandPool();
-        VRTR_CommandBuffer->createCommandBuffers();
     }
 
     void RTRenderer::createSyncObjects()
@@ -272,10 +268,11 @@ namespace VRTR
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1};
 
-        vk::raii::CommandBuffer tmpCmdBuffer = CommandBuffer::createTempCommandBuffer(ctx, vk::CommandBufferLevel::ePrimary, true);
+        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
+        vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
 
-        VRTR_CommandBuffer->transition_image_layout(
-            tmpCmdBuffer,
+        CommandBufferManager::transition_image_layout(
+            tempCmdBuffer,
             storageImage.image,
             vk::ImageLayout::eUndefined,
             vk::ImageLayout::eGeneral, // it's basicaly storage image flag - we can do everything with it copy/write/read
@@ -285,7 +282,7 @@ namespace VRTR
             vk::PipelineStageFlagBits2::eAllCommands  // CHANGE IT LATER
         );
 
-        VRTR::CommandBuffer::flushTempCommandBuffer(ctx, tmpCmdBuffer);
+        tempCmdBufferManager->submitAndWaitTempCmdBuffer();
     }
 
     void RTRenderer::createDescriptorSets()
@@ -554,15 +551,16 @@ namespace VRTR
         // te komendy transition_image_layout nic nei robią z tymi obiektami (CHYBA)
         // ale warto miec to na uwadze
         auto swapChainImages = swapChainManager->getSwapChainImages();
+        auto &commandBuffers = commandBufferManager->getCommandBuffers();
 
-        if (ctx.commandBuffers.size() != swapChainImages.size()) {
+        if (commandBuffers.size() != swapChainImages.size()) {
             VRTR_CRITICAL("Mismatch between command buffer count ({}) and swapchain image count ({})",
-                        ctx.commandBuffers.size(), swapChainImages.size());
+                        commandBuffers.size(), swapChainImages.size());
         }
 
-        for (int32_t i = 0; i < ctx.commandBuffers.size(); i++)
+        for (uint32_t i = 0; i < commandBuffers.size(); i++)
         {
-            ctx.commandBuffers.at(i).begin(beginInfo);
+            commandBufferManager->beginCommandBuffer(i, beginInfo);
 
             const uint32_t handle_size = rayTracingPipelineProperties.shaderGroupHandleSize;
             const uint32_t handle_alignment = rayTracingPipelineProperties.shaderGroupHandleAlignment;
@@ -585,19 +583,19 @@ namespace VRTR
 
             vk::StridedDeviceAddressRegionKHR callableShaderSBTEntry{};
 
-            ctx.commandBuffers.at(i).bindPipeline(
+            commandBufferManager->getCommandBuffer(i).bindPipeline(
                 vk::PipelineBindPoint::eRayTracingKHR,
                 rayTracingPipeline);
 
-            ctx.commandBuffers.at(i).bindDescriptorSets(
+            commandBufferManager->getCommandBuffer(i).bindDescriptorSets(
                 vk::PipelineBindPoint::eRayTracingKHR,
                 *rayTracingPipelineLayout,
                 0,
                 {*descriptorSet},
                 {});
 
-            VRTR_CommandBuffer->transition_image_layout(
-                ctx.commandBuffers.at(i),
+            commandBufferManager->transition_image_layout(
+                commandBufferManager->getCommandBuffer(i),
                 *storageImage.image,
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eGeneral,
@@ -606,7 +604,7 @@ namespace VRTR
                 vk::PipelineStageFlagBits2::eTopOfPipe,
                 vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
 
-            ctx.commandBuffers.at(i).traceRaysKHR(
+            commandBufferManager->getCommandBuffer(i).traceRaysKHR(
                 raygenShaderSBTEntry,
                 missShaderSBTEntry,
                 hitShaderSBTEntry,
@@ -615,8 +613,8 @@ namespace VRTR
                 height,
                 1);
 
-            VRTR_CommandBuffer->transition_image_layout(
-                ctx.commandBuffers.at(i),
+            commandBufferManager->transition_image_layout(
+                commandBufferManager->getCommandBuffer(i),
                 swapChainImages.at(i),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eTransferDstOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
@@ -625,8 +623,8 @@ namespace VRTR
                 {},
                 {});
 
-            VRTR_CommandBuffer->transition_image_layout(
-                ctx.commandBuffers.at(i),
+            commandBufferManager->transition_image_layout(
+                commandBufferManager->getCommandBuffer(i),
                 *storageImage.image,
                 vk::ImageLayout::eGeneral,
                 vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
@@ -644,13 +642,13 @@ namespace VRTR
                 .dstOffset = vk::Offset3D{0, 0, 0},
                 .extent = vk::Extent3D{storageImage.width, storageImage.height, 1}};
 
-            ctx.commandBuffers.at(i).copyImage(
+            commandBufferManager->getCommandBuffer(i).copyImage(
                 *storageImage.image, vk::ImageLayout::eTransferSrcOptimal,
                 swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
                 {copyRegion});
 
-            VRTR_CommandBuffer->transition_image_layout(
-                ctx.commandBuffers.at(i),
+            commandBufferManager->transition_image_layout(
+                commandBufferManager->getCommandBuffer(i),
                 swapChainImages.at(i),
                 vk::ImageLayout::eTransferDstOptimal,
                 vk::ImageLayout::ePresentSrcKHR,
@@ -658,39 +656,40 @@ namespace VRTR
                 {},
                 {},
                 {});
-            ctx.commandBuffers.at(i).end();
+
+            commandBufferManager->endCommandBuffer(i);
         }
     }
 
     void RTRenderer::drawFrame(GLFWwindow *window)
     {
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
-        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*ctx.drawFences.at(VRTR_CommandBuffer->getCurrentFrame()), VK_TRUE, UINT64_MAX))
+        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*ctx.drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
             ;
 
         // Unfortunately it needs to be inside try catch block, because "acquireNextImage" is throwing exceptions
         // I cant disable it, because i am using vk::raii and it requires exceptions to be enabled :(
         try
         {
-            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(VRTR_CommandBuffer->getSemaphoreIndex()), nullptr);
+            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
             // recordCommandBuffer(imageIndex);
-            ctx.logicalDevice.resetFences({ctx.drawFences[VRTR_CommandBuffer->getCurrentFrame()]});
+            ctx.logicalDevice.resetFences({ctx.drawFences[commandBufferManager->getCurrentFrame()]});
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*ctx.presentCompleteSemaphores.at(VRTR_CommandBuffer->getSemaphoreIndex()),
+                .pWaitSemaphores = &*ctx.presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()),
                 .pWaitDstStageMask = &waitDestinationStageMask,
                 .commandBufferCount = 1,
-                .pCommandBuffers = &*ctx.commandBuffers.at(imageIndex),
+                .pCommandBuffers = &*commandBufferManager->getCommandBuffer(imageIndex),
                 .signalSemaphoreCount = 1,
-                .pSignalSemaphores = &*ctx.renderCompleteSemaphores.at(VRTR_CommandBuffer->getCurrentFrame())};
-            ctx.queue.submit({submitInfo}, *ctx.drawFences.at(VRTR_CommandBuffer->getCurrentFrame()));
+                .pSignalSemaphores = &*ctx.renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame())};
+            ctx.queue.submit({submitInfo}, *ctx.drawFences.at(commandBufferManager->getCurrentFrame()));
 
             const vk::PresentInfoKHR presentInfoKHR{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(VRTR_CommandBuffer->getCurrentFrame()),
+                .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame()),
                 .swapchainCount = 1,
                 .pSwapchains = &*swapChain,
                 .pImageIndices = &imageIndex,
@@ -698,8 +697,8 @@ namespace VRTR
 
             result = ctx.queue.presentKHR(presentInfoKHR);
 
-            VRTR_CommandBuffer->setSemaphoreIndex((VRTR_CommandBuffer->getSemaphoreIndex() + 1) % ctx.presentCompleteSemaphores.size());
-            VRTR_CommandBuffer->setCurrentFrame((VRTR_CommandBuffer->getCurrentFrame() + 1) % MAX_FRAMES_IN_FLIGHT);
+            commandBufferManager->setSemaphoreIndex((commandBufferManager->getSemaphoreIndex() + 1) % ctx.presentCompleteSemaphores.size());
+            commandBufferManager->setCurrentFrame((commandBufferManager->getCurrentFrame() + 1) % MAX_FRAMES_IN_FLIGHT);
         }
         catch (const vk::OutOfDateKHRError &e)
         {

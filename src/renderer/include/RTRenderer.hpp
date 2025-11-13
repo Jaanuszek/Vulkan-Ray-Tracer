@@ -2,7 +2,7 @@
 
 #include "renderer_export.h"
 #include "SwapChainManager.hpp"
-#include "CommandBuffer.hpp"
+#include "CommandBufferManager.hpp"
 #include "ConstantsAndStructs.hpp"
 #include "RendererContext.hpp"
 #include "InstanceManager.hpp"
@@ -26,11 +26,7 @@ namespace VRTR
         void drawFrame(GLFWwindow *window);
 
     private:
-        void initSwapChain(GLFWwindow *window);
-
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
-
-        void initCommandBuffer();
 
         void createSyncObjects();
 
@@ -63,7 +59,7 @@ namespace VRTR
         RendererContext rendererContext;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
-        std::unique_ptr<CommandBuffer> VRTR_CommandBuffer;
+        std::unique_ptr<CommandBufferManager> commandBufferManager;
 
         std::unique_ptr<Camera> camera;
 
