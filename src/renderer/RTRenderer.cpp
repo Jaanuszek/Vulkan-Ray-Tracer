@@ -49,7 +49,8 @@ namespace VRTR
 
         createSyncObjects();
 
-        createStorageImage();
+        storageImage = std::make_unique<StorageImage>(ctx.logicalDevice, ctx.gpu, ctx.commandPool, ctx.queue, ctx.graphics_queue_index, width, height);
+        storageImage->init();
 
         createScene();
 
@@ -60,18 +61,6 @@ namespace VRTR
         createDescriptorSets();
 
         buildRTCommandBuffers();
-    }
-
-    uint32_t RTRenderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
-    {
-        for (uint32_t i = 0; i < ctx.gpu.getMemoryProperties().memoryTypeCount; i++)
-        {
-            if ((typeFilter & (1 << i)) && (ctx.gpu.getMemoryProperties().memoryTypes[i].propertyFlags & properties) == properties)
-            {
-                return i;
-            }
-        }
-        throw std::runtime_error("Failed to find suitable memory type");
     }
 
     void RTRenderer::createSyncObjects()
@@ -224,67 +213,6 @@ namespace VRTR
         createTLAS();
     }
 
-    void RTRenderer::createStorageImage()
-    {
-        VRTR_DEBUG("Creating storage image");
-        storageImage.width = static_cast<uint32_t>(width);
-        storageImage.height = static_cast<uint32_t>(height);
-
-        vk::ImageCreateInfo imgCreateInfo{
-            .imageType = vk::ImageType::e2D,
-            .format = vk::Format::eR8G8B8A8Unorm,
-            .extent = vk::Extent3D{storageImage.width, storageImage.height, 1},
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .samples = vk::SampleCountFlagBits::e1,
-            .tiling = vk::ImageTiling::eOptimal,
-            .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc,
-            .sharingMode = vk::SharingMode::eExclusive,
-            .initialLayout = vk::ImageLayout::eUndefined};
-        storageImage.image = vk::raii::Image(ctx.logicalDevice, imgCreateInfo);
-
-        vk::MemoryRequirements memRequirements = storageImage.image.getMemoryRequirements();
-        vk::MemoryAllocateInfo allocInfo{
-            .allocationSize = memRequirements.size,
-            .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)};
-        storageImage.memory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
-        storageImage.image.bindMemory(*storageImage.memory, 0);
-
-        vk::ImageViewCreateInfo viewCreateInfo{
-            .image = *storageImage.image,
-            .viewType = vk::ImageViewType::e2D,
-            .format = vk::Format::eR8G8B8A8Unorm,
-            .components = {
-                vk::ComponentSwizzle::eIdentity, // it has to be identity inside storageImage
-                vk::ComponentSwizzle::eIdentity,
-                vk::ComponentSwizzle::eIdentity,
-                vk::ComponentSwizzle::eIdentity},
-            .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-        storageImage.imageView = vk::raii::ImageView(ctx.logicalDevice, viewCreateInfo);
-
-        // TODO OGARNAC TE TYMCZASOWE COMMAND BUFFERY
-        vk::CommandBufferAllocateInfo cmdBufferAllocInfo{
-            .commandPool = ctx.commandPool,
-            .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1};
-
-        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
-        vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
-
-        CommandBufferManager::transition_image_layout(
-            tempCmdBuffer,
-            storageImage.image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eGeneral, // it's basicaly storage image flag - we can do everything with it copy/write/read
-            vk::AccessFlagBits2::eNone,
-            vk::AccessFlagBits2::eShaderWrite,        // ?????????
-            vk::PipelineStageFlagBits2::eAllCommands, // CHANGE IT LATER. It's very slow since GPU has to wait for all previous commands to finish
-            vk::PipelineStageFlagBits2::eAllCommands  // CHANGE IT LATER
-        );
-
-        tempCmdBufferManager->submitAndWaitTempCmdBuffer();
-    }
-
     void RTRenderer::createDescriptorSets()
     {
         VRTR_DEBUG("Creating Descriptor Sets");
@@ -335,7 +263,7 @@ namespace VRTR
 
         vk::DescriptorImageInfo imageInfo{
             .sampler = {},
-            .imageView = *storageImage.imageView,
+            .imageView = *storageImage->getImageView(),
             .imageLayout = vk::ImageLayout::eGeneral};
 
         vk::WriteDescriptorSet resultImageWrite{
@@ -372,7 +300,7 @@ namespace VRTR
     {
         vk::DescriptorImageInfo imageInfo{
             .sampler = {},
-            .imageView = *storageImage.imageView,
+            .imageView = *storageImage->getImageView(),
             .imageLayout = vk::ImageLayout::eGeneral};
 
         vk::WriteDescriptorSet resultImageWrite{
@@ -596,7 +524,7 @@ namespace VRTR
 
             commandBufferManager->transition_image_layout(
                 commandBufferManager->getCommandBuffer(i),
-                *storageImage.image,
+                *storageImage->getImage(),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eGeneral,
                 {},
@@ -625,7 +553,7 @@ namespace VRTR
 
             commandBufferManager->transition_image_layout(
                 commandBufferManager->getCommandBuffer(i),
-                *storageImage.image,
+                *storageImage->getImage(),
                 vk::ImageLayout::eGeneral,
                 vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
@@ -640,10 +568,10 @@ namespace VRTR
                 .srcOffset = vk::Offset3D{0, 0, 0},
                 .dstSubresource = vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                 .dstOffset = vk::Offset3D{0, 0, 0},
-                .extent = vk::Extent3D{storageImage.width, storageImage.height, 1}};
+                .extent = vk::Extent3D{storageImage->getWidth(), storageImage->getHeight(), 1}};
 
             commandBufferManager->getCommandBuffer(i).copyImage(
-                *storageImage.image, vk::ImageLayout::eTransferSrcOptimal,
+                *storageImage->getImage(), vk::ImageLayout::eTransferSrcOptimal,
                 swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
                 {copyRegion});
 
@@ -703,7 +631,7 @@ namespace VRTR
         catch (const vk::OutOfDateKHRError &e)
         {
             swapChainManager->recreateSwapChain(window, width, height);
-            createStorageImage();
+            storageImage->recreate(width, height);
             updateDescriptorSets();
             buildRTCommandBuffers();
             return;

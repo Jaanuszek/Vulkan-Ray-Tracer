@@ -56,21 +56,13 @@ namespace VRTR
         glm::mat4 proj_inverse;
     };
 
-    struct AccelerationStructure
-    {
-        std::unique_ptr<Buffer> buffer; // to raczej niepotrzebne
-        vk::raii::AccelerationStructureKHR handle{nullptr};
-        vk::DeviceAddress device_address;
-    };
+    // struct AccelerationStructure
+    // {
+    //     std::unique_ptr<Buffer> buffer; // to raczej niepotrzebne
+    //     vk::raii::AccelerationStructureKHR handle{nullptr};
+    //     vk::DeviceAddress device_address;
+    // };
 
-    struct StorageImage
-    {
-        uint32_t width;
-        uint32_t height;
-        vk::raii::Image image{nullptr};
-        vk::raii::ImageView imageView{nullptr};
-        vk::raii::DeviceMemory memory{nullptr};
-    };
 
     namespace CONSTANTS
     {

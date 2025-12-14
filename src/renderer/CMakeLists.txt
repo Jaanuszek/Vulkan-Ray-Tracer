@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME} SHARED
     Camera.cpp
     AccelerationStructureUtils.cpp
     DeviceManager.cpp
+    StorageImage.cpp
 )
 
 include(GenerateExportHeader)

@@ -12,6 +12,7 @@
 #include "AccelerationStructureUtils.hpp"
 #include "Shader.hpp"
 #include "Utils.hpp"
+#include "StorageImage.hpp"
 
 namespace VRTR
 {
@@ -40,8 +41,6 @@ namespace VRTR
 
         void createScene();
 
-        void createStorageImage();
-
         void createDescriptorSets();
 
         void updateDescriptorSets();
@@ -60,6 +59,7 @@ namespace VRTR
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::unique_ptr<CommandBufferManager> commandBufferManager;
+        std::unique_ptr<StorageImage> storageImage;
 
         std::unique_ptr<Camera> camera;
 
@@ -75,7 +75,7 @@ namespace VRTR
         AccelerationStructure blas_structure;
         AccelerationStructure tlas_structure;
 
-        StorageImage storageImage;
+        // StorageImage storageImage;
         // DESCRIPTOR SETS
         vk::raii::DescriptorPool descriptorPool{nullptr};
         vk::raii::DescriptorSet descriptorSet{nullptr};
