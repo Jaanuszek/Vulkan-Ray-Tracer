@@ -37,7 +37,7 @@ void VRTR::AS::primitiveToGeometry(const std::vector<VertexRT> &vertices,
 
 void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
                                            vk::AccelerationStructureTypeKHR asType,
-                                           VRTR::AccelerationStructure &as,
+                                           VRTR::AS::AccelerationStructure &as,
                                            vk::AccelerationStructureGeometryKHR &asGeometry,
                                            vk::AccelerationStructureBuildRangeInfoKHR &asBuildRangeInfo,
                                            vk::BuildAccelerationStructureFlagsKHR flags)
@@ -70,7 +70,7 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
     Buffer scratchBuffer(ctx, BufferType::SCRATCH, scratchSize);
 
     // we need also a buffer that will hold the acceleration structure
-    as.buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, asSizeInfo.accelerationStructureSize,
+    as.asBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, asSizeInfo.accelerationStructureSize,
                                          vk::BufferUsageFlags{}, vk::MemoryPropertyFlagBits::eDeviceLocal,
                                          vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR |
                                              vk::BufferUsageFlagBits2::eShaderDeviceAddress);
@@ -78,7 +78,7 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
     vk::AccelerationStructureCreateInfoKHR asCreateInfo{
         .pNext = nullptr,
         .createFlags = {},
-        .buffer = as.buffer->getBuffer(),
+        .buffer = as.asBuffer->getBuffer(),
         .offset = 0,
         .size = asSizeInfo.accelerationStructureSize,
         .type = asType,
@@ -94,7 +94,7 @@ void VRTR::AS::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
     std::array<vk::AccelerationStructureBuildRangeInfoKHR *, 1> BuildRangeInfos = {&asBuildRangeInfo};
     tempCmdBuffer.buildAccelerationStructuresKHR({asBuildInfo}, BuildRangeInfos);
 
-    as.device_address = ctx.logicalDevice.getAccelerationStructureAddressKHR(
+    as.deviceAddress = ctx.logicalDevice.getAccelerationStructureAddressKHR(
         vk::AccelerationStructureDeviceAddressInfoKHR{
             .accelerationStructure = *as.handle});
     tempCmdBufferManager->submitAndWaitTempCmdBuffer();

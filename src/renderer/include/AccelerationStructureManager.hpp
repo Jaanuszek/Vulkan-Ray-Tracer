@@ -6,22 +6,6 @@
 
 namespace VRTR
 {
-    struct AccelerationStructure
-    {
-        vk::raii::AccelerationStructureKHR handle{nullptr};
-        vk::DeviceAddress deviceAddress{0};
-        std::unique_ptr<Buffer> buffer{nullptr};
-    };
-
-    struct InstanceData
-    {
-        glm::mat4 transform;
-        uint32_t blasIdx;
-        uint32_t customIdx;
-        uint32_t mask;
-        uint32_t hitGroupIndex; // used to fetch the shaders from the SBT
-    };
-
     class AccelerationStructureManager
     {
         public:
@@ -36,14 +20,16 @@ namespace VRTR
 
             void updateTLAS();
 
-            vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.handle; }
+            vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.as.handle; }
 
         private:
             VULKAN_CONTEXT ctx{};
             // TODO change to RendererContext
 
-            std::vector<AccelerationStructure> blasList;
-            AccelerationStructure tlas;
-            std::vector<InstanceData> instances;
+            // Instances data  blasID, transofmr, mask, customidx, hitGroupIndex
+            std::vector<AS::InstanceData> instances;
+
+            std::vector<AS::BottomLevelAS> blasList;
+            AS::TopLevelAS tlas;
     };
 }
