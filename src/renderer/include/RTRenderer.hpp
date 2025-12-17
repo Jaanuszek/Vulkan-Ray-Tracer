@@ -9,10 +9,12 @@
 #include "DeviceManager.hpp"
 #include "buffer.hpp"
 #include "Camera.hpp"
-#include "AccelerationStructureUtils.hpp"
 #include "Shader.hpp"
 #include "Utils.hpp"
 #include "StorageImage.hpp"
+#include "AccelerationStructureManager.hpp"
+#include "DescriptorManager.hpp"
+#include "RayTracingPipeline.hpp"
 
 namespace VRTR
 {
@@ -31,25 +33,21 @@ namespace VRTR
 
         void createSyncObjects();
 
+        glm::mat4 rotateModel(float angle, const glm::vec3 &axis);
+
         // ================== RAY TRACING ==================
-
-        void initRayTracing();
-
-        void createBLAS();
-
-        void createTLAS();
 
         void createScene();
 
-        void createDescriptorSets();
+        // void createDescriptorSets();
 
-        void updateDescriptorSets();
+        // void updateDescriptorSets();
 
-        void createRayTracingPipeline();
+        // void createRayTracingPipeline();
 
-        void createShaderBindingTable();
+        // void createShaderBindingTable();
 
-        void buildRTCommandBuffers();
+        // void buildRTCommandBuffers();
 
     private:
         int width, height;
@@ -58,34 +56,17 @@ namespace VRTR
         RendererContext rendererContext;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
-        std::unique_ptr<CommandBufferManager> commandBufferManager;
-        std::unique_ptr<StorageImage> storageImage;
+        std::shared_ptr<CommandBufferManager> commandBufferManager;
+        std::shared_ptr<StorageImage> storageImage;
+        std::unique_ptr<AccelerationStructureManager> asManager;
+        std::shared_ptr<DescriptorManager> descriptorManager;
+        std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
 
         std::unique_ptr<Camera> camera;
 
         // ================== RAY TRACING ==================
-        vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
-        vk::raii::Pipeline rayTracingPipeline{nullptr};
-        vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
-
-        std::unique_ptr<Buffer> vertex_buffer;
-        std::unique_ptr<Buffer> index_buffer;
         std::unique_ptr<Buffer> uniform_buffer;
         UniformData uniform_data{};
-        AccelerationStructure blas_structure;
-        AccelerationStructure tlas_structure;
-
-        // StorageImage storageImage;
-        // DESCRIPTOR SETS
-        vk::raii::DescriptorPool descriptorPool{nullptr};
-        vk::raii::DescriptorSet descriptorSet{nullptr};
-        vk::raii::DescriptorSetLayout descriptorSetLayout{nullptr};
-
-        std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups{};
-        // Shader Binding Table
-        std::unique_ptr<Buffer> raygen_shader_binding_table;
-        std::unique_ptr<Buffer> miss_shader_binding_table;
-        std::unique_ptr<Buffer> hit_shader_binding_table;
 
         void updateUniformBuffer();
     };

@@ -160,7 +160,7 @@ namespace VRTR
 
     vk::raii::CommandBuffer&  TempCMDBufferManager::createTempCmdBuffer()
     {
-        VRTR_DEBUG("Creating Transient Command Buffer");
+        // VRTR_DEBUG("Creating Transient Command Buffer");
         COMMANDS::beginSingleTimeCommands(transientCmdBuffer, device, transientCMDPool);
 
         return transientCmdBuffer;
@@ -168,7 +168,7 @@ namespace VRTR
 
     void TempCMDBufferManager::submitAndWaitTempCmdBuffer()
     {
-        VRTR_DEBUG("Submitting and waiting for Transient Command Buffer");
+        // VRTR_DEBUG("Submitting and waiting for Transient Command Buffer");
         COMMANDS::endSingleTimeCommands(transientCmdBuffer, device, transientCMDPool, queue);
     }
 

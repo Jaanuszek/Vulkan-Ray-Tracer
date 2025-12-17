@@ -17,9 +17,11 @@ add_library(${PROJECT_NAME} SHARED
     CommandBufferManager.cpp
     buffer.cpp
     Camera.cpp
-    AccelerationStructureUtils.cpp
     DeviceManager.cpp
     StorageImage.cpp
+    AccelerationStructureManager.cpp
+    RayTracingPipeline.cpp
+    DescriptorManager.cpp
 )
 
 include(GenerateExportHeader)

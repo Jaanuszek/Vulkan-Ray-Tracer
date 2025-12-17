@@ -20,7 +20,7 @@ namespace VRTR
                 return swapChainImages.at(index);
             }
 
-            inline std::vector<vk::Image> getSwapChainImages() const
+            inline std::vector<vk::Image>& getSwapChainImages()
             {
                 return swapChainImages;
             }

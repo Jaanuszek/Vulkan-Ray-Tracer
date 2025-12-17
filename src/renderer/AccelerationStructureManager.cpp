@@ -3,7 +3,8 @@
 
 namespace VRTR
 {
-    AccelerationStructureManager::AccelerationStructureManager()
+    AccelerationStructureManager::AccelerationStructureManager(VULKAN_CONTEXT& ctx)
+        : ctx(ctx)
     {
     }
 
@@ -12,7 +13,7 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating BLAS");
 
-        AS::BottomLevelAS blas_structure;
+        BottomLevelAS blas_structure;
 
         size_t vertex_buffer_size = vertices.size() * sizeof(VertexRT);
         size_t index_buffer_size = indices.size() * sizeof(uint32_t);
@@ -28,15 +29,15 @@ namespace VRTR
 
         vk::AccelerationStructureGeometryKHR asGeometry{};
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
-        AS::primitiveToGeometry(vertices, indices, blas_structure.vertexBuffer, blas_structure.indexBuffer, asGeometry, offsetInfo);
+        primitiveToGeometry(vertices, indices, blas_structure.vertexBuffer, blas_structure.indexBuffer, asGeometry, offsetInfo);
         // inicjacja struktury acceleration structure.
-
-        AS::createAccelerationStructure(ctx,
+        createAccelerationStructure(ctx,
                                         vk::AccelerationStructureTypeKHR::eBottomLevel,
                                         blas_structure.as,
                                         asGeometry,
                                         offsetInfo,
                                         vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+
         blasList.push_back(std::move(blas_structure));
         return static_cast<uint32_t>(blasList.size() - 1);
     }
@@ -57,7 +58,7 @@ namespace VRTR
         for (const auto& inst : instances)
         {
             vk::TransformMatrixKHR transform{};
-            memcpy(&transform, &inst.transform, sizeof(glm::mat4));
+            memcpy(&transform, &inst.transform, sizeof(glm::mat4)); // pewnie tu bedzie problerm
             vk::AccelerationStructureInstanceKHR ac_instance{
                 .transform = transform,
                 .instanceCustomIndex = inst.customIdx,
@@ -99,19 +100,210 @@ namespace VRTR
             .firstVertex = 0,
             .transformOffset = 0};
 
-        AS::createAccelerationStructure(ctx,
+        createAccelerationStructure(ctx,
                                         vk::AccelerationStructureTypeKHR::eTopLevel,
                                         tlas.as,
                                         ASGeometry,
                                         ASBuildRangeInfo,
-                                        vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+                                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
     }
 
     void AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
     {
+        InstanceData instanceData;
+        instanceData.blasIdx = blasIdx;
+        instanceData.transform = transform;
+        instanceData.customIdx = static_cast<uint32_t>(instances.size());
+        instanceData.mask = 0xFF;
+        instanceData.hitGroupIndex = 0; // temporary value, will be changed when more hit groups are used
+
+        instances.push_back(instanceData);
+        tlas.instanceCount = static_cast<uint32_t>(instances.size());
     }
 
-    void AccelerationStructureManager::updateTLAS()
+    void AccelerationStructureManager::updateTLAS(const glm::mat4& transform)
     {
+        vk::TransformMatrixKHR transformMatrix{};
+        // memcpy(&transformMatrix, &transform, sizeof(glm::mat4)); // to tez bedzie dzialac?
+        transformMatrix.matrix = std::array<std::array<float, 4>, 3>{
+            std::array<float,4>{transform[0][0], transform[1][0], transform[2][0], transform[3][0]},
+            std::array<float,4>{transform[0][1], transform[1][1], transform[2][1], transform[3][1]},
+            std::array<float,4>{transform[0][2], transform[1][2], transform[2][2], transform[3][2]}
+        };
+        
+        // instacion transform update
+        for(auto& inst : instances)
+        {
+            inst.transform = transform;
+        }
+
+        auto instancesData = vk::AccelerationStructureGeometryInstancesDataKHR{
+            .arrayOfPointers = vk::False,
+            .data = tlas.instanceBuffer->getDeviceAddress()
+        };
+
+        vk::AccelerationStructureGeometryDataKHR geometryData(instancesData);
+
+        vk::AccelerationStructureGeometryKHR tlasGeometry{
+            .geometryType = vk::GeometryTypeKHR::eInstances, // czy eTriangles?
+            .geometry = geometryData,
+            .flags = vk::GeometryFlagBitsKHR::eOpaque
+        };
+
+        vk::AccelerationStructureBuildGeometryInfoKHR tlasBuildGeometryInfo{
+            .type = vk::AccelerationStructureTypeKHR::eTopLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate,
+            .mode = vk::BuildAccelerationStructureModeKHR::eUpdate,
+            .srcAccelerationStructure = tlas.as.handle,
+            .dstAccelerationStructure = tlas.as.handle,
+            .geometryCount = 1,
+            .pGeometries = &tlasGeometry};
+
+        vk::BufferDeviceAddressInfo scratchAddressInfo{
+            .buffer = tlas.as.scratchBuffer->getBuffer()
+        };
+        vk::DeviceAddress scratchAddress = ctx.logicalDevice.getBufferAddress(scratchAddressInfo);
+        tlasBuildGeometryInfo.scratchData.deviceAddress = scratchAddress;
+
+        vk::AccelerationStructureBuildRangeInfoKHR tlasRangeInfo{
+            .primitiveCount = tlas.instanceCount,
+            .primitiveOffset = 0,
+            .firstVertex = 0,
+            .transformOffset = 0
+        };
+
+        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
+        vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
+
+        vk::MemoryBarrier preBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR | vk::AccessFlagBits::eTransferWrite | vk::AccessFlagBits::eShaderRead,
+            .dstAccessMask = vk::AccessFlagBits::eAccelerationStructureReadKHR | vk::AccessFlagBits::eAccelerationStructureWriteKHR};
+
+        tempCmdBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR | vk::PipelineStageFlagBits::eTransfer | vk::PipelineStageFlagBits::eFragmentShader,
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+            {},
+            preBarrier,
+            {},
+            {});
+
+        tempCmdBuffer.buildAccelerationStructuresKHR(
+            {tlasBuildGeometryInfo},
+            {&tlasRangeInfo}
+        );
+
+        vk::MemoryBarrier postBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+            .dstAccessMask = vk::AccessFlagBits::eAccelerationStructureReadKHR | vk::AccessFlagBits::eShaderRead};
+
+        tempCmdBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR | vk::PipelineStageFlagBits::eFragmentShader,
+            {},
+            postBarrier,
+            {},
+            {});
+        
+        tempCmdBufferManager->submitAndWaitTempCmdBuffer();
     }
+
+    void AccelerationStructureManager::primitiveToGeometry(const std::vector<VertexRT> &vertices,
+                                    const std::vector<uint32_t> &indices,
+                                    std::unique_ptr<Buffer> &vertexBuffer,
+                                    std::unique_ptr<Buffer> &indexBuffer,
+                                    vk::AccelerationStructureGeometryKHR &geometry,
+                                    vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
+                                    vk::Format vertexFormat,
+                                    vk::IndexType indexType)
+    {
+        uint32_t triangleCount = static_cast<uint32_t>(indices.size() / 3U);
+
+        vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
+            .pNext = nullptr,
+            .vertexFormat = vertexFormat,
+            .vertexData = vk::DeviceOrHostAddressConstKHR{vertexBuffer->getDeviceAddress()},
+            .vertexStride = sizeof(VertexRT),
+            .maxVertex = static_cast<uint32_t>(vertices.size() - 1),
+            .indexType = indexType,
+            .indexData = vk::DeviceOrHostAddressConstKHR{indexBuffer->getDeviceAddress()},
+            .transformData = {}};
+
+        geometry = vk::AccelerationStructureGeometryKHR{
+            .pNext = nullptr,
+            .geometryType = vk::GeometryTypeKHR::eTriangles,
+            .geometry = triangles,
+            .flags = vk::GeometryFlagBitsKHR::eOpaque | vk::GeometryFlagBitsKHR::eNoDuplicateAnyHitInvocation};
+
+        offsetInfo = vk::AccelerationStructureBuildRangeInfoKHR{
+            .primitiveCount = triangleCount,
+            .primitiveOffset = 0,
+            .firstVertex = 0,
+            .transformOffset = 0};
+    }
+
+    void AccelerationStructureManager::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
+                                            vk::AccelerationStructureTypeKHR asType,
+                                            AccelerationStructure &as,
+                                            vk::AccelerationStructureGeometryKHR &asGeometry,
+                                            vk::AccelerationStructureBuildRangeInfoKHR &asBuildRangeInfo,
+                                            vk::BuildAccelerationStructureFlagsKHR flags)
+    {
+        // gemoetry data
+        vk::AccelerationStructureBuildGeometryInfoKHR asBuildInfo{
+            .type = asType,
+            .flags = flags,
+            .mode = vk::BuildAccelerationStructureModeKHR::eBuild,
+            .geometryCount = 1,
+            .pGeometries = &asGeometry,
+        };
+
+        std::vector<uint32_t> maxPrimCount(1);
+        maxPrimCount.at(0) = asBuildRangeInfo.primitiveCount;
+
+        // getting size info
+        // size needed for the acceleration structure itself,
+        // size needed for the scratch buffer
+        // size needed for the update scratch buffer
+        vk::AccelerationStructureBuildSizesInfoKHR asSizeInfo = ctx.logicalDevice.getAccelerationStructureBuildSizesKHR(
+            vk::AccelerationStructureBuildTypeKHR::eDevice,
+            asBuildInfo,
+            maxPrimCount);
+
+        vk::DeviceSize scratchSize = asSizeInfo.buildScratchSize;
+        vk::DeviceSize minAsScratchOffsetAlignment = ctx.asProperties.minAccelerationStructureScratchOffsetAlignment;
+        scratchSize = utils::aligned_size(scratchSize, minAsScratchOffsetAlignment);
+
+        as.scratchBuffer = std::make_unique<Buffer>(ctx, BufferType::SCRATCH, scratchSize);
+
+        // we need also a buffer that will hold the acceleration structure
+        as.asBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, asSizeInfo.accelerationStructureSize,
+                                            vk::BufferUsageFlags{}, vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                            vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR |
+                                                vk::BufferUsageFlagBits2::eShaderDeviceAddress);
+
+        vk::AccelerationStructureCreateInfoKHR asCreateInfo{
+            .pNext = nullptr,
+            .createFlags = {},
+            .buffer = as.asBuffer->getBuffer(),
+            .offset = 0,
+            .size = asSizeInfo.accelerationStructureSize,
+            .type = asType,
+            .deviceAddress = 0};
+        as.handle = vk::raii::AccelerationStructureKHR(ctx.logicalDevice, asCreateInfo);
+
+        asBuildInfo.dstAccelerationStructure = *as.handle;
+        asBuildInfo.scratchData = as.scratchBuffer->getDeviceAddress();
+
+        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
+        vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
+
+        std::array<vk::AccelerationStructureBuildRangeInfoKHR *, 1> BuildRangeInfos = {&asBuildRangeInfo};
+        tempCmdBuffer.buildAccelerationStructuresKHR({asBuildInfo}, BuildRangeInfos);
+
+        as.deviceAddress = ctx.logicalDevice.getAccelerationStructureAddressKHR(
+            vk::AccelerationStructureDeviceAddressInfoKHR{
+                .accelerationStructure = *as.handle});
+        tempCmdBufferManager->submitAndWaitTempCmdBuffer();
+    }
+
 }
