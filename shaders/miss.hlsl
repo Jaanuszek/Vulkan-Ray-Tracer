@@ -6,5 +6,5 @@ struct Payload
 [shader("miss")]
 void main(inout Payload payload)
 {
-    payload.hitValue = float3(0.0, 0.0, 0.0); // kolor tła - czarny
+    payload.hitValue = float3(1.0, 1.0, 1.0); // kolor tła - czarny
 }

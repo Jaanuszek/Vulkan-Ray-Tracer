@@ -5,32 +5,37 @@
 
 namespace VRTR
 {
-    struct SurfaceCapabilities
-    {
-        vk::SurfaceCapabilitiesKHR capabilities;
-        std::vector<vk::SurfaceFormatKHR> availableFormats;
-        std::vector<vk::PresentModeKHR> availablePresentModes;
-        vk::SurfaceFormatKHR surfaceFormat;
-        vk::PresentModeKHR presentMode;
-        vk::Extent2D extent;
-    };
 
     class SwapChainManager
     {
         public:
-            SwapChainManager(VULKAN_CONTEXT& ctx);
-            ~SwapChainManager() = default;
+            SwapChainManager(RendererContext& ctx);
 
-            inline SurfaceCapabilities getSurfaceCapabilities() { return surfaceCapabilities; }
+            void init(GLFWwindow *window);
+
+            void recreateSwapChain(GLFWwindow* window, int& w, int& h);
+
+            inline vk::Image getSwapChainImage(size_t index) const
+            {
+                return swapChainImages.at(index);
+            }
+
+            inline std::vector<vk::Image>& getSwapChainImages()
+            {
+                return swapChainImages;
+            }
+            inline vk::raii::SwapchainKHR& getSwapChain()
+            {
+                return swapChain;
+            }
+
+        private:            
 
             void createSwapChain(GLFWwindow* window);
-            void createImageViews();
-            void cleanupSwapChain();
-            void recreateSwapChain(GLFWwindow* window, int& w, int& h);
-        private:            
-            SurfaceCapabilities surfaceCapabilities;
 
-            SurfaceCapabilities generateSurfaceCapabilities(GLFWwindow* window);
+            void createImageViews();
+
+            void cleanupSwapChain();
 
             vk::SurfaceFormatKHR chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
 
@@ -39,6 +44,13 @@ namespace VRTR
             vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
         
         private:
-            VULKAN_CONTEXT& ctx;
+            RendererContext &ctx;
+            vk::raii::SwapchainKHR swapChain{nullptr};
+            std::vector<vk::Image> swapChainImages;
+            std::vector<vk::raii::ImageView> swapChainImageViews;
+            vk::Format imageFormat;
+            vk::SurfaceFormatKHR surfaceFormat;
+            vk::PresentModeKHR presentMode;
+            vk::Extent2D extent;
     };
 }

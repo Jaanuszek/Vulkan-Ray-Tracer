@@ -3,50 +3,26 @@
 
 namespace VRTR
 {
-    constexpr int MAX_FRAMES_IN_FLIGHT = 2;
-    inline uint32_t currentFrame = 0;
-    inline uint32_t semaphoreIndex = 0;
-
     class Buffer;
 
-    struct VULKAN_CONTEXT
+    struct Properties
     {
-        vk::raii::Context context;
-
-        vk::raii::Instance instance{nullptr};
-
-        vk::raii::PhysicalDevice gpu{nullptr};
-
-        vk::raii::Device logicalDevice{nullptr};
-
-        vk::raii::Queue queue{nullptr};
-
-        int32_t graphics_queue_index = -1;
-
-        vk::raii::SurfaceKHR surface{nullptr};
-
-        vk::raii::SwapchainKHR swapChain{nullptr};
-
-        std::vector<vk::Image> swapChainImages;
-
-        std::vector<vk::raii::ImageView> swapChainImageViews;
-
-        vk::raii::CommandPool commandPool{nullptr};
-
-        std::vector<vk::raii::CommandBuffer> commandBuffers;
-
-        vk::DebugUtilsMessengerEXT debugMessenger{nullptr};
-
-        // SYNC VARIABLES
-        std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
-
-        std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
-
-        std::vector<vk::raii::Fence> drawFences;
-
-        // CONST VALUES
         vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties{};
         vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
+    };
+
+    struct RendererContext
+    {
+        vk::raii::Context context;
+        vk::raii::Instance instance{nullptr};
+        vk::raii::PhysicalDevice gpu{nullptr};
+        vk::raii::Device logicalDevice{nullptr};
+        vk::raii::Queue queue{nullptr};
+        int32_t graphics_queue_index = -1;
+        vk::raii::SurfaceKHR surface{nullptr};
+        vk::raii::DebugUtilsMessengerEXT debugMessenger{nullptr};
+
+        Properties properties;
     };
 
     struct Vertex
@@ -64,22 +40,6 @@ namespace VRTR
     {
         glm::mat4 view_inverse;
         glm::mat4 proj_inverse;
-    };
-
-    struct AccelerationStructure
-    {
-        std::unique_ptr<Buffer> buffer; // to raczej niepotrzebne
-        vk::raii::AccelerationStructureKHR handle{nullptr};
-        vk::DeviceAddress device_address;
-    };
-
-    struct StorageImage
-    {
-        uint32_t width;
-        uint32_t height;
-        vk::raii::Image image{nullptr};
-        vk::raii::ImageView imageView{nullptr};
-        vk::raii::DeviceMemory memory{nullptr};
     };
 
     namespace CONSTANTS

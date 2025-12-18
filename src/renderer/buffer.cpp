@@ -56,10 +56,11 @@ namespace VRTR
 
         bufferMemory = vk::raii::DeviceMemory{logicalDevice, memoryAllocateInfo};
         buffer.bindMemory(bufferMemory, 0);
+        // tu nie musi byc getBufferAddressKHR?
         deviceAddress = logicalDevice.getBufferAddress(vk::BufferDeviceAddressInfo{.buffer=buffer});
     }
 
-    Buffer::Buffer(VULKAN_CONTEXT& ctx,
+    Buffer::Buffer(RendererContext& ctx,
                    BufferType type,
                    vk::DeviceSize size) : logDevice(ctx.logicalDevice)
     {

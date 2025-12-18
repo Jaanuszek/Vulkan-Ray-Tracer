@@ -11,12 +11,17 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 add_library(${PROJECT_NAME} SHARED
     RTRenderer.cpp
+    InstanceManager.cpp
     SwapChainManager.cpp
     Shader.cpp
-    CommandBuffer.cpp
+    CommandBufferManager.cpp
     buffer.cpp
     Camera.cpp
-    AccelerationStructureUtils.cpp
+    DeviceManager.cpp
+    StorageImage.cpp
+    AccelerationStructureManager.cpp
+    RayTracingPipeline.cpp
+    DescriptorManager.cpp
 )
 
 include(GenerateExportHeader)

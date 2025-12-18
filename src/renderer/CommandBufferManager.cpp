@@ -1,13 +1,19 @@
 #include "pch.h"
-#include "CommandBuffer.hpp"
+#include "CommandBufferManager.hpp"
 
 namespace VRTR
 {
-    CommandBuffer::CommandBuffer(VULKAN_CONTEXT& ctx)
+    CommandBufferManager::CommandBufferManager(RendererContext& ctx)
         : ctx(ctx)
     {}
 
-    void CommandBuffer::createCommandPool()
+    void CommandBufferManager::init()
+    {
+        createCommandPool();
+        createCommandBuffers();
+    }
+
+    void CommandBufferManager::createCommandPool()
     {
         VRTR_DEBUG("Creating Command Pool");
 
@@ -18,27 +24,41 @@ namespace VRTR
             .queueFamilyIndex = static_cast<uint32_t>(ctx.graphics_queue_index)
         };
 
-        ctx.commandPool = vk::raii::CommandPool(ctx.logicalDevice, poolInfo);
+        commandPool = vk::raii::CommandPool(ctx.logicalDevice, poolInfo);
     }
 
-    void CommandBuffer::createCommandBuffers()
+    void CommandBufferManager::createCommandBuffers()
     {
         VRTR_DEBUG("Creating Command Buffers");
-        ctx.commandBuffers.clear();
+        commandBuffers.clear();
         vk::CommandBufferAllocateInfo allocInfo
         {
             .pNext = nullptr,
-            .commandPool = ctx.commandPool,
+            .commandPool = *commandPool,
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = MAX_FRAMES_IN_FLIGHT
         };
 
         // Allocate the command buffers (see commandBufferCount above)
-        // std::move so we can move the lifetime to commandBuffer variable (ownership)
-        ctx.commandBuffers = std::move(vk::raii::CommandBuffers(ctx.logicalDevice, allocInfo));
+        commandBuffers = vk::raii::CommandBuffers(ctx.logicalDevice, allocInfo);
     }
 
-    void CommandBuffer::transition_image_layout(const std::vector<vk::Image>& images, 
+    vk::raii::CommandBuffer &CommandBufferManager::getCommandBuffer(uint32_t index)
+    {
+        return commandBuffers.at(index);
+    }
+
+    void CommandBufferManager::beginCommandBuffer(uint32_t index, vk::CommandBufferBeginInfo beginInfo)
+    {
+        commandBuffers.at(index).begin(beginInfo);
+    }
+
+    void CommandBufferManager::endCommandBuffer(uint32_t index)
+    {
+        commandBuffers.at(index).end();
+    }
+
+    void CommandBufferManager::transition_image_layout(const std::vector<vk::Image>& images, 
                                                 uint32_t imageIndex,
                                                 vk::ImageLayout oldLayout, 
                                                 vk::ImageLayout newLayout,
@@ -82,10 +102,10 @@ namespace VRTR
             .pImageMemoryBarriers = &barrier
         };
 
-        ctx.commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
+        commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
     }
 
-    void CommandBuffer::transition_image_layout(vk::raii::CommandBuffer& commandBuffer,
+    void CommandBufferManager::transition_image_layout(vk::raii::CommandBuffer& commandBuffer,
                                                 const vk::Image& image, 
                                                 vk::ImageLayout oldLayout, 
                                                 vk::ImageLayout newLayout,
@@ -132,47 +152,69 @@ namespace VRTR
         commandBuffer.pipelineBarrier2(dependencyInfo);
     }
 
-    vk::raii::CommandBuffer CommandBuffer::createTempCommandBuffer(VULKAN_CONTEXT& ctx, vk::CommandBufferLevel level, bool begin)
+    TempCMDBufferManager::TempCMDBufferManager(vk::raii::Device& device, vk::raii::Queue& queue, uint32_t graphicsQueueIndex)
+        : device(device), queue(queue), graphicsQueueIndex(graphicsQueueIndex)
     {
-        vk::CommandBufferAllocateInfo cmdBufferAllocInfo
+        createTransientCommandPool();
+    }
+
+    vk::raii::CommandBuffer&  TempCMDBufferManager::createTempCmdBuffer()
+    {
+        // VRTR_DEBUG("Creating Transient Command Buffer");
+        COMMANDS::beginSingleTimeCommands(transientCmdBuffer, device, transientCMDPool);
+
+        return transientCmdBuffer;
+    }
+
+    void TempCMDBufferManager::submitAndWaitTempCmdBuffer()
+    {
+        // VRTR_DEBUG("Submitting and waiting for Transient Command Buffer");
+        COMMANDS::endSingleTimeCommands(transientCmdBuffer, device, transientCMDPool, queue);
+    }
+
+    void TempCMDBufferManager::createTransientCommandPool()
+    {
+        const vk::CommandPoolCreateInfo cmdPoolCreateInfo{
+            .flags = vk::CommandPoolCreateFlagBits::eTransient,
+            .queueFamilyIndex = graphicsQueueIndex};
+        transientCMDPool = vk::raii::CommandPool(device, cmdPoolCreateInfo);
+    }
+
+    void COMMANDS::beginSingleTimeCommands(vk::raii::CommandBuffer& cmd, vk::raii::Device& device, vk::raii::CommandPool& cmdPool)
+    {
+        //TODO add return value
+        vk::CommandBufferAllocateInfo allocInfo
         {
-            .commandPool = ctx.commandPool,
+            .commandPool = cmdPool,
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1
         };
-        vk::raii::CommandBuffer cmdBuffer = std::move(ctx.logicalDevice.allocateCommandBuffers(cmdBufferAllocInfo).front());
+        cmd = std::move(device.allocateCommandBuffers(allocInfo).front());
 
-        if(begin)
-        {
-            cmdBuffer.begin({});
-        }
-
-        return cmdBuffer;
+        cmd.begin(vk::CommandBufferBeginInfo{.flags=vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
     }
 
-    void CommandBuffer::flushTempCommandBuffer(VULKAN_CONTEXT& ctx, 
-                                vk::raii::CommandBuffer& commandBuffer, 
-                                vk::raii::Queue* queue)
+    void COMMANDS::endSingleTimeCommands(vk::raii::CommandBuffer& cmd, vk::raii::Device& device, vk::raii::CommandPool& cmdPool, vk::raii::Queue& queue)
     {
-        commandBuffer.end();
-        vk::SubmitInfo submitInfo
-        {
-            .commandBufferCount = 1,
-            .pCommandBuffers = &*commandBuffer,
+        // TODO add return value
+        cmd.end();
+
+        vk::FenceCreateInfo fenceInfo{};
+        std::array<vk::raii::Fence, 1> fences = { device.createFence(fenceInfo) };
+
+
+        vk::CommandBufferSubmitInfo commandBufferInfo{
+            .commandBuffer = *cmd
         };
 
-        vk::raii::Fence tmpFence = ctx.logicalDevice.createFence({});
-
-        if(queue)
-        {
-            queue->submit({submitInfo}, tmpFence);
-        }
-        else
-        {
-            ctx.queue.submit({submitInfo}, tmpFence);
-        }
-
-        auto result = ctx.logicalDevice.waitForFences(*tmpFence, VK_TRUE, UINT64_MAX);
+        std::array<vk::SubmitInfo2, 1> submitInfo{
+            vk::SubmitInfo2{
+                .commandBufferInfoCount = 1,
+                .pCommandBufferInfos = &commandBufferInfo
+            }
+        };
+        queue.submit2(submitInfo, fences.front());
+        auto result = device.waitForFences(*fences.front(), VK_TRUE, UINT64_MAX);
         if(result != vk::Result::eSuccess)
         {
             VRTR_CRITICAL("Failed to wait for fence after storage image layout transition!");

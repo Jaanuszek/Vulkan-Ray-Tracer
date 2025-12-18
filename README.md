@@ -84,3 +84,7 @@ docker run --hostname AppBuilder -it -v $(pwd)/build:/app/build:rw -v $(pwd)/ven
 ```bash
 ~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/rayGen.hlsl   -Fo shaders/raygen.spv   -spirv -fvk-use-scalar-layout
 ```
+
+```bash
+~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/rayGen.hlsl   -Fo shaders/raygen.spv   -spirv -fvk-use-scalar-layout && ~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/miss.hlsl   -Fo shaders/miss.spv   -spirv -fvk-use-scalar-layout && ~/vulkan/1.4.321.1/x86_64/bin/dxc   -T lib_6_4  -E main -fspv-target-env=vulkan1.1spirv1.4  shaders/closesthit.hlsl   -Fo shaders/closesthit.spv   -spirv -fvk-use-scalar-layout
+```
