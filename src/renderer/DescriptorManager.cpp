@@ -8,17 +8,19 @@ namespace VRTR
     {
     }
 
-    void DescriptorManager::init(vk::raii::AccelerationStructureKHR& TLAS,
-                                vk::raii::Buffer& ubo,
-                                vk::raii::ImageView& storageImageView)
+    void DescriptorManager::init(const DescriptorResources& resources)
     {
-        createDescriptorSets(TLAS, ubo, storageImageView);
-        updateDescriptorSets(storageImageView);
+        descriptorResources = resources;
+
+        assert(resources.TLAS);
+        assert(resources.ubo);
+        assert(resources.storageImageView);
+
+        createDescriptorSets();
+        updateDescriptorSets();
     }
 
-    void DescriptorManager::createDescriptorSets(vk::raii::AccelerationStructureKHR& TLAS,
-                                vk::raii::Buffer& ubo,
-                                vk::raii::ImageView& storageImageView)
+    void DescriptorManager::createDescriptorSets()
     {
         VRTR_DEBUG("Creating Descriptor Sets");
         uint32_t maxSets = 1; // one for now, but later we will need more
@@ -55,7 +57,7 @@ namespace VRTR
         vk::WriteDescriptorSetAccelerationStructureKHR descriptorASInfo{
             .pNext = nullptr,
             .accelerationStructureCount = 1,
-            .pAccelerationStructures = &*TLAS};
+            .pAccelerationStructures = &**descriptorResources.TLAS};
 
         vk::WriteDescriptorSet ASWrite{
             .pNext = &descriptorASInfo,
@@ -68,7 +70,7 @@ namespace VRTR
 
         vk::DescriptorImageInfo imageInfo{
             .sampler = {},
-            .imageView = storageImageView,
+            .imageView = *descriptorResources.storageImageView,
             .imageLayout = vk::ImageLayout::eGeneral};
 
         vk::WriteDescriptorSet resultImageWrite{
@@ -81,7 +83,7 @@ namespace VRTR
             .pImageInfo = &imageInfo};
 
         vk::DescriptorBufferInfo bufferInfo{
-            .buffer = ubo,
+            .buffer = *descriptorResources.ubo,
             .offset = 0,
             .range = vk::WholeSize};
 
@@ -101,11 +103,11 @@ namespace VRTR
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
-    void DescriptorManager::updateDescriptorSets(vk::raii::ImageView& storageImageView)
+    void DescriptorManager::updateDescriptorSets()
     {
         vk::DescriptorImageInfo imageInfo{
             .sampler = {},
-            .imageView = storageImageView,
+            .imageView = *descriptorResources.storageImageView,
             .imageLayout = vk::ImageLayout::eGeneral};
 
         vk::WriteDescriptorSet resultImageWrite{

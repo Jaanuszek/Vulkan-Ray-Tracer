@@ -8,18 +8,41 @@ namespace VRTR
     {
     }
 
-    void RayTracingPipeline::init(std::shared_ptr<DescriptorManager>& descriptorManager,
-                                std::vector<vk::Image>& swapChainImages,
+    void RayTracingPipeline::init(std::vector<vk::Image>& swapChainImages,
+                                const DescriptorResources& resources,
                                 std::shared_ptr<CommandBufferManager>& commandBufferManager,
                                 int width, int height,
                                 std::shared_ptr<StorageImage>& storageImage
                                 )
     {
-        createRayTracingPipeline(descriptorManager);
+        this->swapChainImages = &swapChainImages;
+        this->commandBufferManager = commandBufferManager;
+        this->storageImage = storageImage;
+        this->width = width;
+        this->height = height;
+
+        descriptorManager = std::make_unique<DescriptorManager>(ctx);
+
+        createRayTracingPipeline();
         createShaderBindingTable();
+
+        descriptorManager->init(resources);
+
+        buildRTCommandBuffers();
     }
 
-    void RayTracingPipeline::createRayTracingPipeline(std::shared_ptr<DescriptorManager>& descriptorManager)
+    void RayTracingPipeline::updatePipelineDescriptors(const DescriptorResources& resources, int width, int height)
+    {
+        this->width = width;
+        this->height = height;
+
+        descriptorManager->setDescriptorResources(resources);
+
+        descriptorManager->updateDescriptorSets();
+        buildRTCommandBuffers();
+    }
+
+    void RayTracingPipeline::createRayTracingPipeline()
     {
         VRTR_DEBUG("Creating Ray Tracing Pipeline");
         vk::DescriptorSetLayoutBinding ASLayout{
@@ -165,11 +188,7 @@ namespace VRTR
         hit_shader_binding_table->unmap();
     };
 
-    void RayTracingPipeline::buildRTCommandBuffers(std::vector<vk::Image>& swapChainImages,
-                                         std::shared_ptr<CommandBufferManager>& commandBufferManager,
-                                         std::shared_ptr<DescriptorManager>& descriptorManager,
-                                         int width, int height,
-                                         std::shared_ptr<StorageImage>& storageImage)
+    void RayTracingPipeline::buildRTCommandBuffers()
     {
         vk::CommandBufferBeginInfo beginInfo{
             .flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse,
@@ -186,9 +205,9 @@ namespace VRTR
 
         auto &commandBuffers = commandBufferManager->getCommandBuffers();
 
-        if (commandBuffers.size() != swapChainImages.size()) {
+        if (commandBuffers.size() != swapChainImages->size()) {
             VRTR_CRITICAL("Mismatch between command buffer count ({}) and swapchain image count ({})",
-                        commandBuffers.size(), swapChainImages.size());
+                        commandBuffers.size(), swapChainImages->size());
         }
 
         for (uint32_t i = 0; i < commandBuffers.size(); i++)
@@ -248,7 +267,7 @@ namespace VRTR
 
             commandBufferManager->transition_image_layout(
                 commandBufferManager->getCommandBuffer(i),
-                swapChainImages.at(i),
+                swapChainImages->at(i),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eTransferDstOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
@@ -277,12 +296,12 @@ namespace VRTR
 
             commandBufferManager->getCommandBuffer(i).copyImage(
                 *storageImage->getImage(), vk::ImageLayout::eTransferSrcOptimal,
-                swapChainImages.at(i), vk::ImageLayout::eTransferDstOptimal,
+                swapChainImages->at(i), vk::ImageLayout::eTransferDstOptimal,
                 {copyRegion});
 
             commandBufferManager->transition_image_layout(
                 commandBufferManager->getCommandBuffer(i),
-                swapChainImages.at(i),
+                swapChainImages->at(i),
                 vk::ImageLayout::eTransferDstOptimal,
                 vk::ImageLayout::ePresentSrcKHR,
                 {},

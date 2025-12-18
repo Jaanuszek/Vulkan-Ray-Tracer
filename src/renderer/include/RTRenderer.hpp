@@ -4,7 +4,7 @@
 #include "SwapChainManager.hpp"
 #include "CommandBufferManager.hpp"
 #include "ConstantsAndStructs.hpp"
-#include "RendererContext.hpp"
+// #include "RendererContext.hpp"
 #include "InstanceManager.hpp"
 #include "DeviceManager.hpp"
 #include "buffer.hpp"
@@ -35,31 +35,18 @@ namespace VRTR
 
         glm::mat4 rotateModel(float angle, const glm::vec3 &axis);
 
-        // ================== RAY TRACING ==================
-
         void createScene();
-
-        // void createDescriptorSets();
-
-        // void updateDescriptorSets();
-
-        // void createRayTracingPipeline();
-
-        // void createShaderBindingTable();
-
-        // void buildRTCommandBuffers();
 
     private:
         int width, height;
         VULKAN_CONTEXT ctx;
         // TODO replace VULKAN_CONTEXT with RendererContext
-        RendererContext rendererContext;
+        // RendererContext rendererContext;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
         std::shared_ptr<StorageImage> storageImage;
         std::unique_ptr<AccelerationStructureManager> asManager;
-        std::shared_ptr<DescriptorManager> descriptorManager;
         std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
 
         std::unique_ptr<Camera> camera;

@@ -78,24 +78,18 @@ namespace VRTR
 
         asManager->buildTLAS();
 
-        descriptorManager = std::make_shared<DescriptorManager>(ctx);
+        DescriptorResources descriptorResources{};
+        descriptorResources.TLAS = &asManager->getTLAS();
+        descriptorResources.ubo = &uniform_buffer->getBuffer();
+        descriptorResources.storageImageView = &storageImage->getImageView();
 
         rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx);
-        rayTracingPipeline->init(descriptorManager,
-                                    swapChainManager->getSwapChainImages(),
-                                    commandBufferManager,
-                                    width,
-                                    height,
-                                    storageImage);
-
-        // it has to be init after rayTracingPipeline is created because it uses its descriptor set layout
-        descriptorManager->init(asManager->getTLAS(), uniform_buffer->getBuffer(), storageImage->getImageView());
-        rayTracingPipeline->buildRTCommandBuffers(swapChainManager->getSwapChainImages(),
-                                            commandBufferManager,
-                                            descriptorManager,
-                                            width,
-                                            height,
-                                            storageImage);
+        rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
+                                descriptorResources,
+                                commandBufferManager,
+                                width,
+                                height,
+                                storageImage);
     }
 
     void RTRenderer::createSyncObjects()
@@ -162,10 +156,6 @@ namespace VRTR
         try
         {
             auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
-            // camera->setRotation(glm::vec3(0.0f, 0.0f, static_cast<float>(16.0 * glfwGetTime())));
-            // asManager->updateTLAS(rotateModel(static_cast<float>(2.0 * glfwGetTime()), glm::vec3(0.0f, 0.0f, 1.0f)));
-            // updateUniformBuffer();
-            // recordCommandBuffer(imageIndex);
             ctx.logicalDevice.resetFences({ctx.drawFences[commandBufferManager->getCurrentFrame()]});
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
             const vk::SubmitInfo submitInfo{
@@ -197,9 +187,13 @@ namespace VRTR
         {
             swapChainManager->recreateSwapChain(window, width, height);
             storageImage->recreate(width, height);
-            // tu obowiazkowo trzeba zrobic wrappery
-            descriptorManager->updateDescriptorSets(storageImage->getImageView());
-            rayTracingPipeline->buildRTCommandBuffers(swapChainManager->getSwapChainImages(), commandBufferManager, descriptorManager, width, height, storageImage);
+
+            DescriptorResources desResources{};
+            desResources.TLAS = &asManager->getTLAS();
+            desResources.ubo = &uniform_buffer->getBuffer();
+            desResources.storageImageView = &storageImage->getImageView();
+
+            rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);
             return;
         }
         catch (const std::exception &e)

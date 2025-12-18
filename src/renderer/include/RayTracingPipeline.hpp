@@ -17,29 +17,32 @@ namespace VRTR
         public:
             RayTracingPipeline(VULKAN_CONTEXT& ctx);
 
-            void init(std::shared_ptr<DescriptorManager>& descriptorManager,
-                    std::vector<vk::Image>& swapChainImages,
+            void init(std::vector<vk::Image>& swapChainImages,
+                    const DescriptorResources& resources,
                     std::shared_ptr<CommandBufferManager>& commandBufferManager,
                     int width, int height,
                     std::shared_ptr<StorageImage>& storageImage
                 );
 
-            void buildRTCommandBuffers(std::vector<vk::Image>& swapChainImages,
-                        std::shared_ptr<CommandBufferManager>& commandBufferManager,
-                        std::shared_ptr<DescriptorManager>& descriptorManager,
-                        int width, int height,
-                        std::shared_ptr<StorageImage>& storageImage);
+            void updatePipelineDescriptors(const DescriptorResources& resources, int width, int height);
 
             static void initRayTracing(VULKAN_CONTEXT &ctx);
-            
 
         private:
-            void createRayTracingPipeline(std::shared_ptr<DescriptorManager>& descriptorManager);
+            void createRayTracingPipeline();
 
             void createShaderBindingTable();
 
+            void buildRTCommandBuffers();
+
         private:
             VULKAN_CONTEXT& ctx;
+
+            std::vector<vk::Image>* swapChainImages = nullptr;
+            std::unique_ptr<DescriptorManager> descriptorManager;
+            std::shared_ptr<CommandBufferManager> commandBufferManager;
+            std::shared_ptr<StorageImage> storageImage;
+            int width{0}; int height{0};
             // vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
             vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
             vk::raii::Pipeline rayTracingPipeline{nullptr};

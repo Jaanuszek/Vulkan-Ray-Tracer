@@ -39,6 +39,26 @@ namespace VRTR
         vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
     };
 
+    struct Properties
+    {
+        vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties{};
+        vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
+    };
+
+    struct RendererContext
+    {
+        vk::raii::Context context;
+        vk::raii::Instance instance{nullptr};
+        vk::raii::PhysicalDevice gpu{nullptr};
+        vk::raii::Device logicalDevice{nullptr};
+        vk::raii::Queue queue{nullptr};
+        int32_t graphics_queue_index = -1;
+        vk::raii::SurfaceKHR surface{nullptr};
+        vk::raii::DebugUtilsMessengerEXT debugMessenger{nullptr};
+
+        Properties properties;
+    };
+
     struct Vertex
     {
         glm::vec2 pos;
@@ -55,14 +75,6 @@ namespace VRTR
         glm::mat4 view_inverse;
         glm::mat4 proj_inverse;
     };
-
-    // struct AccelerationStructure
-    // {
-    //     std::unique_ptr<Buffer> buffer; // to raczej niepotrzebne
-    //     vk::raii::AccelerationStructureKHR handle{nullptr};
-    //     vk::DeviceAddress device_address;
-    // };
-
 
     namespace CONSTANTS
     {
