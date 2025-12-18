@@ -1,6 +1,6 @@
 #pragma once
 #include "Logger.hpp"
-#include "RendererContext.hpp"
+#include "ConstantsAndStructs.hpp"
 
 namespace VRTR
 {
@@ -22,7 +22,7 @@ namespace VRTR
     class InstanceManager
     {
         public:
-            static vk::raii::Instance createInstance(vk::raii::Context &ctx, vk::raii::DebugUtilsMessengerEXT& debugMessenger);
+            static vk::raii::Instance createInstance(RendererContext& ctx);
         private:
             static std::vector<const char*> getRequiredExtensions();
             static bool checkExtensionsSupport(const std::vector<const char*>& glfwExtensions,

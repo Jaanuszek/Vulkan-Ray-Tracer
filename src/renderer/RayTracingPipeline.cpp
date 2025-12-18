@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    RayTracingPipeline::RayTracingPipeline(VULKAN_CONTEXT& ctx)
+    RayTracingPipeline::RayTracingPipeline(RendererContext& ctx)
         : ctx(ctx)
     {
     }
@@ -147,8 +147,8 @@ namespace VRTR
     void RayTracingPipeline::createShaderBindingTable()
     {
         VRTR_DEBUG("Creating Shader Binding Table");
-        const uint32_t handle_size = ctx.rtPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
-        const uint32_t handle_alignment = ctx.rtPipelineProperties.shaderGroupHandleAlignment;
+        const uint32_t handle_size = ctx.properties.rtPipelineProperties.shaderGroupHandleSize; // rozmiar jednego shader group
+        const uint32_t handle_alignment = ctx.properties.rtPipelineProperties.shaderGroupHandleAlignment;
         const uint32_t handle_size_aligned = utils::aligned_size(handle_size, handle_alignment); // rozmiar wyrownania
         const uint32_t group_count = static_cast<uint32_t>(shaderGroups.size());                 // licza shaderow
         const uint32_t sbt_size = group_count * handle_size_aligned;                             // calkowity rozmiar SBT - ile bajtow potrzeba zeby zmieniscic wszystkie uchryty shaderow
@@ -214,8 +214,8 @@ namespace VRTR
         {
             commandBufferManager->beginCommandBuffer(i, beginInfo);
             
-            const uint32_t handle_size = ctx.rtPipelineProperties.shaderGroupHandleSize;
-            const uint32_t handle_alignment = ctx.rtPipelineProperties.shaderGroupHandleAlignment;
+            const uint32_t handle_size = ctx.properties.rtPipelineProperties.shaderGroupHandleSize;
+            const uint32_t handle_alignment = ctx.properties.rtPipelineProperties.shaderGroupHandleAlignment;
             const uint32_t handle_size_aligned = utils::aligned_size(handle_size, handle_alignment);
 
             vk::StridedDeviceAddressRegionKHR raygenShaderSBTEntry{
@@ -313,7 +313,7 @@ namespace VRTR
         }
     }
 
-    void RayTracingPipeline::initRayTracing(VULKAN_CONTEXT &ctx)
+    void RayTracingPipeline::initRayTracing(RendererContext &ctx)
     {
         auto prop = ctx.gpu.getProperties2<vk::PhysicalDeviceProperties2,
                                     vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
@@ -321,7 +321,7 @@ namespace VRTR
 
         // rayTracingPipelineProperties = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 
-        ctx.rtPipelineProperties = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
-        ctx.asProperties = prop.get<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>();
+        ctx.properties.rtPipelineProperties = prop.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+        ctx.properties.asProperties = prop.get<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>();
     }
 }

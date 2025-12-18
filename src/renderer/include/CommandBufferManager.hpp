@@ -9,7 +9,7 @@ namespace VRTR
     class CommandBufferManager
     {
     public:
-        CommandBufferManager(vk::raii::Device& device, uint32_t graphicsQueueIndex);
+        CommandBufferManager(RendererContext& ctx);
 
         void init();
 
@@ -54,15 +54,15 @@ namespace VRTR
         // bede chcial to przechowywac w oddzielnej klasie zajmującej się syncrhonizacją
         inline uint32_t getCurrentFrame() const { return currentFrame; }
         inline uint32_t getSemaphoreIndex() const { return semaphoreIndex; }
+        inline vk::raii::CommandPool& getCommandPool() { return commandPool; }
         inline void setCurrentFrame(uint32_t frame) { currentFrame = frame; }
         inline void setSemaphoreIndex(uint32_t index) { semaphoreIndex = index; }
 
     private:
+        RendererContext &ctx;
+
         uint32_t currentFrame = 0;
         uint32_t semaphoreIndex = 0;
-
-        vk::raii::Device& device;
-        uint32_t graphicsQueueIndex;
 
         vk::raii::CommandPool commandPool{nullptr};
         std::vector<vk::raii::CommandBuffer> commandBuffers{};

@@ -3,8 +3,8 @@
 
 namespace VRTR
 {
-    CommandBufferManager::CommandBufferManager(vk::raii::Device& device, uint32_t graphicsQueueIndex)
-        : device(device), graphicsQueueIndex(graphicsQueueIndex)
+    CommandBufferManager::CommandBufferManager(RendererContext& ctx)
+        : ctx(ctx)
     {}
 
     void CommandBufferManager::init()
@@ -21,10 +21,10 @@ namespace VRTR
         {
             .pNext = nullptr,
             .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-            .queueFamilyIndex = static_cast<uint32_t>(graphicsQueueIndex)
+            .queueFamilyIndex = static_cast<uint32_t>(ctx.graphics_queue_index)
         };
 
-        commandPool = vk::raii::CommandPool(device, poolInfo);
+        commandPool = vk::raii::CommandPool(ctx.logicalDevice, poolInfo);
     }
 
     void CommandBufferManager::createCommandBuffers()
@@ -40,7 +40,7 @@ namespace VRTR
         };
 
         // Allocate the command buffers (see commandBufferCount above)
-        commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
+        commandBuffers = vk::raii::CommandBuffers(ctx.logicalDevice, allocInfo);
     }
 
     vk::raii::CommandBuffer &CommandBufferManager::getCommandBuffer(uint32_t index)

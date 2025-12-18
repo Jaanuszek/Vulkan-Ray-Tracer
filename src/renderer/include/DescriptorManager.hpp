@@ -15,7 +15,7 @@ namespace VRTR
     class DescriptorManager
     {
         public:
-            DescriptorManager(VULKAN_CONTEXT& ctx);
+            DescriptorManager(RendererContext& ctx);
 
             void init(const DescriptorResources& resources);
 
@@ -34,7 +34,7 @@ namespace VRTR
             void createDescriptorSets();
 
         private:
-            VULKAN_CONTEXT& ctx;
+            RendererContext& ctx;
             DescriptorResources descriptorResources;
 
             vk::raii::DescriptorPool descriptorPool{nullptr};

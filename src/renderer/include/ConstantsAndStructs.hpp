@@ -5,40 +5,6 @@ namespace VRTR
 {
     class Buffer;
 
-    struct VULKAN_CONTEXT
-    {
-        vk::raii::Context context;
-
-        vk::raii::Instance instance{nullptr};
-
-        vk::raii::PhysicalDevice gpu{nullptr};
-
-        vk::raii::Device logicalDevice{nullptr};
-
-        vk::raii::Queue queue{nullptr};
-
-        int32_t graphics_queue_index = -1;
-
-        vk::raii::SurfaceKHR surface{nullptr};
-
-        vk::raii::CommandPool commandPool{nullptr};
-
-        std::vector<vk::raii::CommandBuffer> commandBuffers;
-
-        vk::raii::DebugUtilsMessengerEXT debugMessenger{nullptr};
-
-        // SYNC VARIABLES
-        std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
-
-        std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
-
-        std::vector<vk::raii::Fence> drawFences;
-
-        // CONST VALUES
-        vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties{};
-        vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties{};
-    };
-
     struct Properties
     {
         vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties{};

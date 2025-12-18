@@ -9,7 +9,7 @@ namespace VRTR
     class SwapChainManager
     {
         public:
-            SwapChainManager(vk::raii::Device &device, vk::raii::PhysicalDevice &gpu, vk::raii::SurfaceKHR &surface);
+            SwapChainManager(RendererContext& ctx);
 
             void init(GLFWwindow *window);
 
@@ -44,9 +44,7 @@ namespace VRTR
             vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities, GLFWwindow* window);
         
         private:
-            vk::raii::Device &device;
-            vk::raii::PhysicalDevice &gpu;
-            vk::raii::SurfaceKHR &surface;
+            RendererContext &ctx;
             vk::raii::SwapchainKHR swapChain{nullptr};
             std::vector<vk::Image> swapChainImages;
             std::vector<vk::raii::ImageView> swapChainImageViews;

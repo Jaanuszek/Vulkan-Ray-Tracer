@@ -15,7 +15,7 @@ namespace VRTR
     class RayTracingPipeline
     {
         public:
-            RayTracingPipeline(VULKAN_CONTEXT& ctx);
+            RayTracingPipeline(RendererContext& ctx);
 
             void init(std::vector<vk::Image>& swapChainImages,
                     const DescriptorResources& resources,
@@ -26,7 +26,7 @@ namespace VRTR
 
             void updatePipelineDescriptors(const DescriptorResources& resources, int width, int height);
 
-            static void initRayTracing(VULKAN_CONTEXT &ctx);
+            static void initRayTracing(RendererContext &ctx);
 
         private:
             void createRayTracingPipeline();
@@ -36,7 +36,7 @@ namespace VRTR
             void buildRTCommandBuffers();
 
         private:
-            VULKAN_CONTEXT& ctx;
+            RendererContext& ctx;
 
             std::vector<vk::Image>* swapChainImages = nullptr;
             std::unique_ptr<DescriptorManager> descriptorManager;

@@ -3,8 +3,8 @@
 
 namespace VRTR
 {
-    SwapChainManager::SwapChainManager(vk::raii::Device &device, vk::raii::PhysicalDevice &gpu, vk::raii::SurfaceKHR &surface)
-        : device(device), gpu(gpu), surface(surface) {}
+    SwapChainManager::SwapChainManager(RendererContext& ctx)
+        : ctx(ctx) {}
 
     void SwapChainManager::init(GLFWwindow *window)
     {
@@ -14,7 +14,7 @@ namespace VRTR
 
     void SwapChainManager::recreateSwapChain(GLFWwindow *window, int &w, int &h)
     {
-        device.waitIdle();
+        ctx.logicalDevice.waitIdle();
 
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
@@ -37,9 +37,9 @@ namespace VRTR
     {
         VRTR_DEBUG("CREATING SWAP CHAIN");
 
-        auto surfaceCapabilities = gpu.getSurfaceCapabilitiesKHR(surface);
-        auto availableFormats = gpu.getSurfaceFormatsKHR(surface);
-        auto availablePresentModes = gpu.getSurfacePresentModesKHR(surface);
+        auto surfaceCapabilities = ctx.gpu.getSurfaceCapabilitiesKHR(ctx.surface);
+        auto availableFormats = ctx.gpu.getSurfaceFormatsKHR(ctx.surface);
+        auto availablePresentModes = ctx.gpu.getSurfacePresentModesKHR(ctx.surface);
 
         surfaceFormat = SwapChainManager::chooseSurfaceFormat(availableFormats);
         imageFormat = surfaceFormat.format;
@@ -55,7 +55,7 @@ namespace VRTR
 
         vk::SwapchainCreateInfoKHR createInfo{
             .flags = vk::SwapchainCreateFlagsKHR{},
-            .surface = surface,
+            .surface = ctx.surface,
             .minImageCount = minImageCount,
             .imageFormat = imageFormat,
             .imageColorSpace = surfaceFormat.colorSpace,
@@ -84,7 +84,7 @@ namespace VRTR
         //     swapChainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
         // }
 
-        swapChain = vk::raii::SwapchainKHR(device, createInfo);
+        swapChain = vk::raii::SwapchainKHR(ctx.logicalDevice, createInfo);
         swapChainImages = swapChain.getImages();
     }
 
@@ -94,7 +94,7 @@ namespace VRTR
         swapChainImageViews.clear();
         swapChainImageViews.reserve(swapChainImages.size());
 
-        auto format = gpu.getSurfaceCapabilitiesKHR(surface);
+        auto format = ctx.gpu.getSurfaceCapabilitiesKHR(ctx.surface);
 
         vk::ImageViewCreateInfo createInfo{
             .pNext = nullptr,
@@ -113,7 +113,7 @@ namespace VRTR
         {
             createInfo.image = image;
             // constructing ImageView from vk::raii::ImageView
-            swapChainImageViews.emplace_back(device, createInfo);
+            swapChainImageViews.emplace_back(ctx.logicalDevice, createInfo);
         }
     }
 

@@ -60,7 +60,7 @@ namespace VRTR
         deviceAddress = logicalDevice.getBufferAddress(vk::BufferDeviceAddressInfo{.buffer=buffer});
     }
 
-    Buffer::Buffer(VULKAN_CONTEXT& ctx,
+    Buffer::Buffer(RendererContext& ctx,
                    BufferType type,
                    vk::DeviceSize size) : logDevice(ctx.logicalDevice)
     {

@@ -29,7 +29,7 @@ namespace VRTR
         return VK_FALSE;
     }
 
-    vk::raii::Instance InstanceManager::createInstance(vk::raii::Context& ctx, vk::raii::DebugUtilsMessengerEXT& debugMessenger)
+    vk::raii::Instance InstanceManager::createInstance(RendererContext& ctx)
     {
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if (glfwVulkanSupported() != GLFW_TRUE)
@@ -38,7 +38,7 @@ namespace VRTR
             throw std::runtime_error("GLFW VULKAN NOT SUPPORTED");
         }
 
-        std::vector<vk::ExtensionProperties> availableExtensionProperties = ctx.enumerateInstanceExtensionProperties();
+        std::vector<vk::ExtensionProperties> availableExtensionProperties = ctx.context.enumerateInstanceExtensionProperties();
 
         auto extensions = getRequiredExtensions();
         uint32_t extensionsCount = static_cast<uint32_t>(extensions.size());
@@ -91,7 +91,7 @@ namespace VRTR
 
         try
         {
-            return vk::raii::Instance(ctx, createInfo);
+            return vk::raii::Instance(ctx.context, createInfo);
         }
         catch (const vk::SystemError &e)
         {

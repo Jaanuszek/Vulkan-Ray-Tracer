@@ -3,16 +3,11 @@
 
 namespace VRTR
 {
-    StorageImage::StorageImage(vk::raii::Device &logicalDevice, 
-        vk::raii::PhysicalDevice &gpu, 
-        vk::raii::CommandPool &commandPool,
-        vk::raii::Queue &queue,
-        uint32_t graphics_queue_index, 
-        uint32_t width, uint32_t height)
-        : logicalDevice(logicalDevice), gpu(gpu), commandPool(commandPool), queue(queue), graphics_queue_index(graphics_queue_index), width(width), height(height)
+    StorageImage::StorageImage(RendererContext& ctx,uint32_t width, uint32_t height)
+        : ctx(ctx), width(width), height(height)
     {}
 
-    void StorageImage::init()
+    void StorageImage::init(vk::raii::CommandPool& commandPool)
     {
         VRTR_DEBUG("Creating storage image");
 
@@ -27,13 +22,13 @@ namespace VRTR
             .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc,
             .sharingMode = vk::SharingMode::eExclusive,
             .initialLayout = vk::ImageLayout::eUndefined};
-        Image = vk::raii::Image(logicalDevice, imgCreateInfo);
+        Image = vk::raii::Image(ctx.logicalDevice, imgCreateInfo);
 
         vk::MemoryRequirements memRequirements = Image.getMemoryRequirements();
         vk::MemoryAllocateInfo allocInfo{
             .allocationSize = memRequirements.size,
-            .memoryTypeIndex = Buffer::findMemoryType(gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)};
-        Memory = vk::raii::DeviceMemory(logicalDevice, allocInfo);
+            .memoryTypeIndex = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)};
+        Memory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
         Image.bindMemory(*Memory, 0); // Do I need this pointer here?
 
         vk::ImageViewCreateInfo viewCreateInfo{
@@ -46,7 +41,7 @@ namespace VRTR
                 vk::ComponentSwizzle::eIdentity,
                 vk::ComponentSwizzle::eIdentity},
             .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-        ImageView = vk::raii::ImageView(logicalDevice, viewCreateInfo);
+        ImageView = vk::raii::ImageView(ctx.logicalDevice, viewCreateInfo);
 
         // TODO OGARNAC TE TYMCZASOWE COMMAND BUFFERY
         vk::CommandBufferAllocateInfo cmdBufferAllocInfo{
@@ -54,7 +49,7 @@ namespace VRTR
             .level = vk::CommandBufferLevel::ePrimary,
             .commandBufferCount = 1};
 
-        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(logicalDevice, queue, graphics_queue_index);
+        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
         vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
 
         CommandBufferManager::transition_image_layout(
@@ -71,7 +66,7 @@ namespace VRTR
         tempCmdBufferManager->submitAndWaitTempCmdBuffer();
     }
 
-    void StorageImage::recreate(uint32_t newWidth, uint32_t newHeight)
+    void StorageImage::recreate(vk::raii::CommandPool& commandPool, uint32_t newWidth, uint32_t newHeight)
     {
         width = newWidth;
         height = newHeight;
@@ -80,6 +75,6 @@ namespace VRTR
         ImageView = nullptr;
         Memory = nullptr;
 
-        init();
+        init(commandPool);
     }
 }

@@ -34,7 +34,7 @@ namespace VRTR
                std::optional<vk::BufferUsageFlags2> usage2 = std::nullopt);
 
         // Buffer constructor for specific types with hardcoded usage and memory properties
-        Buffer(VULKAN_CONTEXT &ctx,
+        Buffer(RendererContext &ctx,
                BufferType type,
                vk::DeviceSize size);
 

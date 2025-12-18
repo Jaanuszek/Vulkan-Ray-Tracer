@@ -14,9 +14,7 @@ namespace VRTR
 
         glfwGetFramebufferSize(window, &width, &height);
 
-        ctx.instance = InstanceManager::createInstance(ctx.context, ctx.debugMessenger);
-        // TODO replace it with
-        // rendererContext.instance = InstanceManager::createInstance(rendererContext.context, rendererContext.debugMessenger);
+        ctx.instance = InstanceManager::createInstance(ctx);
 
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Instance>(*ctx.instance));
 
@@ -26,31 +24,21 @@ namespace VRTR
         ctx.logicalDevice = std::move(deviceProps.logicalDevice);
         ctx.queue = std::move(deviceProps.graphicsQueue);
         ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
-        // TODO replace VULKAN_CONTEXT with RendererContext
-        // rendererContext.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
-        // rendererContext.gpu = std::move(deviceProps.physicalDevice);
-        // rendererContext.surface = std::move(deviceProps.surface);
-        // rendererContext.logicalDevice = std::move(deviceProps.logicalDevice);
-        // rendererContext.queue = std::move(deviceProps.graphicsQueue);
 
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Device>(*ctx.logicalDevice));
 
         RayTracingPipeline::initRayTracing(ctx);
 
-        swapChainManager = std::make_unique<SwapChainManager>(ctx.logicalDevice, ctx.gpu, ctx.surface);
+        swapChainManager = std::make_unique<SwapChainManager>(ctx);
         swapChainManager->init(window);
-        // TODO replace VULKAN_CONTEXT with RendererContext
-        // swapChainManager = std::make_unique<SwapChainManager>(rendererContext.logicalDevice, rendererContext.gpu, rendererContext.surface);
 
-        commandBufferManager = std::make_shared<CommandBufferManager>(ctx.logicalDevice, ctx.graphics_queue_index);
-        // TODO replace VULKAN_CONTEXT with RendererContext
-        // commandBuffermanager = std::make_unique<CommandBufferManager>(rendererContext.logical
+        commandBufferManager = std::make_shared<CommandBufferManager>(ctx);
         commandBufferManager->init();
 
         createSyncObjects();
 
-        storageImage = std::make_shared<StorageImage>(ctx.logicalDevice, ctx.gpu, ctx.commandPool, ctx.queue, ctx.graphics_queue_index, width, height);
-        storageImage->init();
+        storageImage = std::make_shared<StorageImage>(ctx, width, height);
+        storageImage->init(commandBufferManager->getCommandPool());
 
         createScene();
 
@@ -96,9 +84,9 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating Sync Objects");
 
-        ctx.presentCompleteSemaphores.clear();
-        ctx.renderCompleteSemaphores.clear();
-        ctx.drawFences.clear();
+        presentCompleteSemaphores.clear();
+        renderCompleteSemaphores.clear();
+        drawFences.clear();
 
         vk::SemaphoreCreateInfo semaphoreInfo{
             .pNext = nullptr,
@@ -110,9 +98,9 @@ namespace VRTR
         };
         for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            ctx.presentCompleteSemaphores.emplace_back(vk::raii::Semaphore(ctx.logicalDevice, semaphoreInfo));
-            ctx.renderCompleteSemaphores.emplace_back(vk::raii::Semaphore(ctx.logicalDevice, semaphoreInfo));
-            ctx.drawFences.emplace_back(vk::raii::Fence(ctx.logicalDevice, fenceInfo));
+            presentCompleteSemaphores.emplace_back(vk::raii::Semaphore(ctx.logicalDevice, semaphoreInfo));
+            renderCompleteSemaphores.emplace_back(vk::raii::Semaphore(ctx.logicalDevice, semaphoreInfo));
+            drawFences.emplace_back(vk::raii::Fence(ctx.logicalDevice, fenceInfo));
         }
     }
 
@@ -148,31 +136,31 @@ namespace VRTR
     void RTRenderer::drawFrame(GLFWwindow *window)
     {
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
-        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*ctx.drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
+        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
             ;
 
         // Unfortunately it needs to be inside try catch block, because "acquireNextImage" is throwing exceptions
         // I cant disable it, because i am using vk::raii and it requires exceptions to be enabled :(
         try
         {
-            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, ctx.presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
-            ctx.logicalDevice.resetFences({ctx.drawFences[commandBufferManager->getCurrentFrame()]});
+            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
+            ctx.logicalDevice.resetFences({drawFences[commandBufferManager->getCurrentFrame()]});
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*ctx.presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()),
+                .pWaitSemaphores = &*presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()),
                 .pWaitDstStageMask = &waitDestinationStageMask,
                 .commandBufferCount = 1,
                 .pCommandBuffers = &*commandBufferManager->getCommandBuffer(imageIndex),
                 .signalSemaphoreCount = 1,
-                .pSignalSemaphores = &*ctx.renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame())};
-            ctx.queue.submit({submitInfo}, *ctx.drawFences.at(commandBufferManager->getCurrentFrame()));
+                .pSignalSemaphores = &*renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame())};
+            ctx.queue.submit({submitInfo}, *drawFences.at(commandBufferManager->getCurrentFrame()));
 
             const vk::PresentInfoKHR presentInfoKHR{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*ctx.renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame()),
+                .pWaitSemaphores = &*renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame()),
                 .swapchainCount = 1,
                 .pSwapchains = &*swapChain,
                 .pImageIndices = &imageIndex,
@@ -180,13 +168,13 @@ namespace VRTR
 
             result = ctx.queue.presentKHR(presentInfoKHR);
 
-            commandBufferManager->setSemaphoreIndex((commandBufferManager->getSemaphoreIndex() + 1) % ctx.presentCompleteSemaphores.size());
+            commandBufferManager->setSemaphoreIndex((commandBufferManager->getSemaphoreIndex() + 1) % presentCompleteSemaphores.size());
             commandBufferManager->setCurrentFrame((commandBufferManager->getCurrentFrame() + 1) % MAX_FRAMES_IN_FLIGHT);
         }
         catch (const vk::OutOfDateKHRError &e)
         {
             swapChainManager->recreateSwapChain(window, width, height);
-            storageImage->recreate(width, height);
+            storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
 
             DescriptorResources desResources{};
             desResources.TLAS = &asManager->getTLAS();

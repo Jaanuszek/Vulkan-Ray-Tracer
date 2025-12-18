@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    AccelerationStructureManager::AccelerationStructureManager(VULKAN_CONTEXT& ctx)
+    AccelerationStructureManager::AccelerationStructureManager(RendererContext& ctx)
         : ctx(ctx)
     {
     }
@@ -31,12 +31,11 @@ namespace VRTR
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
         primitiveToGeometry(vertices, indices, blas_structure.vertexBuffer, blas_structure.indexBuffer, asGeometry, offsetInfo);
         // inicjacja struktury acceleration structure.
-        createAccelerationStructure(ctx,
-                                        vk::AccelerationStructureTypeKHR::eBottomLevel,
-                                        blas_structure.as,
-                                        asGeometry,
-                                        offsetInfo,
-                                        vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+        createAccelerationStructure(vk::AccelerationStructureTypeKHR::eBottomLevel,
+                                    blas_structure.as,
+                                    asGeometry,
+                                    offsetInfo,
+                                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
         blasList.push_back(std::move(blas_structure));
         return static_cast<uint32_t>(blasList.size() - 1);
@@ -100,12 +99,11 @@ namespace VRTR
             .firstVertex = 0,
             .transformOffset = 0};
 
-        createAccelerationStructure(ctx,
-                                        vk::AccelerationStructureTypeKHR::eTopLevel,
-                                        tlas.as,
-                                        ASGeometry,
-                                        ASBuildRangeInfo,
-                                        vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
+        createAccelerationStructure(vk::AccelerationStructureTypeKHR::eTopLevel,
+                                    tlas.as,
+                                    ASGeometry,
+                                    ASBuildRangeInfo,
+                                    vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
     }
 
     void AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
@@ -241,8 +239,7 @@ namespace VRTR
             .transformOffset = 0};
     }
 
-    void AccelerationStructureManager::createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
-                                            vk::AccelerationStructureTypeKHR asType,
+    void AccelerationStructureManager::createAccelerationStructure(vk::AccelerationStructureTypeKHR asType,
                                             AccelerationStructure &as,
                                             vk::AccelerationStructureGeometryKHR &asGeometry,
                                             vk::AccelerationStructureBuildRangeInfoKHR &asBuildRangeInfo,
@@ -270,7 +267,7 @@ namespace VRTR
             maxPrimCount);
 
         vk::DeviceSize scratchSize = asSizeInfo.buildScratchSize;
-        vk::DeviceSize minAsScratchOffsetAlignment = ctx.asProperties.minAccelerationStructureScratchOffsetAlignment;
+        vk::DeviceSize minAsScratchOffsetAlignment = ctx.properties.asProperties.minAccelerationStructureScratchOffsetAlignment;
         scratchSize = utils::aligned_size(scratchSize, minAsScratchOffsetAlignment);
 
         as.scratchBuffer = std::make_unique<Buffer>(ctx, BufferType::SCRATCH, scratchSize);

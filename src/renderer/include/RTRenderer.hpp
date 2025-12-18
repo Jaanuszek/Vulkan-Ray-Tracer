@@ -39,9 +39,7 @@ namespace VRTR
 
     private:
         int width, height;
-        VULKAN_CONTEXT ctx;
-        // TODO replace VULKAN_CONTEXT with RendererContext
-        // RendererContext rendererContext;
+        RendererContext ctx;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
@@ -50,6 +48,10 @@ namespace VRTR
         std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
 
         std::unique_ptr<Camera> camera;
+
+        std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+        std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
+        std::vector<vk::raii::Fence> drawFences;
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;

@@ -42,7 +42,7 @@ namespace VRTR
     class AccelerationStructureManager
     {
         public:
-            AccelerationStructureManager(VULKAN_CONTEXT& ctx);
+            AccelerationStructureManager(RendererContext& ctx);
         
             uint32_t createBLAS(const std::vector<VertexRT>& vertices,
                                 const std::vector<uint32_t>& indices);
@@ -65,16 +65,14 @@ namespace VRTR
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,
                                  vk::IndexType indexType = vk::IndexType::eUint32);
 
-        void createAccelerationStructure(VRTR::VULKAN_CONTEXT &ctx,
-                                         vk::AccelerationStructureTypeKHR asType,
+        void createAccelerationStructure(vk::AccelerationStructureTypeKHR asType,
                                          AccelerationStructure &as,
                                          vk::AccelerationStructureGeometryKHR &asGeometry,
                                          vk::AccelerationStructureBuildRangeInfoKHR &asBuildRangeInfo,
                                          vk::BuildAccelerationStructureFlagsKHR flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
         private:
-            VULKAN_CONTEXT& ctx;
-            // TODO change to RendererContext
+            RendererContext& ctx;
 
             // Instances data  blasID, transofmr, mask, customidx, hitGroupIndex
             std::vector<InstanceData> instances;

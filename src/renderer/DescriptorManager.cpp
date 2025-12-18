@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    DescriptorManager::DescriptorManager(VULKAN_CONTEXT& ctx)
+    DescriptorManager::DescriptorManager(RendererContext& ctx)
         : ctx(ctx)
     {
     }
