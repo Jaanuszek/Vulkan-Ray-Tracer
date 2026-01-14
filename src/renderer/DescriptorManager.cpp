@@ -28,7 +28,8 @@ namespace VRTR
             {
                 {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
                 {vk::DescriptorType::eStorageImage, maxSets},             // umozliwienie zapisywania wyniku shaderow do storage image
-                {vk::DescriptorType::eUniformBuffer, maxSets}             // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
+                {vk::DescriptorType::eUniformBuffer, maxSets},            // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
+                {vk::DescriptorType::eCombinedImageSampler, maxSets}      // wsparcie dla tekstur
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -96,10 +97,26 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .pBufferInfo = &bufferInfo};
 
-        std::array<vk::WriteDescriptorSet, 3> WriteDescriptorSets = {
+        vk::DescriptorImageInfo textureImageInfo{
+            .sampler = *descriptorResources.texture->getTextureSampler(),
+            .imageView = *descriptorResources.texture->getTextureImageView(),
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+        vk::WriteDescriptorSet textureWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 3,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .pImageInfo = &textureImageInfo};
+
+
+        std::array<vk::WriteDescriptorSet, 4> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
-            uniformBufferWrite};
+            uniformBufferWrite,
+            textureWrite};
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 

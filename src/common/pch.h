@@ -23,6 +23,7 @@
 #include <ranges>
 #include <atomic>
 #include <filesystem>
+#include <cassert>
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN
@@ -45,3 +46,5 @@
 #include <vulkan/vulkan_raii.hpp>
 #include <vulkan/vulkan_structs.hpp>
 #include <vulkan/vulkan_hpp_macros.hpp>
+
+#define assertm(exp, msg) assert((void(msg), exp))

@@ -6,6 +6,13 @@ struct Attribs
 struct Payload
 {
     [[vk::location(0)]] float3 hitValue;
+    [[vk::location(1)]] float2 texCoord;
+};
+
+struct VertexRT
+{
+    float3 pos;
+    float2 texCoord;
 };
 
 // in Attribs jest obliczane przez vulkan
@@ -31,5 +38,6 @@ void main(inout Payload p, in BuiltInTriangleIntersectionAttributes attr)
         attr.barycentrics.y
     );
 
-    p.hitValue = barycentricCoords;
+    // p.hitValue = barycentricCoords;
+    p.hitValue = float3(1.0, 0.0, 1.0);
 }

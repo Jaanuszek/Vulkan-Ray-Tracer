@@ -66,11 +66,19 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
             .pImmutableSamplers = nullptr};
 
-        std::array<vk::DescriptorSetLayoutBinding, 3> bindings =
+        vk::DescriptorSetLayoutBinding textureBinding{
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
+        std::array<vk::DescriptorSetLayoutBinding, 4> bindings =
             {
                 ASLayout,
                 storageImageLayout,
-                uniformBufferLayout
+                uniformBufferLayout,
+                textureBinding
             };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{

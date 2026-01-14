@@ -2,6 +2,7 @@
 
 #include "Logger.hpp"
 #include "ConstantsAndStructs.hpp"
+#include "Texture.hpp"
 
 namespace VRTR
 {
@@ -10,6 +11,7 @@ namespace VRTR
         vk::raii::AccelerationStructureKHR* TLAS = nullptr;
         vk::raii::Buffer* ubo = nullptr;
         vk::raii::ImageView* storageImageView = nullptr;
+        std::shared_ptr<Texture> texture;
     };
 
     class DescriptorManager

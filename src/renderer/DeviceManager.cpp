@@ -94,7 +94,7 @@ namespace VRTR
                            vk::PhysicalDeviceBufferDeviceAddressFeatures,
                            vk::PhysicalDeviceAccelerationStructureFeaturesKHR>
             featuresChain{
-                {},
+                {.features = {.samplerAnisotropy = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},

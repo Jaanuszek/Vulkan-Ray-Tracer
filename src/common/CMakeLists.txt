@@ -1,5 +1,9 @@
 #  Automatic library (static or shared)
 add_library(common pch.cpp)
 target_precompile_headers(common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/pch.h)
-target_include_directories(common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(common 
+    PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/third-party/stb
+    )
 target_compile_options(common PRIVATE -fPIC)

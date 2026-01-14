@@ -44,25 +44,30 @@ namespace VRTR
 
         asManager = std::make_unique<AccelerationStructureManager>(ctx);
 
-        std::vector<VertexRT> verticesRT = {
-            {{1.0f, 1.0f, 0.0f}},
-            {{-1.0f, 1.0f, 0.0f}},
-            {{0.0f, -1.0f, 0.0f}}};
-        std::vector<uint32_t> indicesRT = {0, 1, 2};
+        ModelLoader modelLoader(ctx);
 
-        uint32_t blasIndex = asManager->createBLAS(verticesRT, indicesRT);
+        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
+        auto modelMesh = modelLoader.loadModel(viking_room_path + "model/viking_room.obj");
+
+        // std::vector<VertexRT> verticesRT = {
+        //     {{1.0f, 1.0f, 0.0f}},
+        //     {{-1.0f, 1.0f, 0.0f}},
+        //     {{0.0f, -1.0f, 0.0f}}};
+        // std::vector<uint32_t> indicesRT = {0, 1, 2};
+
+        uint32_t blasIndex = asManager->createBLAS(modelMesh.vertices, modelMesh.indices);
 
         asManager->addInstance(blasIndex, glm::mat4(1.0f));
 
-        std::vector<VertexRT> floorVertices = {
-            {{-5.0f, -1.0f, -5.0f}},
-            {{5.0f, -1.0f, -5.0f}},
-            {{5.0f, -1.0f, 5.0f}},
-            {{-5.0f, -1.0f, 5.0f}}};
-        std::vector<uint32_t> floorIndices = {0, 1, 2,
-                                             2, 3, 0};
-        uint32_t floorBlaIndex = asManager->createBLAS(floorVertices, floorIndices);
-        asManager->addInstance(floorBlaIndex, glm::mat4(-1.0f));
+        // std::vector<VertexRT> floorVertices = {
+        //     {{-5.0f, -1.0f, -5.0f}},
+        //     {{5.0f, -1.0f, -5.0f}},
+        //     {{5.0f, -1.0f, 5.0f}},
+        //     {{-5.0f, -1.0f, 5.0f}}};
+        // std::vector<uint32_t> floorIndices = {0, 1, 2,
+        //                                      2, 3, 0};
+        // uint32_t floorBlaIndex = asManager->createBLAS(floorVertices, floorIndices);
+        // asManager->addInstance(floorBlaIndex, glm::mat4(-1.0f));
 
         asManager->buildTLAS();
 
@@ -70,6 +75,7 @@ namespace VRTR
         descriptorResources.TLAS = &asManager->getTLAS();
         descriptorResources.ubo = &uniform_buffer->getBuffer();
         descriptorResources.storageImageView = &storageImage->getImageView();
+        descriptorResources.texture = std::make_shared<Texture>(ctx, viking_room_path + "textures/viking_room.png");
 
         rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx);
         rayTracingPipeline->init(swapChainManager->getSwapChainImages(),

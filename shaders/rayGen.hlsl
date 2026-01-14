@@ -12,6 +12,12 @@ cbuffer camera : register(b2) //b# - stale dane (CONSTANT BUFFER VIEW)
     Matrices matrices;
 };
 
+// Texture2D<float4> textureSampler : register(t3);
+[[vk::combinedImageSampler]]
+Texture2D tex : register(t3);
+[[vk::combinedImageSampler]][[vk::binding(3)]]
+SamplerState viking_sampler : register(s3); //s# - sampler (SAMPLER)
+
 struct Payload
 {
     [[vk::location(0)]] float3 hitValue; // do layout 0 zapisujemy kolor
@@ -38,5 +44,12 @@ void main()
 
     Payload payload;
     TraceRay(rs, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload); // RAY_FLAG_FORCE_OPAQUE - ignoruje shader any hit
-    image[int2(launchIndex.xy)] = float4(payload.hitValue, 0.0);
+
+    int width, height;
+    tex.GetDimensions(width, height);
+    int2 texelCoord = int2(UV.x * width, UV.y * height);
+    float4 texColor = tex.Load(int3(texelCoord, 0));
+
+    // image[int2(launchIndex.xy)] = float4(payload.hitValue, 1.0) * texColor;
+    image[int2(launchIndex.xy)] = float4(payload.hitValue, 1.0);
 }

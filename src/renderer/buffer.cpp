@@ -64,41 +64,86 @@ namespace VRTR
                    BufferType type,
                    vk::DeviceSize size) : logDevice(ctx.logicalDevice)
     {
-        if(type == BufferType::SCRATCH)
+        switch(type)
         {
-            vk::BufferUsageFlags2CreateInfo bufferUsageFlags2Info{
-                .pNext = nullptr,
-                .usage = BufferTypeProperties[type].first
-            };
+            case BufferType::VERTEX:
+                {}
+                break;
+            case BufferType::INDEX:
+                {}
+                break;
+            case BufferType::UNIFORM:
+                {}
+                break;
+            case BufferType::STORAGE:
+                {}
+                break;
+            case BufferType::ACCELERATION_STRUCTURE:
+                {}
+                break;
+            case BufferType::SCRATCH:
+                {
+                    vk::BufferUsageFlags2CreateInfo bufferUsageFlags2Info{
+                        .pNext = nullptr,
+                        .usage = BufferTypeProperties[type].first
+                    };
 
-            vk::BufferCreateInfo bufferCreateInfo
-            {
-                .pNext = &bufferUsageFlags2Info,
-                .size = size,
-                .usage = {},
-            };
-            buffer = vk::raii::Buffer(logDevice, bufferCreateInfo);
+                    vk::BufferCreateInfo bufferCreateInfo
+                    {
+                        .pNext = &bufferUsageFlags2Info,
+                        .size = size,
+                        .usage = {},
+                    };
 
-            vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+                    buffer = vk::raii::Buffer(logDevice, bufferCreateInfo);
 
-            vk::MemoryAllocateFlagsInfo allocateFlagsInfo
-            {
-                .pNext = nullptr,
-                .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
-            };
+                    vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
 
-            uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+                    vk::MemoryAllocateFlagsInfo allocateFlagsInfo
+                    {
+                        .pNext = nullptr,
+                        .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
+                    };
 
-            vk::MemoryAllocateInfo allocInfo
-            {
-                .pNext = &allocateFlagsInfo,
-                .allocationSize = memRequirements.size,
-                .memoryTypeIndex = memoryType
-            };
-            bufferMemory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
-            buffer.bindMemory(*bufferMemory, 0);
+                    uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-            deviceAddress = ctx.logicalDevice.getBufferAddress(vk::BufferDeviceAddressInfo{.buffer = buffer});
+                    vk::MemoryAllocateInfo allocInfo
+                    {
+                        .pNext = &allocateFlagsInfo,
+                        .allocationSize = memRequirements.size,
+                        .memoryTypeIndex = memoryType
+                    };
+                    bufferMemory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
+                    buffer.bindMemory(*bufferMemory, 0);
+
+                    deviceAddress = ctx.logicalDevice.getBufferAddress(vk::BufferDeviceAddressInfo{.buffer = buffer});
+                }
+                break;
+            case BufferType::STAGING:
+                {
+                    vk::BufferCreateInfo bufferCreateInfo{
+                        .pNext = nullptr,
+                        .size = size,
+                        .usage = vk::BufferUsageFlagBits::eTransferSrc,
+                    };
+
+                    buffer = vk::raii::Buffer(logDevice, bufferCreateInfo);
+
+                    vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+                    uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits,
+                                                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+                    vk::MemoryAllocateInfo allocInfo
+                    {
+                        .pNext = nullptr,
+                        .allocationSize = memRequirements.size, 
+                        .memoryTypeIndex = memoryType
+                    };
+                    bufferMemory = vk::raii::DeviceMemory(logDevice, allocInfo);
+                    buffer.bindMemory(*bufferMemory, 0);
+                }
+                break;
+            default:
+                break;
         }
     }
 
