@@ -6,38 +6,54 @@ struct Attribs
 struct Payload
 {
     [[vk::location(0)]] float3 hitValue;
-    [[vk::location(1)]] float2 texCoord;
+    // [[vk::location(1)]] float2 texCoord;
 };
 
-struct VertexRT
-{
+struct Vertex {
     float3 pos;
-    float2 texCoord;
+    float2 uv;
 };
 
-// in Attribs jest obliczane przez vulkan
-// współrzędne barycentryczne to taka interpolacja jak w fragment shaderze, tylko że ręcznie
+struct IndexData {
+    uint indices[1]; // Dummy size
+};
+
+struct VertexData {
+    Vertex vertices[1]; // Dummy size
+};
+
+struct BufferRefs {
+    vk::BufferPointer<VertexData> vertexBuffer;
+    vk::BufferPointer<IndexData>  indexBuffer;
+};
+
+[[vk::push_constant]] BufferRefs bufferRefs;
+
+struct Triangle {
+    Vertex vertices[3];
+    float2 uv;
+};
+
 [shader("closesthit")]
 void main(inout Payload p, in BuiltInTriangleIntersectionAttributes attr)
 {
-    // Współrzędne barycentryczne to jakby waga każdego z wierzchołków trójkąta
-    // Mówią w jakich proporcjach danego trójkąta trafiliśmy promieniem
-    // znając dwie współrzędne barycentryczne mozna latwo obliczyc trzecią, bo
-    // b1 + b2 + b3 = 1
-    // gdzie b1, - współrzędna barycentryczna wierzchołka 1
-    //       b2, - współrzędna barycentryczna wierzchoł
-    //       b3, - współrzędna barycentryczna wierzchołka 3
-    // P = b1*V1 + b2*V2 + b3*V3
-    // gdzie P - punkt przecięcia promienia z trójkątem
-    //       V1, V2, V3 - wierzchołki trójkąta
-    //       b1, b2, b3 - współrzędne barycentryczne
-
-    float3 barycentricCoords = float3(
+    float3 bary = float3(
         1.0 - attr.barycentrics.x - attr.barycentrics.y,
         attr.barycentrics.x,
         attr.barycentrics.y
     );
 
-    // p.hitValue = barycentricCoords;
-    p.hitValue = float3(1.0, 0.0, 1.0);
+    uint prim = PrimitiveIndex();
+
+    // Access via bufferRefs.indexBuffer.Get().indices[offset]
+    uint i0 = bufferRefs.indexBuffer.Get().indices[prim * 3 + 0];
+    uint i1 = bufferRefs.indexBuffer.Get().indices[prim * 3 + 1];
+    uint i2 = bufferRefs.indexBuffer.Get().indices[prim * 3 + 2];
+
+    Vertex v0 = bufferRefs.vertexBuffer.Get().vertices[i0];
+    Vertex v1 = bufferRefs.vertexBuffer.Get().vertices[i1];
+    Vertex v2 = bufferRefs.vertexBuffer.Get().vertices[i2];
+
+    float3 hitPos = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
+    p.hitValue = hitPos;
 }

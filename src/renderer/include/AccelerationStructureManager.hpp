@@ -55,6 +55,8 @@ namespace VRTR
 
             vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.as.handle; }
 
+            BottomLevelAS& getBLAS(uint32_t index) { return blasList.at(index); }
+
         private:
         void primitiveToGeometry(const std::vector<VertexRT> &vertices,
                                  const std::vector<uint32_t> &indices,

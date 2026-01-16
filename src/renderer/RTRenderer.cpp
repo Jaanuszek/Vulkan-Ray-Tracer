@@ -77,13 +77,22 @@ namespace VRTR
         descriptorResources.storageImageView = &storageImage->getImageView();
         descriptorResources.texture = std::make_shared<Texture>(ctx, viking_room_path + "textures/viking_room.png");
 
-        rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx);
+        auto& viking_room_blas = asManager->getBLAS(blasIndex);
+
+        PushConstant vikingRoomModelPC{
+            .vertices = viking_room_blas.vertexBuffer->getDeviceAddress(),
+            .indices = viking_room_blas.indexBuffer->getDeviceAddress()
+        };
+        VRTR_DEBUG("Push constants: vertices=0x{:x}, indices=0x{:x}", vikingRoomModelPC.vertices, vikingRoomModelPC.indices);
+
+        rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
         rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
                                 descriptorResources,
                                 commandBufferManager,
                                 width,
                                 height,
-                                storageImage);
+                                storageImage
+                                );
     }
 
     void RTRenderer::createSyncObjects()

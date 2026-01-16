@@ -11,11 +11,16 @@
 
 namespace VRTR
 {
+    struct PushConstant
+    {
+        uint64_t vertices; //addr to vertex buffer
+        uint64_t indices; //addr to index buffer
+    };
 
     class RayTracingPipeline
     {
         public:
-            RayTracingPipeline(RendererContext& ctx);
+            RayTracingPipeline(RendererContext& ctx, PushConstant& pushConstantData);
 
             void init(std::vector<vk::Image>& swapChainImages,
                     const DescriptorResources& resources,
@@ -37,6 +42,7 @@ namespace VRTR
 
         private:
             RendererContext& ctx;
+            PushConstant pushConstantData;
 
             std::vector<vk::Image>* swapChainImages = nullptr;
             std::unique_ptr<DescriptorManager> descriptorManager;

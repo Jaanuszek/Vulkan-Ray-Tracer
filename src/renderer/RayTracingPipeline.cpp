@@ -3,8 +3,8 @@
 
 namespace VRTR
 {
-    RayTracingPipeline::RayTracingPipeline(RendererContext& ctx)
-        : ctx(ctx)
+    RayTracingPipeline::RayTracingPipeline(RendererContext& ctx, PushConstant& pushConstantData)
+        : ctx(ctx), pushConstantData(pushConstantData)
     {
     }
 
@@ -88,18 +88,18 @@ namespace VRTR
         auto descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
         descriptorManager->setDescriptorSetLayout(descriptorSetLayout);
 
-        // nei wiem co to xdd
-        // const vk::PushConstantRange pushConstantRange{
-        //     .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
-        //     .offset = 0,
-        //     .size = sizeof(PushConstantData)};
+        const vk::PushConstantRange pushConstantRange{
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+            .offset = 0,
+            .size = sizeof(PushConstant)};
 
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
             .flags = {},
             .setLayoutCount = 1,
             .pSetLayouts = &(*descriptorManager->getDescriptorSetLayout()),
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr};
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pushConstantRange};
+
         rayTracingPipelineLayout = vk::raii::PipelineLayout(ctx.logicalDevice, pipelineLayoutInfo);
 
         std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
@@ -134,6 +134,7 @@ namespace VRTR
             .anyHitShader = VK_SHADER_UNUSED_KHR,
             .intersectionShader = VK_SHADER_UNUSED_KHR};
         shaderGroups.push_back(hitGroup);
+
         vk::RayTracingPipelineCreateInfoKHR pipelineInfo{
             .pNext = nullptr,
             .flags = {},
@@ -253,6 +254,18 @@ namespace VRTR
                 0,
                 {*descriptorManager->getDescriptorSet()},
                 {});
+
+            std::array<uint64_t, 2> pushConstants = {{
+                    pushConstantData.vertices,
+                    pushConstantData.indices
+                }};
+
+            commandBufferManager->getCommandBuffer(i).pushConstants<uint64_t>(
+                *rayTracingPipelineLayout,
+                vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+                0,
+                pushConstants
+            );
 
             commandBufferManager->transition_image_layout(
                 commandBufferManager->getCommandBuffer(i),

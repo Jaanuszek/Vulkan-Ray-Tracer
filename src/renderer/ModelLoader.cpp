@@ -50,10 +50,10 @@ namespace VRTR
                     attrib.vertices[3 * idx.vertex_index + 1],
                     attrib.vertices[3 * idx.vertex_index + 2]
                 };
-                // vertex.texCoord = {
-                //     attrib.texcoords[2 * idx.texcoord_index + 0],
-                //     attrib.texcoords[2 * idx.texcoord_index + 1]
-                // };
+                vertex.texCoord = {
+                    attrib.texcoords[2 * idx.texcoord_index + 0],
+                    attrib.texcoords[2 * idx.texcoord_index + 1]
+                };
 
                 Mesh.vertices.push_back(vertex);
                 Mesh.indices.push_back(Mesh.indices.size());

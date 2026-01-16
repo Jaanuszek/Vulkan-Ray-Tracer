@@ -51,5 +51,5 @@ void main()
     float4 texColor = tex.Load(int3(texelCoord, 0));
 
     // image[int2(launchIndex.xy)] = float4(payload.hitValue, 1.0) * texColor;
-    image[int2(launchIndex.xy)] = float4(payload.hitValue, 1.0);
+    image[int2(launchIndex.xy)] = float4(payload.hitValue, 0.0);
 }
