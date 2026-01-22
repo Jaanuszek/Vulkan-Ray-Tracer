@@ -15,6 +15,8 @@
 #include "AccelerationStructureManager.hpp"
 #include "DescriptorManager.hpp"
 #include "RayTracingPipeline.hpp"
+#include "ModelLoader.hpp"
+#include "Texture.hpp"
 
 namespace VRTR
 {
@@ -41,6 +43,9 @@ namespace VRTR
         int width, height;
         RendererContext ctx;
 
+        double lastFrameTime = 0.0;
+        float deltaTime = 0.0f;
+
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
         std::shared_ptr<StorageImage> storageImage;
@@ -52,6 +57,7 @@ namespace VRTR
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
+        // std::unique_ptr<Texture> texture;
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;

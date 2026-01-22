@@ -22,6 +22,8 @@ add_library(${PROJECT_NAME} SHARED
     AccelerationStructureManager.cpp
     RayTracingPipeline.cpp
     DescriptorManager.cpp
+    ModelLoader.cpp
+    Texture.cpp
 )
 
 include(GenerateExportHeader)
@@ -43,6 +45,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/third-party/tinyobjloader
+        ${CMAKE_SOURCE_DIR}/third-party/stb
     PUBLIC
         ${CMAKE_SOURCE_DIR}/third-party/spdlog/include
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

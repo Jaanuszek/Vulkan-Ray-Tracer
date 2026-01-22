@@ -13,6 +13,9 @@ namespace VRTR
         VRTR_DEBUG("RTRENDERER INIT");
 
         glfwGetFramebufferSize(window, &width, &height);
+        // initialize frame timing
+        lastFrameTime = glfwGetTime();
+        deltaTime = 0.0f;
 
         ctx.instance = InstanceManager::createInstance(ctx);
 
@@ -44,40 +47,45 @@ namespace VRTR
 
         asManager = std::make_unique<AccelerationStructureManager>(ctx);
 
-        std::vector<VertexRT> verticesRT = {
-            {{1.0f, 1.0f, 0.0f}},
-            {{-1.0f, 1.0f, 0.0f}},
-            {{0.0f, -1.0f, 0.0f}}};
-        std::vector<uint32_t> indicesRT = {0, 1, 2};
+        ModelLoader modelLoader(ctx);
 
-        uint32_t blasIndex = asManager->createBLAS(verticesRT, indicesRT);
+        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
+        auto modelMesh = modelLoader.loadModel(viking_room_path + "model/viking_room.obj");
 
-        asManager->addInstance(blasIndex, glm::mat4(1.0f));
+        uint32_t blasIndex = asManager->createBLAS(modelMesh.vertices, modelMesh.indices);
 
-        std::vector<VertexRT> floorVertices = {
-            {{-5.0f, -1.0f, -5.0f}},
-            {{5.0f, -1.0f, -5.0f}},
-            {{5.0f, -1.0f, 5.0f}},
-            {{-5.0f, -1.0f, 5.0f}}};
-        std::vector<uint32_t> floorIndices = {0, 1, 2,
-                                             2, 3, 0};
-        uint32_t floorBlaIndex = asManager->createBLAS(floorVertices, floorIndices);
-        asManager->addInstance(floorBlaIndex, glm::mat4(-1.0f));
+        glm::mat4 modelTransform = glm::mat4({
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        });
+        glm::mat4 rotatedModel = glm::rotate(modelTransform, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
+        asManager->addInstance(blasIndex, rotatedModel);
         asManager->buildTLAS();
 
         DescriptorResources descriptorResources{};
         descriptorResources.TLAS = &asManager->getTLAS();
         descriptorResources.ubo = &uniform_buffer->getBuffer();
         descriptorResources.storageImageView = &storageImage->getImageView();
+        descriptorResources.texture = std::make_shared<Texture>(ctx, viking_room_path + "textures/viking_room.png");
 
-        rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx);
+        auto& viking_room_blas = asManager->getBLAS(blasIndex);
+
+        PushConstant vikingRoomModelPC{
+            .vertices = viking_room_blas.vertexBuffer->getDeviceAddress(),
+            .indices = viking_room_blas.indexBuffer->getDeviceAddress()
+        };
+
+        rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
         rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
                                 descriptorResources,
                                 commandBufferManager,
                                 width,
                                 height,
-                                storageImage);
+                                storageImage
+                                );
     }
 
     void RTRenderer::createSyncObjects()
@@ -117,7 +125,7 @@ namespace VRTR
 
         camera = std::make_unique<Camera>();
         camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
-        camera->setTranslation(glm::vec3(0.0f, 0.0f, -7.0f));
+        camera->setTranslation(glm::vec3(0.0f, 0.0f, -4.0f));
         camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
@@ -136,6 +144,19 @@ namespace VRTR
     void RTRenderer::drawFrame(GLFWwindow *window)
     {
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
+        // compute delta time at start of frame
+        {
+            double currentTime = glfwGetTime();
+            double dt = currentTime - lastFrameTime;
+            if (dt < 0.0)
+                dt = 0.0;
+            // clamp large dt to avoid instability after pauses
+            if (dt > 0.25)
+                dt = 0.25;
+            deltaTime = static_cast<float>(dt);
+            lastFrameTime = currentTime;
+        }
+
         while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
             ;
 
@@ -146,6 +167,8 @@ namespace VRTR
             auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
             ctx.logicalDevice.resetFences({drawFences[commandBufferManager->getCurrentFrame()]});
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
+
+            asManager->updateTLAS(deltaTime);
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,

@@ -87,6 +87,7 @@ namespace VRTR
 
         vk::StructureChain<vk::PhysicalDeviceFeatures2,
                            vk::PhysicalDeviceVulkan11Features,
+                        //    vk::PhysicalDeviceVulkan12Features,
                            vk::PhysicalDeviceVulkan13Features,
                            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
                            vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
@@ -94,8 +95,9 @@ namespace VRTR
                            vk::PhysicalDeviceBufferDeviceAddressFeatures,
                            vk::PhysicalDeviceAccelerationStructureFeaturesKHR>
             featuresChain{
-                {},
+                {.features = {.samplerAnisotropy = VK_TRUE, .shaderInt64 = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
+                // {.scalarBlockLayout = VK_TRUE},
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},
                 {.extendedDynamicState = VK_TRUE},

@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Script to compile GLSL ray tracing shaders to SPIR-V
+# Requires glslangValidator or glslc to be installed
+
+ROOT_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+GLSL_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# compiler=""
+# args=("$@")
+# for arg in "${args[@]}"; do
+#     case $arg in
+#         --help|-h)
+#             echo "Usage: $0"
+#             echo "Compiles GLSL ray tracing shaders to SPIR-V format."
+#             exit 0
+#             ;;
+#         --glslan
+#         *)
+#             echo "Unknown argument: $arg"
+#             exit 1
+#             ;;
+#     esac
+# done
+
+# Check if glslc is available, otherwise try glslangValidator
+if command -v glslc &> /dev/null; then
+    COMPILER="glslc"
+    echo "Using glslc compiler"
+elif command -v glslangValidator &> /dev/null; then
+    COMPILER="glslangValidator"
+    echo "Using glslangValidator compiler"
+else
+    echo "Error: Neither glslc nor glslangValidator found. Please install Vulkan SDK."
+    exit 1
+fi
+
+# Compile function
+compile_shader() {
+    local input_file=$1
+    local output_file=$2
+    local stage=$3
+    
+    echo "Compiling $input_file -> $output_file"
+    
+    if [ "$COMPILER" == "glslc" ]; then
+        glslc -fshader-stage="$stage" "$input_file" -o "$output_file" \
+            --target-env=vulkan1.2 \
+            -g \
+            -O 
+    else
+        glslangValidator -V "$input_file" -o "$output_file" \
+            --target-env vulkan1.2 \
+            -S "$stage"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo "✓ Successfully compiled $output_file"
+    else
+        echo "✗ Failed to compile $input_file"
+        exit 1
+    fi
+}
+
+# Compile all shaders
+compile_shader "$GLSL_SHADER_DIR/rayGen.glsl" "$ROOT_SHADER_DIR/raygen.spv" "rgen"
+compile_shader "$GLSL_SHADER_DIR/miss.glsl" "$ROOT_SHADER_DIR/miss.spv" "rmiss"
+compile_shader "$GLSL_SHADER_DIR/closesthit.glsl" "$ROOT_SHADER_DIR/closesthit.spv" "rchit"
+
+echo ""
+echo "All shaders compiled successfully!"

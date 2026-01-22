@@ -33,7 +33,8 @@ namespace VRTR
 
     struct VertexRT
     {
-        glm::vec3 pos;
+        alignas(16) glm::vec3 pos;
+        alignas(8) glm::vec2 texCoord;
     };
 
     struct UniformData
@@ -59,6 +60,7 @@ namespace VRTR
 
         const std::filesystem::path EXEC_DIR = getExecutableDir();
         const std::filesystem::path SHADERS_DIR = EXEC_DIR / "../shaders";
+        const std::filesystem::path ASSETS_DIR = EXEC_DIR / "../assets";
     }
 
 }

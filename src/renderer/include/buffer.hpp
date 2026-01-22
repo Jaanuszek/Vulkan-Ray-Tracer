@@ -11,7 +11,8 @@ namespace VRTR
         UNIFORM,
         STORAGE,
         ACCELERATION_STRUCTURE,
-        SCRATCH
+        SCRATCH, // Temp buffor in GPU
+        STAGING // TEMP buffor in CPU that can be used to transfer data to GPU
     };
 
     static std::unordered_map<BufferType, std::pair<vk::BufferUsageFlags2, vk::MemoryPropertyFlags>> BufferTypeProperties = {
@@ -20,7 +21,7 @@ namespace VRTR
               vk::BufferUsageFlagBits2::eShaderDeviceAddress |
               vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR,
           vk::MemoryPropertyFlagBits::eDeviceLocal}},
-    };
+    }; // <----- meh
 
     class Buffer
     {
