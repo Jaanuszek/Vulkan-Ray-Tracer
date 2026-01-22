@@ -3,7 +3,8 @@
 # Script to compile GLSL ray tracing shaders to SPIR-V
 # Requires glslangValidator or glslc to be installed
 
-SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+GLSL_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # compiler=""
 # args=("$@")
@@ -62,9 +63,9 @@ compile_shader() {
 }
 
 # Compile all shaders
-compile_shader "$SHADER_DIR/rayGen.rgen" "$SHADER_DIR/raygen.spv" "rgen"
-compile_shader "$SHADER_DIR/miss.rmiss" "$SHADER_DIR/miss.spv" "rmiss"
-compile_shader "$SHADER_DIR/closesthit.rchit" "$SHADER_DIR/closesthit.spv" "rchit"
+compile_shader "$GLSL_SHADER_DIR/rayGen.glsl" "$ROOT_SHADER_DIR/raygen.spv" "rgen"
+compile_shader "$GLSL_SHADER_DIR/miss.glsl" "$ROOT_SHADER_DIR/miss.spv" "rmiss"
+compile_shader "$GLSL_SHADER_DIR/closesthit.glsl" "$ROOT_SHADER_DIR/closesthit.spv" "rchit"
 
 echo ""
 echo "All shaders compiled successfully!"
