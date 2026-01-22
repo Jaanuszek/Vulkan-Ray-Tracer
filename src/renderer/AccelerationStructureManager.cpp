@@ -45,36 +45,16 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating TLAS");
 
-        std::vector<vk::AccelerationStructureInstanceKHR> vkInstances;
-        instances.reserve(instances.size());
-        // Propably I would like to save it to a variable
-        // vk::TransformMatrixKHR transformMatrix{
-        //     std::array<std::array<float, 4>, 3>{
-        //         1.0f, 0.0f, 0.0f, 0.0f,
-        //         0.0f, 1.0f, 0.0f, 0.0f,
-        //         0.0f, 0.0f, 1.0f, 0.0f}};
-
-        for (const auto& inst : instances)
-        {
-            vk::TransformMatrixKHR transform{};
-            memcpy(&transform, &inst.transform, sizeof(glm::mat4)); // pewnie tu bedzie problerm
-            vk::AccelerationStructureInstanceKHR ac_instance{
-                .transform = transform,
-                .instanceCustomIndex = inst.customIdx,
-                .mask = inst.mask,
-                .instanceShaderBindingTableRecordOffset = inst.hitGroupIndex,
-                .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-                .accelerationStructureReference = blasList[inst.blasIdx].as.deviceAddress
-            };
-
-            vkInstances.push_back(ac_instance);
-        }
-
         const vk::DeviceSize instanceBufferSize = vkInstances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
+        if(instanceBufferSize == 0)
+        {
+            VRTR_WARN("No instances to build TLAS");
+            return;
+        }
 
         tlas.instanceBuffer = std::make_unique<Buffer>(ctx.logicalDevice,
                                                         ctx.gpu,
-                                                        sizeof(vk::AccelerationStructureInstanceKHR),
+                                                        instanceBufferSize,
                                                         vk::BufferUsageFlags{},
                                                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                                         vk::BufferUsageFlagBits2::eShaderDeviceAddress | vk::BufferUsageFlagBits2::eAccelerationStructureBuildInputReadOnlyKHR);
@@ -108,32 +88,41 @@ namespace VRTR
 
     void AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
     {
-        InstanceData instanceData;
-        instanceData.blasIdx = blasIdx;
-        instanceData.transform = transform;
-        instanceData.customIdx = static_cast<uint32_t>(instances.size());
-        instanceData.mask = 0xFF;
-        instanceData.hitGroupIndex = 0; // temporary value, will be changed when more hit groups are used
+        vk::TransformMatrixKHR transformMatrix{};
+        memcpy(&transformMatrix, &transform, sizeof(glm::mat4));
 
-        instances.push_back(instanceData);
-        tlas.instanceCount = static_cast<uint32_t>(instances.size());
+        vk::AccelerationStructureInstanceKHR ac_instance{
+            .transform = transformMatrix,
+            .instanceCustomIndex = static_cast<uint32_t>(vkInstances.size()),
+            .mask = 0xFF,
+            .instanceShaderBindingTableRecordOffset = 0, // temp
+            .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+            .accelerationStructureReference = blasList[blasIdx].as.deviceAddress
+        };
+        vkInstances.push_back(ac_instance);
+
+        tlas.instanceCount = static_cast<uint32_t>(vkInstances.size());
     }
 
-    void AccelerationStructureManager::updateTLAS(const glm::mat4& transform)
-    {
-        vk::TransformMatrixKHR transformMatrix{};
-        // memcpy(&transformMatrix, &transform, sizeof(glm::mat4)); // to tez bedzie dzialac?
-        transformMatrix.matrix = std::array<std::array<float, 4>, 3>{
-            std::array<float,4>{transform[0][0], transform[1][0], transform[2][0], transform[3][0]},
-            std::array<float,4>{transform[0][1], transform[1][1], transform[2][1], transform[3][1]},
-            std::array<float,4>{transform[0][2], transform[1][2], transform[2][2], transform[3][2]}
-        };
-        
-        // instacion transform update
-        for(auto& inst : instances)
+    void AccelerationStructureManager::updateTLAS(float deltaTime)
+    {        
+        // for (size_t i = 0; i < vkInstances.size(); ++i)
+        for(auto& inst : vkInstances)
         {
-            inst.transform = transform;
+            vk::TransformMatrixKHR &transformMatrix = inst.transform;
+            // memcpy()
+            glm::mat4 tempMat;
+            memcpy(&tempMat, &transformMatrix, sizeof(glm::mat4));
+            glm::mat4 rotatedMat = glm::rotate(tempMat, glm::radians(10.0f * deltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
+            memcpy(&transformMatrix, &rotatedMat, sizeof(glm::mat4));
+            // memcpy(&transformMatrix, &inst.transform, sizeof(glm::mat4));
+
+            inst.transform = transformMatrix;
+
+            // vkInstances[i].transform = transformMatrix;
         }
+
+        tlas.instanceBuffer->Update(vkInstances.data(), vkInstances.size() * sizeof(vk::AccelerationStructureInstanceKHR));
 
         auto instancesData = vk::AccelerationStructureGeometryInstancesDataKHR{
             .arrayOfPointers = vk::False,

@@ -43,6 +43,9 @@ namespace VRTR
         int width, height;
         RendererContext ctx;
 
+        double lastFrameTime = 0.0;
+        float deltaTime = 0.0f;
+
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
         std::shared_ptr<StorageImage> storageImage;

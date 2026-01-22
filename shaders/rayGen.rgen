@@ -31,9 +31,5 @@ void main()
     
     traceRayEXT(topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, 0, 0, 0, origin, tMin, direction, tMax, 0);
     
-    ivec2 texSize = textureSize(textureSampler, 0);
-    ivec2 texelCoord = ivec2(UV.x * texSize.x, UV.y * texSize.y);
-    vec4 texColor = texelFetch(textureSampler, texelCoord, 0);
-    
     imageStore(image, ivec2(launchIndex.xy), vec4(hitValue, 0.0));
 }

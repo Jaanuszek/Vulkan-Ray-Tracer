@@ -5,6 +5,23 @@
 
 SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# compiler=""
+# args=("$@")
+# for arg in "${args[@]}"; do
+#     case $arg in
+#         --help|-h)
+#             echo "Usage: $0"
+#             echo "Compiles GLSL ray tracing shaders to SPIR-V format."
+#             exit 0
+#             ;;
+#         --glslan
+#         *)
+#             echo "Unknown argument: $arg"
+#             exit 1
+#             ;;
+#     esac
+# done
+
 # Check if glslc is available, otherwise try glslangValidator
 if command -v glslc &> /dev/null; then
     COMPILER="glslc"
@@ -28,7 +45,8 @@ compile_shader() {
     if [ "$COMPILER" == "glslc" ]; then
         glslc -fshader-stage="$stage" "$input_file" -o "$output_file" \
             --target-env=vulkan1.2 \
-            -O
+            -g \
+            -O 
     else
         glslangValidator -V "$input_file" -o "$output_file" \
             --target-env vulkan1.2 \

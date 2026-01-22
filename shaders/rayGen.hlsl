@@ -13,10 +13,10 @@ cbuffer camera : register(b2) //b# - stale dane (CONSTANT BUFFER VIEW)
 };
 
 // Texture2D<float4> textureSampler : register(t3);
-[[vk::combinedImageSampler]]
-Texture2D tex : register(t3);
-[[vk::combinedImageSampler]][[vk::binding(3)]]
-SamplerState viking_sampler : register(s3); //s# - sampler (SAMPLER)
+// [[vk::combinedImageSampler]]
+// Texture2D tex : register(t3);
+// [[vk::combinedImageSampler]][[vk::binding(3)]]
+// SamplerState viking_sampler : register(s3); //s# - sampler (SAMPLER)
 
 struct Payload
 {

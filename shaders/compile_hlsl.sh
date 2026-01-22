@@ -27,8 +27,8 @@ compile_shader() {
     "$input_file" \
     -Fo "$output_file" \
     -spirv \
-    -fvk-use-scalar-layout \
-
+    -fvk-use-scalar-layout 
+    
     if [ $? -eq 0 ]; then
         echo "✓ Successfully compiled $output_file"
     else

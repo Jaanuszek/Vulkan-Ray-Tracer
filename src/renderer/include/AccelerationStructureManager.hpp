@@ -30,15 +30,6 @@ namespace VRTR
         uint32_t instanceCount{0};
     };
 
-    struct InstanceData
-    {
-        glm::mat4 transform;
-        uint32_t blasIdx;
-        uint32_t customIdx;
-        uint32_t mask;
-        uint32_t hitGroupIndex; // used to fetch the shaders from the SBT
-    };
-
     class AccelerationStructureManager
     {
         public:
@@ -51,11 +42,12 @@ namespace VRTR
 
             void addInstance(uint32_t blasIdx, const glm::mat4 &transform);
 
-            void updateTLAS(const glm::mat4& transform);
+            void updateTLAS(float deltaTime);
 
             vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.as.handle; }
 
             BottomLevelAS& getBLAS(uint32_t index) { return blasList.at(index); }
+
 
         private:
         void primitiveToGeometry(const std::vector<VertexRT> &vertices,
@@ -76,8 +68,7 @@ namespace VRTR
         private:
             RendererContext& ctx;
 
-            // Instances data  blasID, transofmr, mask, customidx, hitGroupIndex
-            std::vector<InstanceData> instances;
+            std::vector<vk::AccelerationStructureInstanceKHR> vkInstances; // Przechowuje opis instancji
 
             std::vector<BottomLevelAS> blasList;
             TopLevelAS tlas;

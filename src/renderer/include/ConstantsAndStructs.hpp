@@ -33,8 +33,8 @@ namespace VRTR
 
     struct VertexRT
     {
-        glm::vec3 pos;
-        glm::vec2 texCoord;
+        alignas(16) glm::vec3 pos;
+        alignas(8) glm::vec2 texCoord;
     };
 
     struct UniformData

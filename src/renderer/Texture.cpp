@@ -27,6 +27,7 @@ namespace VRTR
 
     stbi_uc *Texture::loadTexture()
     {
+        stbi_set_flip_vertically_on_load(true);
         stbi_uc* pixels = stbi_load(texPath.c_str(), &textureData.width, &textureData.height, &textureData.channels, STBI_rgb_alpha);
 
         assertm(pixels, "Failed to load texture image!");
@@ -43,7 +44,7 @@ namespace VRTR
             .pNext = nullptr,
             .flags = {},
             .imageType = vk::ImageType::e2D,
-            .format = vk::Format::eR8G8B8A8Srgb,
+            .format = vk::Format::eB8G8R8A8Srgb,
             .extent = vk::Extent3D{
                 .width = static_cast<uint32_t>(textureData.width),
                 .height = static_cast<uint32_t>(textureData.height),
@@ -74,7 +75,7 @@ namespace VRTR
         vk::ImageViewCreateInfo viewInfo{
             .image = *textureImage,
             .viewType = vk::ImageViewType::e2D,
-            .format = vk::Format::eR8G8B8A8Srgb,
+            .format = vk::Format::eB8G8R8A8Srgb,
             .components = vk::ComponentMapping{
                 .r = vk::ComponentSwizzle::eIdentity,
                 .g = vk::ComponentSwizzle::eIdentity,
