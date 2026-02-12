@@ -17,7 +17,8 @@ namespace VRTR
 
         vk::PipelineShaderStageCreateInfo createShaderStageInfo(vk::raii::Device &device,
                                                                 const std::string &filename,
-                                                                vk::ShaderStageFlagBits stage);
+                                                                vk::ShaderStageFlagBits stage,
+                                                                const char* entryPoint);
 
     private:
         std::vector<vk::raii::ShaderModule> shaderModules;

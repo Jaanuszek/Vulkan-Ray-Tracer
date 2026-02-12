@@ -11,7 +11,6 @@ namespace VRTR
 
         struct Matrices
         {
-            // glm::mat4 model;
             glm::mat4 view;
             glm::mat4 perspective;
         } matrices;
