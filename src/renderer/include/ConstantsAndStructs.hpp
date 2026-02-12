@@ -25,16 +25,22 @@ namespace VRTR
         Properties properties;
     };
 
-    struct Vertex
-    {
-        glm::vec2 pos;
-        glm::vec3 color;
-    };
+    // struct Vertex
+    // {
+    //     glm::vec2 pos;
+    //     glm::vec3 color;
+    // };
 
+    // struct VertexRT
+    // {
+    //     alignas(16) glm::vec3 pos;
+    //     // float _pad0;
+    //     alignas(8) glm::vec2 texCoord;
+    // };
     struct VertexRT
     {
-        alignas(16) glm::vec3 pos;
-        alignas(8) glm::vec2 texCoord;
+        glm::vec3 pos;
+        glm::vec2 texCoord;
     };
 
     struct UniformData

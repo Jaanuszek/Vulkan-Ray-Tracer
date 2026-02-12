@@ -36,7 +36,8 @@ namespace VRTR
 
     vk::PipelineShaderStageCreateInfo Shader::createShaderStageInfo(vk::raii::Device &device,
                                                                     const std::string &filename,
-                                                                    vk::ShaderStageFlagBits stage)
+                                                                    vk::ShaderStageFlagBits stage,
+                                                                    const char* entryPoint)
     {
         std::vector<char> shaderCode = readFile(filename);
         auto shaderModule = createShaderModule(device, shaderCode);
@@ -44,7 +45,7 @@ namespace VRTR
         vk::PipelineShaderStageCreateInfo shaderStageInfo{
             .stage = stage,
             .module = shaderModules.back(),
-            .pName = "main"};
+            .pName = entryPoint};
 
         return shaderStageInfo;
     }

@@ -17,7 +17,7 @@ add_subdirectory(src/renderer)
 SET(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
 SET(temp="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-
+SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # set(SLANGC_EXECUTABLE "${VULKAN_SDK}/bin/slangc")
 
 # function (add_slang_shader_target TARGET)

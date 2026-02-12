@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build",
+  "command": "/usr/bin/c++  -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/third-party/spdlog/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/core/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/src/core/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/common -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/third-party/stb -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/renderer/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/src/renderer/include -g -std=gnu++20 -Winvalid-pch -x c++-header -include /home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx -o CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx.gch -c /home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx.cxx",
+  "file": "/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx.cxx",
+  "output": "CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx.gch"
+},
+{
+  "directory": "/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build",
+  "command": "/usr/bin/c++  -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/third-party/spdlog/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/core/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/src/core/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/common -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/third-party/stb -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/renderer/include -I/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/src/renderer/include -g -std=gnu++20 -Winvalid-pch -include /home/jabol/Desktop/repos/Vulkan-Ray-Tracer/build/CMakeFiles/VulkanRayTracer.dir/cmake_pch.hxx -o CMakeFiles/VulkanRayTracer.dir/src/home/jabol/Desktop/repos/Vulkan-Ray-Tracerlication/main.cpp.o -c /home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/home/jabol/Desktop/repos/Vulkan-Ray-Tracerlication/main.cpp",
+  "file": "/home/jabol/Desktop/repos/Vulkan-Ray-Tracer/src/home/jabol/Desktop/repos/Vulkan-Ray-Tracerlication/main.cpp",
+  "output": "CMakeFiles/VulkanRayTracer.dir/src/home/jabol/Desktop/repos/Vulkan-Ray-Tracerlication/main.cpp.o"
+}
+]

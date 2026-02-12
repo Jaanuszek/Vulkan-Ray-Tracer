@@ -9,7 +9,6 @@ namespace VRTR
     {
         std::vector<VertexRT> vertices;
         std::vector<uint32_t> indices;
-        std::vector<uint32_t> texCoords;
     };
 
     class ModelLoader

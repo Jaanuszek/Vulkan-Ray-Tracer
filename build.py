@@ -49,7 +49,8 @@ try:
         cmake_build_args.append("--verbose")
 
     subprocess.run(["cmake", ".."] + cmake_conf_args, cwd=build_dir, check=True)
-    subprocess.run(["cmake", "--build", "."] + cmake_build_args, cwd=build_dir, check=True)
+    # subprocess.run(["cmake", "--build", "."] + cmake_build_args, cwd=build_dir, check=True)
+    subprocess.run(["cmake", "--build", ".", "-j", "4"] + cmake_build_args, cwd=build_dir, check=True)
     subprocess.run(["cmake", "--install", "."], cwd=build_dir, check=True)
 except subprocess.CalledProcessError as e:
     print(f"Error during build: {e}")
