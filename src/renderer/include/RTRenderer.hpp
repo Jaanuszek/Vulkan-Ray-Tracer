@@ -15,7 +15,7 @@
 #include "AccelerationStructureManager.hpp"
 #include "DescriptorManager.hpp"
 #include "RayTracingPipeline.hpp"
-#include "ModelLoader.hpp"
+#include "Model.hpp"
 #include "Texture.hpp"
 
 namespace VRTR
@@ -57,7 +57,8 @@ namespace VRTR
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
-        // std::unique_ptr<Texture> texture;
+
+        std::unordered_map<std::string, VRTR::Model> models;
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;
