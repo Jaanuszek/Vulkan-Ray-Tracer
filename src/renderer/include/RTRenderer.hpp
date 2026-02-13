@@ -25,10 +25,10 @@ namespace VRTR
     public:
         bool framebufferResized = false;
 
-        RTRenderer() = default;
+        RTRenderer(std::shared_ptr<Camera> camera);
         ~RTRenderer();
         void init(GLFWwindow *window);
-        void drawFrame(GLFWwindow *window);
+        void drawFrame(GLFWwindow *window, double deltaTime);
 
     private:
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
@@ -43,16 +43,13 @@ namespace VRTR
         int width, height;
         RendererContext ctx;
 
-        double lastFrameTime = 0.0;
-        float deltaTime = 0.0f;
-
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
         std::shared_ptr<StorageImage> storageImage;
         std::unique_ptr<AccelerationStructureManager> asManager;
         std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
 
-        std::unique_ptr<Camera> camera;
+        std::shared_ptr<Camera> camera;
 
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;

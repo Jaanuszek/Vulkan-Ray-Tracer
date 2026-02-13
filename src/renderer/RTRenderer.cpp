@@ -3,6 +3,8 @@
 
 namespace VRTR
 {
+    RTRenderer::RTRenderer(std::shared_ptr<Camera> camera) : camera(camera) {}
+
     RTRenderer::~RTRenderer()
     {
         ctx.logicalDevice.waitIdle();
@@ -13,9 +15,6 @@ namespace VRTR
         VRTR_DEBUG("RTRENDERER INIT");
 
         glfwGetFramebufferSize(window, &width, &height);
-        // initialize frame timing
-        lastFrameTime = glfwGetTime();
-        deltaTime = 0.0f;
 
         ctx.instance = InstanceManager::createInstance(ctx);
 
@@ -142,11 +141,6 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating scene");
 
-        camera = std::make_unique<Camera>();
-        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
-        camera->setTranslation(glm::vec3(0.0f, 0.0f, -4.0f));
-        camera->setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
-
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                                   vk::BufferUsageFlagBits{},
                                                   vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -160,22 +154,9 @@ namespace VRTR
         return glm::rotate(glm::mat4(1.0f), angle, axis);
     }
 
-    void RTRenderer::drawFrame(GLFWwindow *window)
+    void RTRenderer::drawFrame(GLFWwindow *window, double deltaTime)
     {
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
-        // compute delta time at start of frame
-        {
-            double currentTime = glfwGetTime();
-            double dt = currentTime - lastFrameTime;
-            if (dt < 0.0)
-                dt = 0.0;
-            // clamp large dt to avoid instability after pauses
-            if (dt > 0.25)
-                dt = 0.25;
-            deltaTime = static_cast<float>(dt);
-            lastFrameTime = currentTime;
-        }
-
         while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
             ;
 
@@ -188,6 +169,7 @@ namespace VRTR
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
 
             asManager->updateTLAS(deltaTime);
+            updateUniformBuffer(); // Camera UBO update
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
@@ -217,6 +199,9 @@ namespace VRTR
         {
             swapChainManager->recreateSwapChain(window, width, height);
             storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
+
+            // Update camera perspective with new aspect ratio
+            camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
             DescriptorResources desResources{};
             desResources.TLAS = &asManager->getTLAS();

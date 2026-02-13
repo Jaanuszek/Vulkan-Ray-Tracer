@@ -10,6 +10,8 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 add_library(${PROJECT_NAME} SHARED
     Logger.cpp
+    InputManager.cpp
+    Camera.cpp
 )
 
 include(GenerateExportHeader)
