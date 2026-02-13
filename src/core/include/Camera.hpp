@@ -22,10 +22,6 @@ namespace VRTR
 
         void setPerspective(float fov, float aspect, float near, float far);
 
-        void setRotation(const glm::vec3 &rotation);
-
-        void setTranslation(const glm::vec3 &translation);
-
         void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
 
         void moveForward(float distance);

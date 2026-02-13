@@ -18,23 +18,7 @@ namespace VRTR
         matrices.perspective = glm::perspective(glm::radians(fov), aspect, near, far);
         // matrices.perspective[1][1] *= -1; // Invert Y for Vulkan
     }
-
-    void Camera::setRotation(const glm::vec3 &rotation)
-    {
-        this->rotation = rotation;
-        pitch = rotation.x;
-        yaw = rotation.y;
-        updateCameraVectors();
-        updateViewMatrix();
-    }
-
-    void Camera::setTranslation(const glm::vec3 &translation)
-    {
-        this->translation = translation;
-        this->pos = translation;
-        updateViewMatrix();
-    }
-
+    
     void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch)
     {
         xoffset *= SENSITIVITY;
