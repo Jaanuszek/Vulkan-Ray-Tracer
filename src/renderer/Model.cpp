@@ -1,4 +1,4 @@
-#include "ModelLoader.hpp"
+#include "Model.hpp"
 
 // it has to be there!
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -6,12 +6,15 @@
 
 namespace VRTR
 {
-    ModelLoader::ModelLoader(RendererContext& ctx)
+    Model::Model(RendererContext& ctx, const std::string& modelPath, const std::string& texturePath)
         : ctx(ctx)
     {
+        modelName = getModelNameFromPath(modelPath);
+        loadModel(modelPath);
+        loadTexture(texturePath);
     }
 
-    mesh ModelLoader::loadModel(const std::string &path)
+    void Model::loadModel(const std::string &path)
     {
         VRTR_DEBUG("Loading model from path: {}", path);
 
@@ -59,6 +62,16 @@ namespace VRTR
                 Mesh.indices.push_back(Mesh.indices.size());
             }
         }
-        return Mesh;
+        modelMesh = std::make_unique<mesh>(std::move(Mesh));
     }
+
+    void Model::loadTexture(const std::string &path)
+    {
+        VRTR_DEBUG("Loading texture from path: {}", path);
+
+        assert(std::filesystem::exists(path));
+
+        texture = std::make_unique<Texture>(ctx, path);
+    }
+
 }

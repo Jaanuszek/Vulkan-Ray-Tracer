@@ -11,7 +11,8 @@ namespace VRTR
         vk::raii::AccelerationStructureKHR* TLAS = nullptr;
         vk::raii::Buffer* ubo = nullptr;
         vk::raii::ImageView* storageImageView = nullptr;
-        std::shared_ptr<Texture> texture;
+        vk::raii::ImageView* texImageView = nullptr;
+        vk::raii::Sampler* texSampler = nullptr;
     };
 
     class DescriptorManager

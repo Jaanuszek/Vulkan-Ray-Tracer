@@ -98,8 +98,8 @@ namespace VRTR
             .pBufferInfo = &bufferInfo};
 
         vk::DescriptorImageInfo textureImageInfo{
-            .sampler = *descriptorResources.texture->getTextureSampler(),
-            .imageView = *descriptorResources.texture->getTextureImageView(),
+            .sampler = *descriptorResources.texSampler,
+            .imageView = *descriptorResources.texImageView,
             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
         vk::WriteDescriptorSet textureWrite{
@@ -135,7 +135,25 @@ namespace VRTR
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageImage,
             .pImageInfo = &imageInfo};
-        std::array<vk::WriteDescriptorSet, 1> WriteDescriptorSets{resultImageWrite};
+
+        vk::DescriptorImageInfo textureImageInfo{
+            .sampler = *descriptorResources.texSampler,
+            .imageView = *descriptorResources.texImageView,
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+        vk::WriteDescriptorSet textureWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 3,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .pImageInfo = &textureImageInfo};
+
+        std::array<vk::WriteDescriptorSet, 2> WriteDescriptorSets = {
+            resultImageWrite,
+            textureWrite
+        };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 }

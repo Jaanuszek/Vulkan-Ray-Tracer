@@ -22,7 +22,7 @@ add_library(${PROJECT_NAME} SHARED
     AccelerationStructureManager.cpp
     RayTracingPipeline.cpp
     DescriptorManager.cpp
-    ModelLoader.cpp
+    Model.cpp
     Texture.cpp
 )
 

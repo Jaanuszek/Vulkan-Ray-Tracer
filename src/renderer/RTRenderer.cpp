@@ -47,10 +47,28 @@ namespace VRTR
 
         asManager = std::make_unique<AccelerationStructureManager>(ctx);
 
-        ModelLoader modelLoader(ctx);
-
+        // TODO dodać jakąś lepszą obsługę modeli
+        // Uwzględnić to również w callbacku framebufferResize
         std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        auto modelMesh = modelLoader.loadModel(viking_room_path + "model/viking_room.obj");
+        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
+        std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
+
+        std::string viking_model_name = Model::getModelNameFromPath(viking_room_model_path);
+        //std::piecewise_construct - mówi mapie że osobno przekazuje argumenty do konstruktora klucza i wartości
+        //std::forward_as_tuple - tworzy tuple, z przekazanych wartości
+        // std::forward_as_tuple(ctx, viking_room_model_path, viking_room_texture_path) == std::make_tuple(ctx, viking_room_model_path, viking_room_texture_path)
+        // auto [it, inserted] = models.emplace(std::piecewise_construct,
+        //                                      std::forward_as_tuple(viking_model_name),
+        //                                      std::forward_as_tuple(ctx, viking_room_model_path, viking_room_texture_path));
+        // ale tez mozna tak:
+        auto [it, inserted] = models.try_emplace(
+            viking_model_name,
+            ctx,
+            viking_room_model_path,
+            viking_room_texture_path);
+
+        auto& modelMesh = it->second.getMesh();
+        auto& modelTexture = it->second.getTexture();
 
         uint32_t blasIndex = asManager->createBLAS(modelMesh.vertices, modelMesh.indices);
 
@@ -69,7 +87,8 @@ namespace VRTR
         descriptorResources.TLAS = &asManager->getTLAS();
         descriptorResources.ubo = &uniform_buffer->getBuffer();
         descriptorResources.storageImageView = &storageImage->getImageView();
-        descriptorResources.texture = std::make_shared<Texture>(ctx, viking_room_path + "textures/viking_room.png");
+        descriptorResources.texImageView = modelTexture.getTextureImageView();
+        descriptorResources.texSampler = modelTexture.getTextureSampler();
 
         auto& viking_room_blas = asManager->getBLAS(blasIndex);
 
@@ -203,6 +222,9 @@ namespace VRTR
             desResources.TLAS = &asManager->getTLAS();
             desResources.ubo = &uniform_buffer->getBuffer();
             desResources.storageImageView = &storageImage->getImageView();
+            // temporary solution
+            desResources.texImageView = models.begin()->second.getTexture().getTextureImageView();
+            desResources.texSampler = models.begin()->second.getTexture().getTextureSampler();
 
             rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);
             return;
