@@ -66,21 +66,30 @@ namespace VRTR
             viking_room_model_path,
             viking_room_texture_path);
 
-        auto& modelMesh = it->second.getMesh();
         auto& modelTexture = it->second.getTexture();
 
-        uint32_t blasIndex = asManager->createBLAS(modelMesh.vertices, modelMesh.indices);
+        uint32_t blasIndex = asManager->createBLAS(models.at(viking_model_name));
 
-        glm::mat4 modelTransform = glm::mat4({
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f
-        });
-        glm::mat4 rotatedModel = glm::rotate(modelTransform, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
+        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         asManager->addInstance(blasIndex, rotatedModel);
+
+        std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
+        std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
+        auto [guyIt, guyInserted] = models.try_emplace(
+            guy_model_name,
+            ctx,
+            guy_model_path,
+            "");
+        uint32_t guyBlasIndex = asManager->createBLAS(guyIt->second);
+
+        asManager->addInstance(guyBlasIndex, rotatedModel);
         asManager->buildTLAS();
+
+        auto& viking_room_blas = asManager->getBLAS(blasIndex);
+        auto& guy_blas = asManager->getBLAS(guyBlasIndex);
+
+        it->second.setGeometryInfo({viking_room_blas.vertexBuffer->getDeviceAddress(), viking_room_blas.indexBuffer->getDeviceAddress(), blasIndex});
+        guyIt->second.setGeometryInfo({guy_blas.vertexBuffer->getDeviceAddress(), guy_blas.indexBuffer->getDeviceAddress(), guyBlasIndex});
 
         DescriptorResources descriptorResources{};
         descriptorResources.TLAS = &asManager->getTLAS();
@@ -88,8 +97,6 @@ namespace VRTR
         descriptorResources.storageImageView = &storageImage->getImageView();
         descriptorResources.texImageView = modelTexture.getTextureImageView();
         descriptorResources.texSampler = modelTexture.getTextureSampler();
-
-        auto& viking_room_blas = asManager->getBLAS(blasIndex);
 
         PushConstant vikingRoomModelPC{
             .vertices = viking_room_blas.vertexBuffer->getDeviceAddress(),
@@ -208,8 +215,15 @@ namespace VRTR
             desResources.ubo = &uniform_buffer->getBuffer();
             desResources.storageImageView = &storageImage->getImageView();
             // temporary solution
-            desResources.texImageView = models.begin()->second.getTexture().getTextureImageView();
-            desResources.texSampler = models.begin()->second.getTexture().getTextureSampler();
+            for(auto& [name, model] : models)
+            {
+                if (model.hasTexture())
+                {
+                    desResources.texImageView = model.getTexture().getTextureImageView();
+                    desResources.texSampler = model.getTexture().getTextureSampler();
+                    break;
+                }
+            }
 
             rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);
             return;

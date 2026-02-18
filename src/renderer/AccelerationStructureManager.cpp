@@ -8,12 +8,15 @@ namespace VRTR
     {
     }
 
-    uint32_t AccelerationStructureManager::createBLAS(const std::vector<VertexRT>& vertices,
-                                                     const std::vector<uint32_t>& indices)
+    uint32_t AccelerationStructureManager::createBLAS(Model& model)
     {
         VRTR_DEBUG("Creating BLAS");
 
         BottomLevelAS blas_structure;
+
+        mesh& modelMesh = model.getMesh();
+        const std::vector<VertexRT>& vertices = modelMesh.vertices;
+        const std::vector<uint32_t>& indices = modelMesh.indices;
 
         size_t vertex_buffer_size = vertices.size() * sizeof(VertexRT);
         size_t index_buffer_size = indices.size() * sizeof(uint32_t);
@@ -93,12 +96,11 @@ namespace VRTR
 
         vk::AccelerationStructureInstanceKHR ac_instance{
             .transform = transformMatrix,
-            .instanceCustomIndex = static_cast<uint32_t>(vkInstances.size()),
+            .instanceCustomIndex = static_cast<uint32_t>(vkInstances.size()), // moze blasIdx zamiast vkInstances.size()?
             .mask = 0xFF,
             .instanceShaderBindingTableRecordOffset = 0, // temp
             .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-            .accelerationStructureReference = blasList[blasIdx].as.deviceAddress
-        };
+            .accelerationStructureReference = blasList[blasIdx].as.deviceAddress};
         vkInstances.push_back(ac_instance);
 
         tlas.instanceCount = static_cast<uint32_t>(vkInstances.size());

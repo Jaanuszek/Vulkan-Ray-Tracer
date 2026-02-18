@@ -70,9 +70,9 @@ void missShader(inout RayPayload payload)
 [shader("closesthit")]
 void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 {
-    // const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
+    const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
-    Triangle tri = unpackTriangle(PrimitiveIndex(), attribs);
-    float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
-    payload.hitValue = color.bgr;
+    // Triangle tri = unpackTriangle(PrimitiveIndex(), attribs);
+    // float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+    payload.hitValue = barycentricCoords;
 }

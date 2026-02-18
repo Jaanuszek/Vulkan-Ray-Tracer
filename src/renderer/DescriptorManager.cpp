@@ -29,7 +29,9 @@ namespace VRTR
                 {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
                 {vk::DescriptorType::eStorageImage, maxSets},             // umozliwienie zapisywania wyniku shaderow do storage image
                 {vk::DescriptorType::eUniformBuffer, maxSets},            // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
-                {vk::DescriptorType::eCombinedImageSampler, maxSets}      // wsparcie dla tekstur
+                {vk::DescriptorType::eCombinedImageSampler, maxSets},      // wsparcie dla tekstur
+                {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla geometry info buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -111,12 +113,41 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
             .pImageInfo = &textureImageInfo};
 
+        vk::DescriptorBufferInfo geometryInfoBufferInfo{
+            .buffer = *descriptorResources.geometryInfoBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
 
-        std::array<vk::WriteDescriptorSet, 4> WriteDescriptorSets = {
+        vk::WriteDescriptorSet geometryInfoBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 4,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &geometryInfoBufferInfo};
+
+        vk::DescriptorBufferInfo materialBufferInfo{
+            .buffer = *descriptorResources.materialBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet materialBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 5,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &materialBufferInfo};
+
+        std::array<vk::WriteDescriptorSet, 6> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
             uniformBufferWrite,
-            textureWrite};
+            textureWrite,
+            geometryInfoBufferWrite,
+            materialBufferWrite};
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
@@ -150,9 +181,39 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
             .pImageInfo = &textureImageInfo};
 
-        std::array<vk::WriteDescriptorSet, 2> WriteDescriptorSets = {
+        vk::DescriptorBufferInfo geometryInfoBufferInfo{
+            .buffer = *descriptorResources.geometryInfoBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet geometryInfoBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 4,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &geometryInfoBufferInfo};
+
+        vk::DescriptorBufferInfo materialBufferInfo{
+            .buffer = *descriptorResources.materialBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet materialBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 5,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &materialBufferInfo};
+
+        std::array<vk::WriteDescriptorSet, 4> WriteDescriptorSets = {
             resultImageWrite,
-            textureWrite
+            textureWrite,
+            geometryInfoBufferWrite,
+            materialBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

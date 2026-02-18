@@ -11,7 +11,12 @@ namespace VRTR
     {
         modelName = getModelNameFromPath(modelPath);
         loadModel(modelPath);
-        loadTexture(texturePath);
+
+        if(!texturePath.empty())
+        {
+            withTexture = true;
+            loadTexture(texturePath);
+        }
     }
 
     void Model::loadModel(const std::string &path)
@@ -24,6 +29,7 @@ namespace VRTR
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
         std::string warn, err;
+        bool containTexture = false;
 
         bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str());
         if(!warn.empty())
@@ -53,10 +59,14 @@ namespace VRTR
                     attrib.vertices[3 * idx.vertex_index + 1],
                     attrib.vertices[3 * idx.vertex_index + 2]
                 };
-                vertex.texCoord = {
-                    attrib.texcoords[2 * idx.texcoord_index + 0],
-                    attrib.texcoords[2 * idx.texcoord_index + 1]
-                };
+
+                if(withTexture) // bede tu mial puste texCoordy, co jest niewydajne. Miej o tym swiadomość
+                {
+                    vertex.texCoord = {
+                        attrib.texcoords[2 * idx.texcoord_index + 0],
+                        attrib.texcoords[2 * idx.texcoord_index + 1]
+                    };
+                }
 
                 Mesh.vertices.push_back(vertex);
                 Mesh.indices.push_back(Mesh.indices.size());

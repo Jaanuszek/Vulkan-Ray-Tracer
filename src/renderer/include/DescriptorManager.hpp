@@ -11,8 +11,11 @@ namespace VRTR
         vk::raii::AccelerationStructureKHR* TLAS = nullptr;
         vk::raii::Buffer* ubo = nullptr;
         vk::raii::ImageView* storageImageView = nullptr;
-        vk::raii::ImageView* texImageView = nullptr;
-        vk::raii::Sampler* texSampler = nullptr;
+        // no i aktualnie moge przechowywac tylko jedną teksture, co jest problematyczne.
+        vk::raii::ImageView* texImageView = nullptr; // to powinno byc kontenerem
+        vk::raii::Sampler* texSampler = nullptr; // to powinno byc kontenerem
+        vk::raii::Buffer* geometryInfoBuffer = nullptr;
+        vk::raii::Buffer* materialBuffer = nullptr;
     };
 
     class DescriptorManager
