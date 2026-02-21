@@ -15,7 +15,7 @@ namespace VRTR
         vk::raii::ImageView* texImageView = nullptr; // to powinno byc kontenerem
         vk::raii::Sampler* texSampler = nullptr; // to powinno byc kontenerem
         vk::raii::Buffer* geometryInfoBuffer = nullptr;
-        vk::raii::Buffer* materialBuffer = nullptr;
+        // vk::raii::Buffer* materialBuffer = nullptr;
     };
 
     class DescriptorManager

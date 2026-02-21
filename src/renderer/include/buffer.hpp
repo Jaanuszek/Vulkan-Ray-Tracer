@@ -16,12 +16,24 @@ namespace VRTR
     };
 
     static std::unordered_map<BufferType, std::pair<vk::BufferUsageFlags2, vk::MemoryPropertyFlags>> BufferTypeProperties = {
-        {BufferType::SCRATCH,
-         {vk::BufferUsageFlagBits2::eStorageBuffer |
-              vk::BufferUsageFlagBits2::eShaderDeviceAddress |
-              vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR,
-          vk::MemoryPropertyFlagBits::eDeviceLocal}},
-    }; // <----- meh
+        {
+            BufferType::SCRATCH,
+            {
+                vk::BufferUsageFlagBits2::eStorageBuffer |
+                vk::BufferUsageFlagBits2::eShaderDeviceAddress |
+                vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR,
+                vk::MemoryPropertyFlagBits::eDeviceLocal
+            }
+        },
+        {
+            BufferType::STORAGE,
+            {
+                vk::BufferUsageFlagBits2::eStorageBuffer |
+                vk::BufferUsageFlagBits2::eShaderDeviceAddress,
+                vk::MemoryPropertyFlagBits::eDeviceLocal
+            }
+        }
+    };
 
     class Buffer
     {

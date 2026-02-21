@@ -6,17 +6,30 @@
 
 namespace VRTR
 {
-    Model::Model(RendererContext& ctx, const std::string& modelPath, const std::string& texturePath)
-        : ctx(ctx)
+    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc, const std::string& modelPath, const std::string& texturePath)
+        : ctx(ctx), modelBuffers(vmaAlloc)
     {
+        VRTR_DEBUG("Creating model from path: {}", modelPath);
+
         modelName = getModelNameFromPath(modelPath);
-        loadModel(modelPath);
 
         if(!texturePath.empty())
-        {
             withTexture = true;
+
+        loadModel(modelPath);
+        createVertexBuffer();
+        createIndexBuffer();
+        setGeometryInfo();
+
+        if(withTexture)
+        {
             loadTexture(texturePath);
         }
+    }
+
+    Model::~Model()
+    {
+        VRTR_DEBUG("Destroying model: {}", modelName);
     }
 
     void Model::loadModel(const std::string &path)
@@ -73,6 +86,75 @@ namespace VRTR
             }
         }
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
+    }
+
+    vk::BufferCreateInfo Model::getBufferCreateInfo(vk::DeviceSize size)
+    {
+        vk::BufferCreateInfo bufferInfo{
+            .pNext = nullptr,
+            .size = size,
+            .usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            .sharingMode = vk::SharingMode::eExclusive,
+        };
+
+        return bufferInfo;
+    }
+
+    VmaAllocationCreateInfo Model::getVmaAllocCreateInfo()
+    {
+        // Te flagi sa w miare wolne, bo pozwalaja na odczyt cdanych z CPU
+        // w przyszlosci fajnie by bylo miec dwa bufory, jeden ktory lezy na GPU
+        // a drugi staging ktory pozwala na kopiowanie danych z CPU do GPU
+        VmaAllocationCreateInfo allocInfo{
+            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+            .usage = VMA_MEMORY_USAGE_AUTO,
+        };
+        
+        return allocInfo;
+    }
+
+    void Model::createVertexBuffer()
+    {
+        vk::DeviceSize bufferSize = modelMesh->vertices.size() * sizeof(VertexRT);
+
+        vk::BufferCreateInfo bufferInfo = getBufferCreateInfo(bufferSize);
+        VmaAllocationCreateInfo allocInfo = getVmaAllocCreateInfo();
+
+        VkBuffer vbo;
+        VmaAllocation &allocation = modelBuffers.vertexAllocation;
+        VkBufferCreateInfo rawBufferCI = *reinterpret_cast<const VkBufferCreateInfo *>(&bufferInfo);
+
+        vmaCreateBuffer(modelBuffers.vmaAlloc, &rawBufferCI, &allocInfo, &vbo, &allocation, nullptr);
+        modelBuffers.vertexBuffer = std::move(vk::raii::Buffer(ctx.logicalDevice, vbo, nullptr));
+
+        vmaCopyMemoryToAllocation(modelBuffers.vmaAlloc, modelMesh->vertices.data(), allocation, 0, bufferSize);
+    }
+
+    void Model::createIndexBuffer()
+    {
+        vk::DeviceSize bufferSize = modelMesh->indices.size() * sizeof(uint32_t);
+
+        vk::BufferCreateInfo bufferInfo = getBufferCreateInfo(bufferSize);
+        VmaAllocationCreateInfo allocInfo = getVmaAllocCreateInfo();
+        
+        VkBuffer ebo;
+        VmaAllocation &allocation = modelBuffers.indexAllocation;
+        vmaCreateBuffer(modelBuffers.vmaAlloc, reinterpret_cast<const VkBufferCreateInfo *>(&bufferInfo), &allocInfo, &ebo, &allocation, nullptr);
+
+        modelBuffers.indexBuffer = std::move(vk::raii::Buffer(ctx.logicalDevice, ebo, nullptr));
+
+        vmaCopyMemoryToAllocation(modelBuffers.vmaAlloc, modelMesh->indices.data(), allocation, 0, bufferSize);
+    }
+
+    void Model::setGeometryInfo()
+    {
+        vk::BufferDeviceAddressInfo addrInfo{
+            .buffer = modelBuffers.vertexBuffer
+        };
+        geometryInfo.vertexBufferAddr = ctx.logicalDevice.getBufferAddress(addrInfo);
+
+        addrInfo.buffer = modelBuffers.indexBuffer;
+        geometryInfo.indexBufferAddr = ctx.logicalDevice.getBufferAddress(addrInfo);
     }
 
     void Model::loadTexture(const std::string &path)

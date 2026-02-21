@@ -87,23 +87,21 @@ namespace VRTR
 
         vk::StructureChain<vk::PhysicalDeviceFeatures2,
                            vk::PhysicalDeviceVulkan11Features,
-                        //    vk::PhysicalDeviceVulkan12Features,
+                           vk::PhysicalDeviceVulkan12Features,
                            vk::PhysicalDeviceVulkan13Features,
                            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
                            vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
                            vk::PhysicalDeviceRayQueryFeaturesKHR,
-                           vk::PhysicalDeviceBufferDeviceAddressFeatures,
                            vk::PhysicalDeviceAccelerationStructureFeaturesKHR>
             featuresChain{
                 {.features = {.samplerAnisotropy = VK_TRUE, .shaderInt64 = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
-                // {.scalarBlockLayout = VK_TRUE},
+                {.scalarBlockLayout = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},
                 {.extendedDynamicState = VK_TRUE},
                 {.rayTracingPipeline = VK_TRUE},
                 {.rayQuery = VK_TRUE},
-                {.bufferDeviceAddress = VK_TRUE},
                 {.accelerationStructure = VK_TRUE}};
 
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = device.getQueueFamilyProperties();

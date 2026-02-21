@@ -19,6 +19,9 @@ ConstantBuffer<CameraData> cameraData;
 [[vk::binding(3, 0)]]
 uniform Sampler2D colorSampler;
 
+[[vk::binding(4, 0)]]
+StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
+
 [[vk::push_constant]] internal pc_blas blasAddr;
 
 public struct RayPayload
@@ -72,7 +75,39 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 {
     const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
-    // Triangle tri = unpackTriangle(PrimitiveIndex(), attribs);
-    // float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
-    payload.hitValue = barycentricCoords;
+    uint instanceIndex = InstanceIndex();
+    Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
+    float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+    payload.hitValue = color.bgr; // Color from texture
+    // payload.hitValue = barycentricCoords; 
+    // uint* vboAddr = (uint*)geometryInfoBuffer[instanceIndex].vertexBufferAddr;
+
+    // if (instanceIndex == 0) {
+    //     if (vboAddr != nullptr) // if not null
+    //     {
+    //         float temp = vboAddr[0];
+    //         payload.hitValue = float3(temp, 0.0, 0.0);
+    //     }
+    //     else
+    //     {
+    //         // Triangle tri = unpackTriangle(PrimitiveIndex(), attribs);
+    //         // float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+    //         payload.hitValue = barycentricCoords; // Color from texture
+    //     }
+    // }
+    // else if (instanceIndex == 1) {
+    //     if (vboAddr != nullptr) // if not null
+    //     {
+    //         payload.hitValue = float3(0.0, 0.0, 1.0);
+    //     }
+    //     else
+    //     {
+    //         // Triangle tri = unpackTriangle(PrimitiveIndex(), attribs);
+    //         // float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+    //         payload.hitValue = barycentricCoords; // Color from texture
+    //     }
+    // }
+    // else {
+    //     payload.hitValue = float3(0.0, 1.0, 1.0); // Blue for other instances
+    // }
 }

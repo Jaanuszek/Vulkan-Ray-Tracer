@@ -8,34 +8,18 @@ namespace VRTR
     {
     }
 
-    uint32_t AccelerationStructureManager::createBLAS(Model& model)
+    uint32_t AccelerationStructureManager::createBLAS(std::unique_ptr<Model>& model)
     {
         VRTR_DEBUG("Creating BLAS");
 
         BottomLevelAS blas_structure;
 
-        mesh& modelMesh = model.getMesh();
-        const std::vector<VertexRT>& vertices = modelMesh.vertices;
-        const std::vector<uint32_t>& indices = modelMesh.indices;
-
-        size_t vertex_buffer_size = vertices.size() * sizeof(VertexRT);
-        size_t index_buffer_size = indices.size() * sizeof(uint32_t);
-
-        const vk::BufferUsageFlags2 buffer_usage_flags = vk::BufferUsageFlagBits2::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits2::eShaderDeviceAddress;
-        const vk::MemoryPropertyFlags memory_property_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
-
-        blas_structure.vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, vertex_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
-        blas_structure.vertexBuffer->Update(vertices.data(), vertex_buffer_size);
-
-        blas_structure.indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, index_buffer_size, vk::BufferUsageFlags{}, memory_property_flags, buffer_usage_flags);
-        blas_structure.indexBuffer->Update(indices.data(), index_buffer_size);
-
         vk::AccelerationStructureGeometryKHR asGeometry{};
         vk::AccelerationStructureBuildRangeInfoKHR offsetInfo{};
-        primitiveToGeometry(vertices, indices, blas_structure.vertexBuffer, blas_structure.indexBuffer, asGeometry, offsetInfo);
+        primitiveToGeometry(model, asGeometry, offsetInfo);
         // inicjacja struktury acceleration structure.
         createAccelerationStructure(vk::AccelerationStructureTypeKHR::eBottomLevel,
-                                    blas_structure.as,
+                                    blas_structure,
                                     asGeometry,
                                     offsetInfo,
                                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
@@ -100,7 +84,7 @@ namespace VRTR
             .mask = 0xFF,
             .instanceShaderBindingTableRecordOffset = 0, // temp
             .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-            .accelerationStructureReference = blasList[blasIdx].as.deviceAddress};
+            .accelerationStructureReference = blasList[blasIdx].deviceAddress};
         vkInstances.push_back(ac_instance);
 
         tlas.instanceCount = static_cast<uint32_t>(vkInstances.size());
@@ -196,25 +180,23 @@ namespace VRTR
         tempCmdBufferManager->submitAndWaitTempCmdBuffer();
     }
 
-    void AccelerationStructureManager::primitiveToGeometry(const std::vector<VertexRT> &vertices,
-                                    const std::vector<uint32_t> &indices,
-                                    std::unique_ptr<Buffer> &vertexBuffer,
-                                    std::unique_ptr<Buffer> &indexBuffer,
-                                    vk::AccelerationStructureGeometryKHR &geometry,
-                                    vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
-                                    vk::Format vertexFormat,
-                                    vk::IndexType indexType)
+    void AccelerationStructureManager::primitiveToGeometry(
+                                std::unique_ptr<Model>& model,
+                                vk::AccelerationStructureGeometryKHR &geometry,
+                                vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
+                                vk::Format vertexFormat,
+                                vk::IndexType indexType)
     {
-        uint32_t triangleCount = static_cast<uint32_t>(indices.size() / 3U);
+        uint32_t triangleCount = static_cast<uint32_t>(model->getIndexCount() / 3U);
 
         vk::AccelerationStructureGeometryTrianglesDataKHR triangles{
             .pNext = nullptr,
             .vertexFormat = vertexFormat,
-            .vertexData = vk::DeviceOrHostAddressConstKHR{vertexBuffer->getDeviceAddress()},
+            .vertexData = vk::DeviceOrHostAddressConstKHR{model->getVertexBufferAddress()},
             .vertexStride = sizeof(VertexRT),
-            .maxVertex = static_cast<uint32_t>(vertices.size() - 1),
+            .maxVertex = static_cast<uint32_t>(model->getVertexCount() - 1),
             .indexType = indexType,
-            .indexData = vk::DeviceOrHostAddressConstKHR{indexBuffer->getDeviceAddress()},
+            .indexData = vk::DeviceOrHostAddressConstKHR{model->getIndexBufferAddress()},
             .transformData = {}};
 
         geometry = vk::AccelerationStructureGeometryKHR{

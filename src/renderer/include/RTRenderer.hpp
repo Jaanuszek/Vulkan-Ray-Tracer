@@ -1,5 +1,7 @@
 #pragma once
 
+#include "VmaUsage.h"
+
 #include "renderer_export.h"
 #include "SwapChainManager.hpp"
 #include "CommandBufferManager.hpp"
@@ -31,9 +33,11 @@ namespace VRTR
         void drawFrame(GLFWwindow *window, double deltaTime);
 
     private:
-        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+        void setupVMA();
 
         void createSyncObjects();
+
+        uint32_t createModel(std::string modelPath, std::string texturePath);
 
         glm::mat4 rotateModel(float angle, const glm::vec3 &axis);
 
@@ -42,6 +46,7 @@ namespace VRTR
     private:
         int width, height;
         RendererContext ctx;
+        VmaAllocator vmaAlloc;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
@@ -55,11 +60,14 @@ namespace VRTR
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
 
-        std::unordered_map<std::string, VRTR::Model> models;
+        std::unordered_map<std::string, std::unique_ptr<Model>> models;
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;
         UniformData uniform_data{};
+        // TODO przemyslec gdzie chce trzymac te buffery
+        vk::raii::Buffer geometry_info_buffer{nullptr};
+        std::unique_ptr<Buffer> material_buffer;
 
         void updateUniformBuffer();
     };

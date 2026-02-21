@@ -33,6 +33,7 @@ generate_export_header(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE
     common
     Core
+    Vulkan::Vulkan
 )
 
 target_precompile_headers(${PROJECT_NAME} REUSE_FROM common)

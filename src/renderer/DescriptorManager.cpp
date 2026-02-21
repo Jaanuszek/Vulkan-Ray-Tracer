@@ -22,16 +22,71 @@ namespace VRTR
 
     void DescriptorManager::createDescriptorSets()
     {
+        // TODO rozbić tą funkcje na mniejsze kawałki
+        // Zrobic oddzielną funkcje do tworzenia descriptorSetLayout, descriptorPool i descriptorSet
+        // Aktualnie ta funkcja robi za dużo
         VRTR_DEBUG("Creating Descriptor Sets");
+
+        vk::DescriptorSetLayoutBinding ASLayout{
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr};
+
+        vk::DescriptorSetLayoutBinding storageImageLayout{
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr};
+
+        vk::DescriptorSetLayoutBinding uniformBufferLayout{
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr};
+
+        vk::DescriptorSetLayoutBinding textureBinding{
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
+        vk::DescriptorSetLayoutBinding geometryInfoBufferLayout{
+            .binding = 4,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
+
+        std::array<vk::DescriptorSetLayoutBinding, 5> bindings =
+            {
+                ASLayout,
+                storageImageLayout,
+                uniformBufferLayout,
+                textureBinding,
+                geometryInfoBufferLayout
+            };
+
+        vk::DescriptorSetLayoutCreateInfo layoutInfo{
+            .flags = {},
+            .bindingCount = static_cast<uint32_t>(bindings.size()),
+            .pBindings = bindings.data()};
+        descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
+        
         uint32_t maxSets = 1; // one for now, but later we will need more
         std::vector<vk::DescriptorPoolSize> poolSizes =
             {
                 {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
                 {vk::DescriptorType::eStorageImage, maxSets},             // umozliwienie zapisywania wyniku shaderow do storage image
                 {vk::DescriptorType::eUniformBuffer, maxSets},            // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
-                {vk::DescriptorType::eCombinedImageSampler, maxSets},      // wsparcie dla tekstur
+                {vk::DescriptorType::eCombinedImageSampler, maxSets},     // wsparcie dla tekstur
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla geometry info buffera
-                {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
+                // {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -49,7 +104,6 @@ namespace VRTR
             .descriptorPool = descriptorPool,
             .descriptorSetCount = 1,
             .pSetLayouts = &*descriptorSetLayout};
-
         // A little workaround here, because Its not possible to create a single descriptor set in hpp vulkan
         // So I create descriptorSets (NOTE S on the end) and then move the first one to descriptorSet
         // https://github.com/KhronosGroup/Vulkan-Hpp/blob/938a2c36d2d3886a293c63c9a26417d6b0e2bc2d/vk_raii_ProgrammingGuide.md#09-create-a-vkraiidescriptorpool-and-vkraiidescriptorsets
@@ -127,27 +181,28 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &geometryInfoBufferInfo};
 
-        vk::DescriptorBufferInfo materialBufferInfo{
-            .buffer = *descriptorResources.materialBuffer,
-            .offset = 0,
-            .range = vk::WholeSize};
+        // vk::DescriptorBufferInfo materialBufferInfo{
+        //     .buffer = *descriptorResources.materialBuffer,
+        //     .offset = 0,
+        //     .range = vk::WholeSize};
 
-        vk::WriteDescriptorSet materialBufferWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 5,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &materialBufferInfo};
+        // vk::WriteDescriptorSet materialBufferWrite{
+        //     .pNext = nullptr,
+        //     .dstSet = *descriptorSet,
+        //     .dstBinding = 5,
+        //     .dstArrayElement = 0,
+        //     .descriptorCount = 1,
+        //     .descriptorType = vk::DescriptorType::eStorageBuffer,
+        //     .pBufferInfo = &materialBufferInfo};
 
-        std::array<vk::WriteDescriptorSet, 6> WriteDescriptorSets = {
+        std::array<vk::WriteDescriptorSet, 5> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
             uniformBufferWrite,
             textureWrite,
             geometryInfoBufferWrite,
-            materialBufferWrite};
+            // materialBufferWrite
+        };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
@@ -195,25 +250,25 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &geometryInfoBufferInfo};
 
-        vk::DescriptorBufferInfo materialBufferInfo{
-            .buffer = *descriptorResources.materialBuffer,
-            .offset = 0,
-            .range = vk::WholeSize};
+        // vk::DescriptorBufferInfo materialBufferInfo{
+        //     .buffer = *descriptorResources.materialBuffer,
+        //     .offset = 0,
+        //     .range = vk::WholeSize};
 
-        vk::WriteDescriptorSet materialBufferWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 5,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &materialBufferInfo};
+        // vk::WriteDescriptorSet materialBufferWrite{
+        //     .pNext = nullptr,
+        //     .dstSet = *descriptorSet,
+        //     .dstBinding = 5,
+        //     .dstArrayElement = 0,
+        //     .descriptorCount = 1,
+        //     .descriptorType = vk::DescriptorType::eStorageBuffer,
+        //     .pBufferInfo = &materialBufferInfo};
 
-        std::array<vk::WriteDescriptorSet, 4> WriteDescriptorSets = {
+        std::array<vk::WriteDescriptorSet, 3> WriteDescriptorSets = {
             resultImageWrite,
             textureWrite,
             geometryInfoBufferWrite,
-            materialBufferWrite
+            // materialBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

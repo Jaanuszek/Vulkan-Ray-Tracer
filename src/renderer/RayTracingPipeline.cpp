@@ -23,10 +23,12 @@ namespace VRTR
 
         descriptorManager = std::make_unique<DescriptorManager>(ctx);
 
+        descriptorManager->init(resources);
+
         createRayTracingPipeline();
         createShaderBindingTable();
 
-        descriptorManager->init(resources);
+        // descriptorManager->init(resources);
 
         buildRTCommandBuffers();
     }
@@ -45,48 +47,6 @@ namespace VRTR
     void RayTracingPipeline::createRayTracingPipeline()
     {
         VRTR_DEBUG("Creating Ray Tracing Pipeline");
-        vk::DescriptorSetLayoutBinding ASLayout{
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
-            .pImmutableSamplers = nullptr};
-
-        vk::DescriptorSetLayoutBinding storageImageLayout{
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
-            .pImmutableSamplers = nullptr};
-
-        vk::DescriptorSetLayoutBinding uniformBufferLayout{
-            .binding = 2,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
-            .pImmutableSamplers = nullptr};
-
-        vk::DescriptorSetLayoutBinding textureBinding{
-            .binding = 3,
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
-            .pImmutableSamplers = nullptr};
-
-        std::array<vk::DescriptorSetLayoutBinding, 4> bindings =
-            {
-                ASLayout,
-                storageImageLayout,
-                uniformBufferLayout,
-                textureBinding
-            };
-
-        vk::DescriptorSetLayoutCreateInfo layoutInfo{
-            .flags = {},
-            .bindingCount = static_cast<uint32_t>(bindings.size()),
-            .pBindings = bindings.data()};
-        auto descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
-        descriptorManager->setDescriptorSetLayout(descriptorSetLayout);
 
         const vk::PushConstantRange pushConstantRange{
             .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,

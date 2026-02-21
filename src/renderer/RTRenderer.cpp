@@ -8,6 +8,15 @@ namespace VRTR
     RTRenderer::~RTRenderer()
     {
         ctx.logicalDevice.waitIdle();
+
+        // Must explicitly destroy all VMA-managed resources BEFORE vmaDestroyAllocator.
+        // Member destructors run AFTER the destructor body, so without this the
+        // allocator would be destroyed while allocations are still live → VMA assert → abort().
+        models.clear();
+        uniform_buffer.reset();
+        asManager.reset();
+
+        vmaDestroyAllocator(vmaAlloc);
     }
 
     void RTRenderer::init(GLFWwindow *window)
@@ -28,6 +37,8 @@ namespace VRTR
         ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
 
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Device>(*ctx.logicalDevice));
+
+        setupVMA();
 
         RayTracingPipeline::initRayTracing(ctx);
 
@@ -52,55 +63,56 @@ namespace VRTR
         std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
         std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
 
-        std::string viking_model_name = Model::getModelNameFromPath(viking_room_model_path);
-        //std::piecewise_construct - mówi mapie że osobno przekazuje argumenty do konstruktora klucza i wartości
-        //std::forward_as_tuple - tworzy tuple, z przekazanych wartości
-        // std::forward_as_tuple(ctx, viking_room_model_path, viking_room_texture_path) == std::make_tuple(ctx, viking_room_model_path, viking_room_texture_path)
-        // auto [it, inserted] = models.emplace(std::piecewise_construct,
-        //                                      std::forward_as_tuple(viking_model_name),
-        //                                      std::forward_as_tuple(ctx, viking_room_model_path, viking_room_texture_path));
-        // ale tez mozna tak:
-        auto [it, inserted] = models.try_emplace(
-            viking_model_name,
-            ctx,
-            viking_room_model_path,
-            viking_room_texture_path);
-
-        auto& modelTexture = it->second.getTexture();
-
-        uint32_t blasIndex = asManager->createBLAS(models.at(viking_model_name));
-
-        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        asManager->addInstance(blasIndex, rotatedModel);
+        uint32_t blasIndex = createModel(viking_room_model_path, viking_room_texture_path);
 
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
-        auto [guyIt, guyInserted] = models.try_emplace(
-            guy_model_name,
-            ctx,
-            guy_model_path,
-            "");
-        uint32_t guyBlasIndex = asManager->createBLAS(guyIt->second);
 
-        asManager->addInstance(guyBlasIndex, rotatedModel);
+        // uint32_t guyBlasIndex = createModel(guy_model_path, "");
+
         asManager->buildTLAS();
 
-        auto& viking_room_blas = asManager->getBLAS(blasIndex);
-        auto& guy_blas = asManager->getBLAS(guyBlasIndex);
+        // stworzenie storage buffora
 
-        it->second.setGeometryInfo({viking_room_blas.vertexBuffer->getDeviceAddress(), viking_room_blas.indexBuffer->getDeviceAddress(), blasIndex});
-        guyIt->second.setGeometryInfo({guy_blas.vertexBuffer->getDeviceAddress(), guy_blas.indexBuffer->getDeviceAddress(), guyBlasIndex});
+        vk::DeviceSize storageBufferSize = sizeof(GeometryInfo) * CONSTANTS::MAX_OBJECTS;
+
+        vk::BufferCreateInfo storageBufferCI{
+            .size = storageBufferSize,
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer,
+            .sharingMode = vk::SharingMode::eExclusive,
+        };
+
+        VmaAllocationCreateInfo storageBufferAllocCI{
+            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+            .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+        };
+        VkBuffer rawStorageBuffer;
+        VmaAllocation storageBufferAlloc;
+        vmaCreateBuffer(vmaAlloc, reinterpret_cast<VkBufferCreateInfo*>(&storageBufferCI), &storageBufferAllocCI, &rawStorageBuffer, &storageBufferAlloc, nullptr);
+
+        geometry_info_buffer = vk::raii::Buffer(ctx.logicalDevice, rawStorageBuffer);
+
+        std::vector<GeometryInfo> geometryInfos;
+        for (const auto& [name, model] : models)
+        {
+            auto info = model->getGeometryInfo();
+            geometryInfos.push_back(info);
+        }
+
+        vmaCopyMemoryToAllocation(vmaAlloc, geometryInfos.data(), storageBufferAlloc, 0, geometryInfos.size() * sizeof(GeometryInfo));
 
         DescriptorResources descriptorResources{};
         descriptorResources.TLAS = &asManager->getTLAS();
         descriptorResources.ubo = &uniform_buffer->getBuffer();
         descriptorResources.storageImageView = &storageImage->getImageView();
-        descriptorResources.texImageView = modelTexture.getTextureImageView();
-        descriptorResources.texSampler = modelTexture.getTextureSampler();
-
+        descriptorResources.texImageView = models.at("viking_room")->getTexture().getTextureImageView();
+        descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSampler();
+        descriptorResources.geometryInfoBuffer = &geometry_info_buffer;
+        // descriptorResources.materialBuffer = &it->second.getMaterialBuffer()->getBuffer();
+        auto gi = models.at("viking_room")->getGeometryInfo();
         PushConstant vikingRoomModelPC{
-            .vertices = viking_room_blas.vertexBuffer->getDeviceAddress(),
-            .indices = viking_room_blas.indexBuffer->getDeviceAddress()
+            .vertices = gi.vertexBufferAddr,
+            .indices = gi.indexBufferAddr
         };
 
         rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
@@ -111,6 +123,27 @@ namespace VRTR
                                 height,
                                 storageImage
                                 );
+    }
+
+    void RTRenderer::setupVMA()
+    {
+        VmaVulkanFunctions vulkanFunctions{
+            .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+            .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+            .vkCreateBuffer = vkCreateBuffer,
+            .vkCreateImage = vkCreateImage,
+        };
+
+        VmaAllocatorCreateInfo allocatorCI{
+            .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+            .physicalDevice = *ctx.gpu,
+            .device = *ctx.logicalDevice,
+            .pVulkanFunctions = &vulkanFunctions,
+            .instance = *ctx.instance,
+            .vulkanApiVersion = VK_API_VERSION_1_4,
+        };
+
+        vmaCreateAllocator(&allocatorCI, &vmaAlloc);
     }
 
     void RTRenderer::createSyncObjects()
@@ -135,6 +168,24 @@ namespace VRTR
             renderCompleteSemaphores.emplace_back(vk::raii::Semaphore(ctx.logicalDevice, semaphoreInfo));
             drawFences.emplace_back(vk::raii::Fence(ctx.logicalDevice, fenceInfo));
         }
+    }
+
+    uint32_t RTRenderer::createModel(std::string modelPath, std::string texturePath)
+    {
+        std::string model_name = Model::getModelNameFromPath(modelPath);
+        auto [it, inserted] = models.try_emplace(
+            model_name,
+            std::make_unique<Model>(
+            ctx,
+            vmaAlloc,
+            modelPath,
+            texturePath));
+
+        uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
+
+        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        asManager->addInstance(blasIndex, rotatedModel);
+        return blasIndex;
     }
 
     void RTRenderer::updateUniformBuffer()
@@ -217,10 +268,10 @@ namespace VRTR
             // temporary solution
             for(auto& [name, model] : models)
             {
-                if (model.hasTexture())
+                if (model->hasTexture())
                 {
-                    desResources.texImageView = model.getTexture().getTextureImageView();
-                    desResources.texSampler = model.getTexture().getTextureSampler();
+                    desResources.texImageView = model->getTexture().getTextureImageView();
+                    desResources.texSampler = model->getTexture().getTextureSampler();
                     break;
                 }
             }

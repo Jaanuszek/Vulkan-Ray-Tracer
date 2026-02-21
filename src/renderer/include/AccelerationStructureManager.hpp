@@ -17,12 +17,8 @@ namespace VRTR
         std::unique_ptr<Buffer> scratchBuffer{nullptr};
     };
 
-    struct BottomLevelAS
-    {
-        AccelerationStructure as;
-        std::unique_ptr<Buffer> vertexBuffer{nullptr};
-        std::unique_ptr<Buffer> indexBuffer{nullptr};
-    };
+    // Dla czytelnosci. Bo mnie nazwa Acceleration Structure myli
+    using BottomLevelAS = AccelerationStructure;
 
     struct TopLevelAS
     {
@@ -41,7 +37,7 @@ namespace VRTR
              Tworzy Blas, zapisuje go do vektora ze wszystkimi blasami
              Zwraca indeks tego Blasa w wektorze blasów (jest to po prostu indeks tego Blasa w wektorze blasów)
             */
-            uint32_t createBLAS(Model& model);
+            uint32_t createBLAS(std::unique_ptr<Model>& model);
 
             void buildTLAS();
 
@@ -55,10 +51,7 @@ namespace VRTR
 
 
         private:
-        void primitiveToGeometry(const std::vector<VertexRT> &vertices,
-                                 const std::vector<uint32_t> &indices,
-                                 std::unique_ptr<Buffer> &vertexBuffer,
-                                 std::unique_ptr<Buffer> &indexBuffer,
+        void primitiveToGeometry(std::unique_ptr<Model>& model,
                                  vk::AccelerationStructureGeometryKHR &geometry,
                                  vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,
