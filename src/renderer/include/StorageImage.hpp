@@ -15,10 +15,12 @@ namespace VRTR
 
             void init(vk::raii::CommandPool& commandPool);
             void recreate(vk::raii::CommandPool& commandPool, uint32_t newWidth, uint32_t newHeight);
-            vk::raii::Image &getImage() { return Image; };
-            vk::raii::ImageView& getImageView() { return ImageView; };
-            uint32_t getWidth() { return width; };
-            uint32_t getHeight() { return height; };
+            const vk::raii::Image &getImage() const { return Image; };
+            vk::Image getImageHandle() const { return *Image; };
+            const vk::raii::ImageView& getImageView() const { return ImageView; };
+            vk::ImageView getImageViewHandle() const { return *ImageView; };
+            uint32_t getWidth() const { return width; };
+            uint32_t getHeight() const { return height; };
         private:
             RendererContext &ctx;
 

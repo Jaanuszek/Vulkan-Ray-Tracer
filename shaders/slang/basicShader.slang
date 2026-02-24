@@ -22,6 +22,9 @@ uniform Sampler2D colorSampler;
 [[vk::binding(4, 0)]]
 StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
 
+[[vk::binding(5, 0)]]
+StructuredBuffer<Material, Std140DataLayout> materialBuffer;
+
 [[vk::push_constant]] internal pc_blas blasAddr;
 
 public struct RayPayload
@@ -78,7 +81,9 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     uint instanceIndex = InstanceIndex();
     Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
     float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
-    payload.hitValue = color.bgr; // Color from texture
+    // payload.hitValue = color.bgr; // Color from texture
+    payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
+
     // payload.hitValue = barycentricCoords; 
     // uint* vboAddr = (uint*)geometryInfoBuffer[instanceIndex].vertexBufferAddr;
 

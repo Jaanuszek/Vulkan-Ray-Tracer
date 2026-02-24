@@ -19,6 +19,7 @@
 #include "RayTracingPipeline.hpp"
 #include "Model.hpp"
 #include "Texture.hpp"
+#include "StorageBuffer.hpp"
 
 namespace VRTR
 {
@@ -68,6 +69,8 @@ namespace VRTR
         // TODO przemyslec gdzie chce trzymac te buffery
         vk::raii::Buffer geometry_info_buffer{nullptr};
         std::unique_ptr<Buffer> material_buffer;
+        std::unique_ptr<StorageBuffer> geometrySBO;
+        std::unique_ptr<StorageBuffer> materialSBO;
 
         void updateUniformBuffer();
     };

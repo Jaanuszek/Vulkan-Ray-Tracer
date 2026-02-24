@@ -24,6 +24,7 @@
 #include <atomic>
 #include <filesystem>
 #include <cassert>
+#include <queue>
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN

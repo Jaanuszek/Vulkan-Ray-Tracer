@@ -22,9 +22,11 @@ namespace VRTR
         public:
             Texture(RendererContext& ctx, const std::string &path);
 
-            vk::raii::ImageView* getTextureImageView() { return &textureImageView; }
-            vk::raii::Sampler* getTextureSampler() { return &texSampler; }
-
+            const vk::raii::ImageView& getTextureImageView() const { return textureImageView; }
+            vk::ImageView getTextureImageViewHandle() const { return *textureImageView; }
+            const vk::raii::Sampler& getTextureSampler() const { return texSampler; }
+            vk::Sampler getTextureSamplerHandle() const { return *texSampler; }
+            
         private:
             stbi_uc* loadTexture();
             void createTextureImage();

@@ -60,13 +60,18 @@ namespace VRTR
     class Model
     {
         public:
-            Model(RendererContext& ctx, VmaAllocator& vmaAlloc, const std::string& modelPath, const std::string& texturePath);
+            // temporary constructor, W przyszlosci pewnie informacje o materiale beda odczytywane z pliku modelu
+            Model(RendererContext& ctx, VmaAllocator& vmaAlloc, 
+                    const std::string& modelPath, const std::string& texturePath,
+                    const Material& mat = Material{});
+
             ~Model();
 
             static std::string getModelNameFromPath(const std::string& path) { return std::filesystem::path(path).stem().string(); }
 
             void setMaterial(const Material& mat) { material = mat; }
             GeometryInfo getGeometryInfo() const { return geometryInfo; }
+            Material getMaterial() const { return material; }
 
             std::string& getName() { return modelName; }
 
@@ -83,8 +88,6 @@ namespace VRTR
             // Wiem ze sie powtarzam, ale dla czytelnosci takie cos zrobie
             const vk::raii::Buffer& getVertexBuffer() const { return modelBuffers.vertexBuffer; }
             const vk::raii::Buffer& getIndexBuffer() const { return modelBuffers.indexBuffer; }
-
-            const 
 
             bool hasTexture() const { return withTexture; }
 

@@ -6,8 +6,10 @@
 
 namespace VRTR
 {
-    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc, const std::string& modelPath, const std::string& texturePath)
-        : ctx(ctx), modelBuffers(vmaAlloc)
+    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc, 
+                const std::string& modelPath, const std::string& texturePath,
+                const Material& mat)
+        : ctx(ctx), modelBuffers(vmaAlloc), material(mat)
     {
         VRTR_DEBUG("Creating model from path: {}", modelPath);
 

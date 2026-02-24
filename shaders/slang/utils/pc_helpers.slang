@@ -24,6 +24,23 @@ struct GeometryInfo
     uint64_t indicesAddress;
 };
 
+enum class MaterialType
+{
+    NONE = 0,
+    ALBEDO = 1,
+    METALLIC = 2,
+    ROUGHNESS = 3
+};
+
+struct Material
+{
+    float4 albedo;
+    float metallic; // 4B
+    float roughness; // 4B
+    MaterialType type; // 4B
+    float _pad;
+};
+
 public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Triangle
 {
     Triangle tri;

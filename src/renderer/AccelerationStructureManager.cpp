@@ -80,7 +80,7 @@ namespace VRTR
 
         vk::AccelerationStructureInstanceKHR ac_instance{
             .transform = transformMatrix,
-            .instanceCustomIndex = static_cast<uint32_t>(vkInstances.size()), // moze blasIdx zamiast vkInstances.size()?
+            .instanceCustomIndex = static_cast<uint32_t>(vkInstances.size()), // tu nie moze byc blasIdx,, bo mozemy miec duzo tlasow odnoszacych sie do tego samego blasa
             .mask = 0xFF,
             .instanceShaderBindingTableRecordOffset = 0, // temp
             .flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,

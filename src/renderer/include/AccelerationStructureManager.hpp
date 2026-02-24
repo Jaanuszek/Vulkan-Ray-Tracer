@@ -45,7 +45,9 @@ namespace VRTR
 
             void updateTLAS(float deltaTime);
 
-            vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.as.handle; }
+            const vk::raii::AccelerationStructureKHR& getTLAS() const { return tlas.as.handle; }
+
+            vk::AccelerationStructureKHR getTLASHandle() const { return *tlas.as.handle; }
 
             BottomLevelAS& getBLAS(uint32_t index) { return blasList.at(index); }
 

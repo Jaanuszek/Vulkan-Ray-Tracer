@@ -8,14 +8,14 @@ namespace VRTR
 {
     struct DescriptorResources
     {
-        vk::raii::AccelerationStructureKHR* TLAS = nullptr;
-        vk::raii::Buffer* ubo = nullptr;
-        vk::raii::ImageView* storageImageView = nullptr;
+        vk::AccelerationStructureKHR TLAS = nullptr;
+        vk::Buffer ubo = nullptr;
+        vk::ImageView storageImageView = nullptr;
         // no i aktualnie moge przechowywac tylko jedną teksture, co jest problematyczne.
-        vk::raii::ImageView* texImageView = nullptr; // to powinno byc kontenerem
-        vk::raii::Sampler* texSampler = nullptr; // to powinno byc kontenerem
-        vk::raii::Buffer* geometryInfoBuffer = nullptr;
-        // vk::raii::Buffer* materialBuffer = nullptr;
+        vk::ImageView texImageView = nullptr; // to powinno byc kontenerem
+        vk::Sampler texSampler = nullptr; // to powinno byc kontenerem
+        vk::Buffer geometryInfoBuffer = nullptr;
+        vk::Buffer materialBuffer = nullptr;
     };
 
     class DescriptorManager

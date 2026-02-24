@@ -63,7 +63,9 @@ namespace VRTR
         void unmap();
 
         // GETTERS
-        inline vk::raii::Buffer &getBuffer() { return buffer; }
+        inline const vk::raii::Buffer &getBuffer() const { return buffer; }
+
+        vk::Buffer getBufferHandle() const { return *buffer; }
 
         inline vk::DeviceAddress getDeviceAddress() { return deviceAddress; }
 

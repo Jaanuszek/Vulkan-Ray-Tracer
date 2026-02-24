@@ -12,8 +12,13 @@ namespace VRTR
         // Must explicitly destroy all VMA-managed resources BEFORE vmaDestroyAllocator.
         // Member destructors run AFTER the destructor body, so without this the
         // allocator would be destroyed while allocations are still live → VMA assert → abort().
+
+        // Ptoblem jest taki, ze najpierw wywoluje sie destruktur RTRenderera,
+        // a dopiero potem destruktory pól tej klasy
         models.clear();
         uniform_buffer.reset();
+        geometrySBO.reset();
+        materialSBO.reset();
         asManager.reset();
 
         vmaDestroyAllocator(vmaAlloc);
@@ -73,42 +78,30 @@ namespace VRTR
         asManager->buildTLAS();
 
         // stworzenie storage buffora
-
-        vk::DeviceSize storageBufferSize = sizeof(GeometryInfo) * CONSTANTS::MAX_OBJECTS;
-
-        vk::BufferCreateInfo storageBufferCI{
-            .size = storageBufferSize,
-            .usage = vk::BufferUsageFlagBits::eStorageBuffer,
-            .sharingMode = vk::SharingMode::eExclusive,
-        };
-
-        VmaAllocationCreateInfo storageBufferAllocCI{
-            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-        };
-        VkBuffer rawStorageBuffer;
-        VmaAllocation storageBufferAlloc;
-        vmaCreateBuffer(vmaAlloc, reinterpret_cast<VkBufferCreateInfo*>(&storageBufferCI), &storageBufferAllocCI, &rawStorageBuffer, &storageBufferAlloc, nullptr);
-
-        geometry_info_buffer = vk::raii::Buffer(ctx.logicalDevice, rawStorageBuffer);
+        geometrySBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(GeometryInfo));
+         materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
 
         std::vector<GeometryInfo> geometryInfos;
+        geometryInfos.reserve(models.size());
+        std::vector<Material> materials;
+        materials.reserve(models.size());
         for (const auto& [name, model] : models)
         {
-            auto info = model->getGeometryInfo();
-            geometryInfos.push_back(info);
+            geometryInfos.push_back(model->getGeometryInfo());
+            materials.push_back(model->getMaterial());
         }
 
-        vmaCopyMemoryToAllocation(vmaAlloc, geometryInfos.data(), storageBufferAlloc, 0, geometryInfos.size() * sizeof(GeometryInfo));
+        geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
+        materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
 
         DescriptorResources descriptorResources{};
-        descriptorResources.TLAS = &asManager->getTLAS();
-        descriptorResources.ubo = &uniform_buffer->getBuffer();
-        descriptorResources.storageImageView = &storageImage->getImageView();
-        descriptorResources.texImageView = models.at("viking_room")->getTexture().getTextureImageView();
-        descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSampler();
-        descriptorResources.geometryInfoBuffer = &geometry_info_buffer;
-        // descriptorResources.materialBuffer = &it->second.getMaterialBuffer()->getBuffer();
+        descriptorResources.TLAS = asManager->getTLASHandle();
+        descriptorResources.ubo = uniform_buffer->getBufferHandle();
+        descriptorResources.storageImageView = storageImage->getImageViewHandle();
+        descriptorResources.texImageView = models.at("viking_room")->getTexture().getTextureImageViewHandle();
+        descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSamplerHandle();
+        descriptorResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
+        descriptorResources.materialBuffer = materialSBO->getBufferHandle();
         auto gi = models.at("viking_room")->getGeometryInfo();
         PushConstant vikingRoomModelPC{
             .vertices = gi.vertexBufferAddr,
@@ -172,6 +165,10 @@ namespace VRTR
 
     uint32_t RTRenderer::createModel(std::string modelPath, std::string texturePath)
     {
+        Material mat{
+            .albedo = glm::vec4(0.1f,0.4f, 0.8f, 1.0f),
+        };
+
         std::string model_name = Model::getModelNameFromPath(modelPath);
         auto [it, inserted] = models.try_emplace(
             model_name,
@@ -179,7 +176,8 @@ namespace VRTR
             ctx,
             vmaAlloc,
             modelPath,
-            texturePath));
+            texturePath,
+            mat));
 
         uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
 
@@ -262,16 +260,16 @@ namespace VRTR
             camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
             DescriptorResources desResources{};
-            desResources.TLAS = &asManager->getTLAS();
-            desResources.ubo = &uniform_buffer->getBuffer();
-            desResources.storageImageView = &storageImage->getImageView();
+            desResources.TLAS = asManager->getTLASHandle();
+            desResources.ubo = uniform_buffer->getBufferHandle();
+            desResources.storageImageView = storageImage->getImageViewHandle();
             // temporary solution
             for(auto& [name, model] : models)
             {
                 if (model->hasTexture())
                 {
-                    desResources.texImageView = model->getTexture().getTextureImageView();
-                    desResources.texSampler = model->getTexture().getTextureSampler();
+                    desResources.texImageView = model->getTexture().getTextureImageViewHandle();
+                    desResources.texSampler = model->getTexture().getTextureSamplerHandle();
                     break;
                 }
             }

@@ -23,6 +23,7 @@ add_library(${PROJECT_NAME} SHARED
     DescriptorManager.cpp
     Model.cpp
     Texture.cpp
+    StorageBuffer.cpp
 )
 
 include(GenerateExportHeader)
