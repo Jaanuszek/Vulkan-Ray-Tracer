@@ -75,11 +75,19 @@ namespace VRTR
 
         // uint32_t guyBlasIndex = createModel(guy_model_path, "");
 
+        auto [floorVertices, floorIndices] = createFloor();
+        models.try_emplace("floor", std::make_unique<Model>(ctx, vmaAlloc, floorVertices, floorIndices));
+        uint32_t floorBlasIdx = asManager->createBLAS(models.at("floor"));
+
+        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
+
+        asManager->addInstance(floorBlasIdx, floorModel);
+
         asManager->buildTLAS();
 
         // stworzenie storage buffora
         geometrySBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(GeometryInfo));
-         materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
+        materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
 
         std::vector<GeometryInfo> geometryInfos;
         geometryInfos.reserve(models.size());
@@ -102,6 +110,7 @@ namespace VRTR
         descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSamplerHandle();
         descriptorResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         descriptorResources.materialBuffer = materialSBO->getBufferHandle();
+
         auto gi = models.at("viking_room")->getGeometryInfo();
         PushConstant vikingRoomModelPC{
             .vertices = gi.vertexBufferAddr,
@@ -205,6 +214,51 @@ namespace VRTR
         updateUniformBuffer();
     }
 
+    void RTRenderer::recreateResources(GLFWwindow *window)
+    {
+        swapChainManager->recreateSwapChain(window, width, height);
+        storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
+
+        // Update camera perspective with new aspect ratio
+        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
+
+        DescriptorResources desResources{};
+        desResources.TLAS = asManager->getTLASHandle();
+        desResources.ubo = uniform_buffer->getBufferHandle();
+        desResources.storageImageView = storageImage->getImageViewHandle();
+        // temporary solution
+        for(auto& [name, model] : models)
+        {
+            if (model->hasTexture())
+            {
+                desResources.texImageView = model->getTexture().getTextureImageViewHandle();
+                desResources.texSampler = model->getTexture().getTextureSamplerHandle();
+                break;
+            }
+        }
+        desResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
+        desResources.materialBuffer = materialSBO->getBufferHandle();
+
+        rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);   
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> RTRenderer::createFloor()
+    {
+        std::vector<VertexRT> vertices = {
+            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+        };
+
+        std::vector<uint32_t> indices = {
+            0, 1, 2,
+            2, 3, 0
+        };
+
+        return {vertices, indices};
+    }
+
     glm::mat4 RTRenderer::rotateModel(float angle, const glm::vec3 &axis)
     {
         return glm::rotate(glm::mat4(1.0f), angle, axis);
@@ -253,28 +307,7 @@ namespace VRTR
         }
         catch (const vk::OutOfDateKHRError &e)
         {
-            swapChainManager->recreateSwapChain(window, width, height);
-            storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
-
-            // Update camera perspective with new aspect ratio
-            camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
-
-            DescriptorResources desResources{};
-            desResources.TLAS = asManager->getTLASHandle();
-            desResources.ubo = uniform_buffer->getBufferHandle();
-            desResources.storageImageView = storageImage->getImageViewHandle();
-            // temporary solution
-            for(auto& [name, model] : models)
-            {
-                if (model->hasTexture())
-                {
-                    desResources.texImageView = model->getTexture().getTextureImageViewHandle();
-                    desResources.texSampler = model->getTexture().getTextureSamplerHandle();
-                    break;
-                }
-            }
-
-            rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);
+            recreateResources(window);
             return;
         }
         catch (const std::exception &e)

@@ -96,11 +96,11 @@ namespace VRTR
         }
         if(InputManager::isKeyPressed(ActionKeyMap[Action::MoveUp]))
         {
-            camera->moveUp(-cameraSpeed);
+            camera->moveUp(cameraSpeed);
         }
         if(InputManager::isKeyPressed(ActionKeyMap[Action::MoveDown]))
         {
-            camera->moveUp(cameraSpeed);
+            camera->moveUp(-cameraSpeed);
         }
         if(InputManager::isKeyPressed(ActionKeyMap[Action::EnableMouse]))
         {

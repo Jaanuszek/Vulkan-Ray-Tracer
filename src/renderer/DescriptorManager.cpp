@@ -20,13 +20,9 @@ namespace VRTR
         updateDescriptorSets();
     }
 
-    void DescriptorManager::createDescriptorSets()
+    void DescriptorManager::createDescriptorSetLayout()
     {
-        // TODO rozbić tą funkcje na mniejsze kawałki
-        // Zrobic oddzielną funkcje do tworzenia descriptorSetLayout, descriptorPool i descriptorSet
-        // Aktualnie ta funkcja robi za dużo
-        VRTR_DEBUG("Creating Descriptor Sets");
-
+        VRTR_DEBUG("Creating Descriptor Set Layout");
         vk::DescriptorSetLayoutBinding ASLayout{
             .binding = 0,
             .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
@@ -84,8 +80,12 @@ namespace VRTR
             .bindingCount = static_cast<uint32_t>(bindings.size()),
             .pBindings = bindings.data()};
         descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
-        
-        uint32_t maxSets = 1; // one for now, but later we will need more
+    }
+
+    void DescriptorManager::createDescriptorPool()
+    {
+        VRTR_DEBUG("Creating Descriptor Pool");
+        constexpr uint32_t maxSets = 1; // one for now, but later we will need more
         std::vector<vk::DescriptorPoolSize> poolSizes =
             {
                 {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
@@ -104,20 +104,23 @@ namespace VRTR
             .pPoolSizes = poolSizes.data()};
 
         descriptorPool = vk::raii::DescriptorPool(ctx.logicalDevice, poolInfo);
+    }
 
-        // Descriptor set - opis zasobów używanych przez shadery,
-        // czyli layouty, bindingi ktore potem sie wykorzystujew shaderach
+    void DescriptorManager::allocateDescriptorSet()
+    {
         vk::DescriptorSetAllocateInfo allocInfo{
             .descriptorPool = descriptorPool,
             .descriptorSetCount = 1,
             .pSetLayouts = &*descriptorSetLayout};
-        // A little workaround here, because Its not possible to create a single descriptor set in hpp vulkan
-        // So I create descriptorSets (NOTE S on the end) and then move the first one to descriptorSet
         // https://github.com/KhronosGroup/Vulkan-Hpp/blob/938a2c36d2d3886a293c63c9a26417d6b0e2bc2d/vk_raii_ProgrammingGuide.md#09-create-a-vkraiidescriptorpool-and-vkraiidescriptorsets
 
         vk::raii::DescriptorSets tempDescriptorSets = vk::raii::DescriptorSets(ctx.logicalDevice, allocInfo);
         descriptorSet = std::move(tempDescriptorSets.front());
+    }
 
+    void DescriptorManager::writeDescriptorSet()
+    {
+        VRTR_DEBUG("Writing Descriptor Sets");
         vk::WriteDescriptorSetAccelerationStructureKHR descriptorASInfo{
             .pNext = nullptr,
             .accelerationStructureCount = 1,
@@ -211,6 +214,19 @@ namespace VRTR
             materialBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
+    }
+
+    void DescriptorManager::createDescriptorSets()
+    {
+        VRTR_DEBUG("Creating Descriptor Sets");
+
+        createDescriptorSetLayout();
+
+        createDescriptorPool();
+
+        allocateDescriptorSet();
+
+        writeDescriptorSet();
     }
 
     void DescriptorManager::updateDescriptorSets()

@@ -76,7 +76,14 @@ namespace VRTR
     void AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
     {
         vk::TransformMatrixKHR transformMatrix{};
-        memcpy(&transformMatrix, &transform, sizeof(glm::mat4));
+
+        // ogolnie Vulkan w instancji AS przyjmuje maceirz 3x4 row major
+        // glm jest column major, wiec trzeba transponowac, zeby to sie zgadzalo
+        // nie trzeba tego przepisywac na oddzielna strukture 3x4,
+        glm::mat4 tempMat = glm::transpose(transform);
+
+        // tutaj po prostu pomijamy 4 rząd macierzy glm::mat4
+        memcpy(&transformMatrix, &tempMat, sizeof(vk::TransformMatrixKHR)); // TODO jak bedzie cos nie tak to zmienic na sizeof(glm::mat4)
 
         vk::AccelerationStructureInstanceKHR ac_instance{
             .transform = transformMatrix,
@@ -97,10 +104,10 @@ namespace VRTR
         {
             vk::TransformMatrixKHR &transformMatrix = inst.transform;
             // memcpy()
-            glm::mat4 tempMat;
-            memcpy(&tempMat, &transformMatrix, sizeof(glm::mat4));
+            glm::mat4 tempMat{};
+            memcpy(&tempMat, &transformMatrix, sizeof(vk::TransformMatrixKHR));
             glm::mat4 rotatedMat = glm::rotate(tempMat, glm::radians(10.0f * deltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
-            memcpy(&transformMatrix, &rotatedMat, sizeof(glm::mat4));
+            memcpy(&transformMatrix, &rotatedMat, sizeof(vk::TransformMatrixKHR));
             // memcpy(&transformMatrix, &inst.transform, sizeof(glm::mat4));
 
             inst.transform = transformMatrix;

@@ -16,7 +16,7 @@ namespace VRTR
         this->far = far;
 
         matrices.perspective = glm::perspective(glm::radians(fov), aspect, near, far);
-        // matrices.perspective[1][1] *= -1; // Invert Y for Vulkan
+        matrices.perspective[1][1] *= -1; // Invert Y for Vulkan
     }
     
     void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch)
@@ -26,7 +26,7 @@ namespace VRTR
 
         yaw += xoffset;
         yaw = std::fmod(yaw, 360.0f); // Keep yaw in the range [0, 360)
-        pitch += yoffset;
+        pitch -= yoffset; // Invert yoffset to match typical camera controls
 
         if (constrainPitch)
         {

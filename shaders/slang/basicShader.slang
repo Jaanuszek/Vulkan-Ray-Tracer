@@ -37,6 +37,8 @@ public struct HitAttribute
     float2 bary;
 };
 
+const static uint MAX_RECURSION_DEPTH = 4;
+
 [shader("raygeneration")]
 void rayGenShader()
 {
@@ -82,6 +84,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
     float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
     // payload.hitValue = color.bgr; // Color from texture
+    // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
     // payload.hitValue = barycentricCoords; 

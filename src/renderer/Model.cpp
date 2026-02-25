@@ -29,6 +29,23 @@ namespace VRTR
         }
     }
 
+    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc,
+        const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
+        const Material& mat)
+        : ctx(ctx), modelBuffers(vmaAlloc), material(mat)
+    {
+        VRTR_DEBUG("Creating model from vertices and indices");
+
+        modelMesh = std::make_unique<mesh>();
+        modelMesh->vertices = vertices;
+        modelMesh->indices = indices;
+        material = mat;
+
+        createVertexBuffer();
+        createIndexBuffer();
+        setGeometryInfo();
+    }
+
     Model::~Model()
     {
         VRTR_DEBUG("Destroying model: {}", modelName);
@@ -73,6 +90,12 @@ namespace VRTR
                     attrib.vertices[3 * idx.vertex_index + 0],
                     attrib.vertices[3 * idx.vertex_index + 1],
                     attrib.vertices[3 * idx.vertex_index + 2]
+                };
+
+                vertex.normal = {
+                    attrib.normals[3 * idx.normal_index + 0],
+                    attrib.normals[3 * idx.normal_index + 1],
+                    attrib.normals[3 * idx.normal_index + 2]
                 };
 
                 if(withTexture) // bede tu mial puste texCoordy, co jest niewydajne. Miej o tym swiadomość

@@ -65,6 +65,10 @@ namespace VRTR
                     const std::string& modelPath, const std::string& texturePath,
                     const Material& mat = Material{});
 
+            Model(RendererContext& ctx, VmaAllocator& vmaAlloc,
+                    const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
+                    const Material& mat = Material{});
+
             ~Model();
 
             static std::string getModelNameFromPath(const std::string& path) { return std::filesystem::path(path).stem().string(); }

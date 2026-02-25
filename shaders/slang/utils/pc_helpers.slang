@@ -3,6 +3,7 @@ implementing basicShader;
 public struct Vertex
 {
     float3 pos;
+    float3 normal;
     float2 uv;
 };
 
@@ -57,6 +58,7 @@ public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Trian
         const uint64_t vertexOffset = geometryInfoBuffer[objIdx].verticesAddress + vertexIdx * vertexSize;
         Vertex* v = (Vertex*)vertexOffset;
         tri.vertices[i].pos = v->pos;
+        tri.vertices[i].normal = v->normal;
         tri.vertices[i].uv = v->uv;
     }
     

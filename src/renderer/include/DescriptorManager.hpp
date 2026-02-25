@@ -37,6 +37,10 @@ namespace VRTR
             void setDescriptorResources(const DescriptorResources& resources) { descriptorResources = resources; }
 
         private:
+            void createDescriptorSetLayout();
+            void createDescriptorPool();
+            void writeDescriptorSet();
+            void allocateDescriptorSet();
             void createDescriptorSets();
 
         private:
