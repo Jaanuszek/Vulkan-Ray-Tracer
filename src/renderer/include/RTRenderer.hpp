@@ -66,6 +66,7 @@ namespace VRTR
         std::vector<vk::raii::Fence> drawFences;
 
         std::unordered_map<std::string, std::unique_ptr<Model>> models;
+        std::vector<std::string> modelInstanceOrder;
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;

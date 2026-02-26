@@ -10,6 +10,7 @@ public struct Vertex
 public struct Triangle
 {
     Vertex[3] vertices;
+    float3 normal;
     float2 uv;
 }
 
@@ -64,5 +65,6 @@ public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Trian
     
     float3 barycentricCoords = float3(1.0f - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     tri.uv = tri.vertices[0].uv * barycentricCoords.x + tri.vertices[1].uv * barycentricCoords.y + tri.vertices[2].uv * barycentricCoords.z;
+    tri.normal = normalize(tri.vertices[0].normal * barycentricCoords.x + tri.vertices[1].normal * barycentricCoords.y + tri.vertices[2].normal * barycentricCoords.z);
     return tri;
 }

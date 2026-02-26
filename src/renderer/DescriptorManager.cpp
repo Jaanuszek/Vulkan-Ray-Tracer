@@ -27,7 +27,7 @@ namespace VRTR
             .binding = 0,
             .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding storageImageLayout{

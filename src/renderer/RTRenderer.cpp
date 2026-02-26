@@ -27,6 +27,7 @@ namespace VRTR
     void RTRenderer::init(GLFWwindow *window)
     {
         VRTR_DEBUG("RTRENDERER INIT");
+        modelInstanceOrder.clear();
 
         glfwGetFramebufferSize(window, &width, &height);
 
@@ -76,12 +77,17 @@ namespace VRTR
         // uint32_t guyBlasIndex = createModel(guy_model_path, "");
 
         auto [floorVertices, floorIndices] = createFloor();
-        models.try_emplace("floor", std::make_unique<Model>(ctx, vmaAlloc, floorVertices, floorIndices));
+        Material floorMat{
+            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+            .type = MaterialType::METALLIC,
+        };
+        models.try_emplace("floor", std::make_unique<Model>(ctx, vmaAlloc, floorVertices, floorIndices, floorMat));
         uint32_t floorBlasIdx = asManager->createBLAS(models.at("floor"));
 
         glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
 
         asManager->addInstance(floorBlasIdx, floorModel);
+        modelInstanceOrder.push_back("floor");
 
         asManager->buildTLAS();
 
@@ -90,11 +96,17 @@ namespace VRTR
         materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
 
         std::vector<GeometryInfo> geometryInfos;
-        geometryInfos.reserve(models.size());
+        geometryInfos.reserve(modelInstanceOrder.size());
         std::vector<Material> materials;
-        materials.reserve(models.size());
-        for (const auto& [name, model] : models)
+        materials.reserve(modelInstanceOrder.size());
+        for (const auto& modelName : modelInstanceOrder)
         {
+            auto it = models.find(modelName);
+            if (it == models.end())
+            {
+                throw std::runtime_error("Model missing for TLAS instance order: " + modelName);
+            }
+            auto& model = it->second;
             geometryInfos.push_back(model->getGeometryInfo());
             materials.push_back(model->getMaterial());
         }
@@ -176,6 +188,7 @@ namespace VRTR
     {
         Material mat{
             .albedo = glm::vec4(0.1f,0.4f, 0.8f, 1.0f),
+            // .type = MaterialType::METALLIC,
         };
 
         std::string model_name = Model::getModelNameFromPath(modelPath);
@@ -192,6 +205,7 @@ namespace VRTR
 
         glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         asManager->addInstance(blasIndex, rotatedModel);
+        modelInstanceOrder.push_back(model_name);
         return blasIndex;
     }
 

@@ -102,7 +102,7 @@ namespace VRTR
             .pStages = shaderStages.data(),
             .groupCount = static_cast<uint32_t>(shaderGroups.size()),
             .pGroups = shaderGroups.data(),
-            .maxPipelineRayRecursionDepth = 1,
+            .maxPipelineRayRecursionDepth = 4,
             .pLibraryInfo = nullptr,
             .pLibraryInterface = nullptr,
             .pDynamicState = nullptr,
