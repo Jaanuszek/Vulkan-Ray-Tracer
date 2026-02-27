@@ -1,5 +1,6 @@
 module basicShader;
 __include "utils/pc_helpers";
+__include "utils/helpers";
 
 struct CameraData
 {
@@ -135,11 +136,15 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
     uint instanceIndex = InstanceIndex();
     Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
-    // float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+    float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
     // // payload.hitValue = color.bgr; // Color from texture
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
+    if (materialBuffer[instanceIndex].type == MaterialType::METALLIC)
+    {
+        color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
+    }
 
     // ========================== REFLECTIONS
     float3 normal = tri.normal;
@@ -148,7 +153,8 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
     float dot_product = max(dot(lightVector, normal), 0.6);
-    payload.hitValue.rgb = materialBuffer[instanceIndex].albedo.rgb * dot_product;
+    // payload.hitValue.rgb = materialBuffer[instanceIndex].albedo.rgb * dot_product;
+    payload.hitValue.rgb = (color * dot_product).rgb;
     payload.distance = RayTCurrent();
     payload.normal = normal;
     payload.reflector = materialBuffer[instanceIndex].type == MaterialType::METALLIC ? 0.75f : 0.0f;
