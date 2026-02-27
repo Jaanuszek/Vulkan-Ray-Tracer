@@ -27,7 +27,7 @@ compile_shader() {
     # -emit-spirv-directly
 
     # slangc "$input_file" -o "$output_file" -target spirv -entry "$stage" -fvk-use-entrypoint-name -emit-spirv-directly -g2
-    slangc "$input_file" -o "$output_file" -target spirv -fvk-use-entrypoint-name -emit-spirv-directly -g2
+    slangc "$input_file" -o "$output_file" -target spirv -fvk-use-scalar-layout -fvk-use-entrypoint-name -emit-spirv-directly -g2
 }
 
 # compile_shader "${SLANG_SHADER_DIR}/basicShader.slang" "${ROOT_SHADER_DIR}/raygen.spv" "rayGenShader"

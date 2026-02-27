@@ -5,6 +5,7 @@
 #include "Utils.hpp"
 #include "buffer.hpp"
 #include "CommandBufferManager.hpp"
+#include "Model.hpp"
 
 namespace VRTR
 {
@@ -16,12 +17,8 @@ namespace VRTR
         std::unique_ptr<Buffer> scratchBuffer{nullptr};
     };
 
-    struct BottomLevelAS
-    {
-        AccelerationStructure as;
-        std::unique_ptr<Buffer> vertexBuffer{nullptr};
-        std::unique_ptr<Buffer> indexBuffer{nullptr};
-    };
+    // Dla czytelnosci. Bo mnie nazwa Acceleration Structure myli
+    using BottomLevelAS = AccelerationStructure;
 
     struct TopLevelAS
     {
@@ -34,9 +31,13 @@ namespace VRTR
     {
         public:
             AccelerationStructureManager(RendererContext& ctx);
-        
-            uint32_t createBLAS(const std::vector<VertexRT>& vertices,
-                                const std::vector<uint32_t>& indices);
+
+            /*
+             Funkcja ta tworzy bufory wierzchołków i indeksów dla modelu
+             Tworzy Blas, zapisuje go do vektora ze wszystkimi blasami
+             Zwraca indeks tego Blasa w wektorze blasów (jest to po prostu indeks tego Blasa w wektorze blasów)
+            */
+            uint32_t createBLAS(std::unique_ptr<Model>& model);
 
             void buildTLAS();
 
@@ -44,16 +45,15 @@ namespace VRTR
 
             void updateTLAS(float deltaTime);
 
-            vk::raii::AccelerationStructureKHR& getTLAS() { return tlas.as.handle; }
+            const vk::raii::AccelerationStructureKHR& getTLAS() const { return tlas.as.handle; }
+
+            vk::AccelerationStructureKHR getTLASHandle() const { return *tlas.as.handle; }
 
             BottomLevelAS& getBLAS(uint32_t index) { return blasList.at(index); }
 
 
         private:
-        void primitiveToGeometry(const std::vector<VertexRT> &vertices,
-                                 const std::vector<uint32_t> &indices,
-                                 std::unique_ptr<Buffer> &vertexBuffer,
-                                 std::unique_ptr<Buffer> &indexBuffer,
+        void primitiveToGeometry(std::unique_ptr<Model>& model,
                                  vk::AccelerationStructureGeometryKHR &geometry,
                                  vk::AccelerationStructureBuildRangeInfoKHR &offsetInfo,
                                  vk::Format vertexFormat = vk::Format::eR32G32B32Sfloat,

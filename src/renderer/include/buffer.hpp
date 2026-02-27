@@ -16,12 +16,24 @@ namespace VRTR
     };
 
     static std::unordered_map<BufferType, std::pair<vk::BufferUsageFlags2, vk::MemoryPropertyFlags>> BufferTypeProperties = {
-        {BufferType::SCRATCH,
-         {vk::BufferUsageFlagBits2::eStorageBuffer |
-              vk::BufferUsageFlagBits2::eShaderDeviceAddress |
-              vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR,
-          vk::MemoryPropertyFlagBits::eDeviceLocal}},
-    }; // <----- meh
+        {
+            BufferType::SCRATCH,
+            {
+                vk::BufferUsageFlagBits2::eStorageBuffer |
+                vk::BufferUsageFlagBits2::eShaderDeviceAddress |
+                vk::BufferUsageFlagBits2::eAccelerationStructureStorageKHR,
+                vk::MemoryPropertyFlagBits::eDeviceLocal
+            }
+        },
+        {
+            BufferType::STORAGE,
+            {
+                vk::BufferUsageFlagBits2::eStorageBuffer |
+                vk::BufferUsageFlagBits2::eShaderDeviceAddress,
+                vk::MemoryPropertyFlagBits::eDeviceLocal
+            }
+        }
+    };
 
     class Buffer
     {
@@ -51,7 +63,9 @@ namespace VRTR
         void unmap();
 
         // GETTERS
-        inline vk::raii::Buffer &getBuffer() { return buffer; }
+        inline const vk::raii::Buffer &getBuffer() const { return buffer; }
+
+        vk::Buffer getBufferHandle() const { return *buffer; }
 
         inline vk::DeviceAddress getDeviceAddress() { return deviceAddress; }
 

@@ -76,7 +76,42 @@ namespace VRTR
                 {}
                 break;
             case BufferType::STORAGE:
-                {}
+                {
+                    vk::BufferUsageFlags2CreateInfo bufferUsageFlags2Info{
+                        .pNext = nullptr,
+                        .usage = BufferTypeProperties[type].first
+                    };
+
+                    vk::BufferCreateInfo bufferCreateInfo
+                    {
+                        .pNext = &bufferUsageFlags2Info,
+                        .size = size,
+                        .usage = {},
+                    };
+
+                    buffer = vk::raii::Buffer(logDevice, bufferCreateInfo);
+
+                    vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+
+                    vk::MemoryAllocateFlagsInfo allocateFlagsInfo
+                    {
+                        .pNext = nullptr,
+                        .flags = vk::MemoryAllocateFlagBits::eDeviceAddress,
+                    };
+
+                    uint32_t memoryType = Buffer::findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+                    vk::MemoryAllocateInfo allocInfo
+                    {
+                        .pNext = &allocateFlagsInfo,
+                        .allocationSize = memRequirements.size,
+                        .memoryTypeIndex = memoryType
+                    };
+                    bufferMemory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
+                    buffer.bindMemory(*bufferMemory, 0);
+
+                    deviceAddress = ctx.logicalDevice.getBufferAddress(vk::BufferDeviceAddressInfo{.buffer = buffer});
+                }
                 break;
             case BufferType::ACCELERATION_STRUCTURE:
                 {}
