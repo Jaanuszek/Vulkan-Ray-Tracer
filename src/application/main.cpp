@@ -51,7 +51,7 @@ int main()
             lastFrameTime = currentTime;
             glfwPollEvents();
             VRTR::processInput(window, deltaTime, camera);
-            renderer->drawFrame(window, deltaTime);
+            renderer->drawFrame(window, deltaTime, VRTR::InputManager::renderGUI);
         }
 
         renderer.reset();   

@@ -66,6 +66,9 @@ namespace VRTR
         // Unmaps the buffer memory
         void unmap();
 
+        // Recreates the buffer with new size, old data will be lost
+        void recreate(vk::DeviceSize newSize);
+
         // GETTERS
         inline const vk::raii::Buffer &getBuffer() const { return buffer; }
 
@@ -78,9 +81,17 @@ namespace VRTR
     private:
         VmaAllocator *vmaAllocator{nullptr};
         VmaAllocation vmaAllocation{nullptr};
+        VmaAllocationInfo vmaAllocationInfo{};
         vk::raii::Device &logDevice;
         vk::raii::Buffer buffer{nullptr};
         vk::raii::DeviceMemory bufferMemory{nullptr};
         vk::DeviceAddress deviceAddress{};
+
+        struct BufferInfo
+        {
+            vk::BufferUsageFlags usage;
+            VmaAllocationCreateInfo allocInfo;
+            vk::DeviceSize size;
+        } bufferInfo;
     };
 }

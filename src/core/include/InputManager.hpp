@@ -16,6 +16,7 @@ namespace VRTR
         CloseWindow,
         EnableMouse, // bring back the os mouse
         DisableMouse, // hide Os mouse and use camera
+        ToggleGUI,
 
         ACTION_COUNT // last element, dont overwrite it
     };
@@ -30,6 +31,7 @@ namespace VRTR
         {Action::CloseWindow, GLFW_KEY_ESCAPE},
         {Action::EnableMouse, GLFW_KEY_F1},
         {Action::DisableMouse, GLFW_KEY_F2},
+        {Action::ToggleGUI, GLFW_KEY_F3},
     };
 
     class CORE_EXPORT InputManager
@@ -37,18 +39,25 @@ namespace VRTR
         public:
             static void init(GLFWwindow *window);
             static bool isKeyPressed(int key);
+            static bool isKeyJustPressed(int key);
             static bool isMouseButtonPressed(int button);
             static void setCursorCallback(GLFWwindow *window);
             static void disableCursorCallback(GLFWwindow *window);
 
+        public:
+            static bool renderGUI;
+
         private:
             static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-            // static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+            static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+            static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+            static void char_callback(GLFWwindow* window, unsigned int c);
             static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 
         private:
             static std::unordered_map<int, bool> keyStates;
+            static std::unordered_map<int, bool> keyStatesLastFrame;
             static std::unordered_map<int, bool> mouseButtonStates;
             static double mouseX, mouseY;
             static double lastMouseX, lastMouseY;

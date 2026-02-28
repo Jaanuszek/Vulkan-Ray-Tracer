@@ -12,7 +12,12 @@ namespace VRTR
     {
         if (vmaAllocation != nullptr && ctx.vmaAllocator != nullptr)
         {
-            vmaFreeMemory(ctx.vmaAllocator, vmaAllocation);
+            VkImage rawImage = *image ? static_cast<VkImage>(*image) : VK_NULL_HANDLE;
+            if (rawImage != VK_NULL_HANDLE)
+            {
+                image.release();
+            }
+            vmaDestroyImage(ctx.vmaAllocator, rawImage, vmaAllocation);
             vmaAllocation = nullptr;
         }
     }

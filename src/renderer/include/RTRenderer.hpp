@@ -20,6 +20,7 @@
 #include "Model.hpp"
 #include "Texture.hpp"
 #include "StorageBuffer.hpp"
+#include "GUI.hpp"
 
 namespace VRTR
 {
@@ -31,10 +32,12 @@ namespace VRTR
         RTRenderer(std::shared_ptr<Camera> camera);
         ~RTRenderer();
         void init(GLFWwindow *window);
-        void drawFrame(GLFWwindow *window, double deltaTime);
+        void drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI);
 
     private:
         void setupVMA();
+
+        void initImGUI(GLFWwindow* window);
 
         void createSyncObjects();
 
@@ -51,6 +54,8 @@ namespace VRTR
     private:
         int width, height;
         RendererContext ctx;
+
+        std::unique_ptr<GUI> gui;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;

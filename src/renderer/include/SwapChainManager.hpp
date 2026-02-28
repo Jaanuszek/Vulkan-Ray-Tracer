@@ -20,6 +20,21 @@ namespace VRTR
                 return swapChainImages.at(index);
             }
 
+            inline vk::ImageView getSwapChainImageView(size_t index) const
+            {
+                return *swapChainImageViews.at(index);
+            }
+
+            inline vk::Format getImageFormat() const
+            {
+                return imageFormat;
+            }
+
+            inline vk::Extent2D getExtent() const
+            {
+                return extent;
+            }
+
             inline std::vector<vk::Image>& getSwapChainImages()
             {
                 return swapChainImages;

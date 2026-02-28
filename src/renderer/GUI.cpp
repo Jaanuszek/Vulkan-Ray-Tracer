@@ -1,43 +1,33 @@
 #include "pch.h"
 #include "GUI.hpp"
+#include "CommandBufferManager.hpp"
 
 namespace VRTR
 {
     GUI::GUI(RendererContext& ctx)
         : ctx(ctx)
-    {
-        VmaAllocationCreateInfo allocInfo{
-            .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO
-        };
-
-        vertexBuffer = std::make_unique<Buffer>(
-            ctx.logicalDevice, ctx.vmaAllocator, 1,
-            vk::BufferUsageFlagBits::eVertexBuffer,
-            allocInfo
-        );
-
-        indexBuffer = std::make_unique<Buffer>(
-            ctx.logicalDevice, ctx.vmaAllocator, 1,
-            vk::BufferUsageFlagBits::eIndexBuffer,
-            allocInfo
-        );
-
-        renderingInfo.colorAttachmentCount = 1;
-        std::array<vk::Format, 1> formats = {colorFormat};
-        renderingInfo.pColorAttachmentFormats = formats.data();
-    }
+    {}
 
     GUI::~GUI()
     {
-        if(ctx.logicalDevice != nullptr)
+        VRTR_DEBUG("Destroying GUI");
+        if (ctx.logicalDevice != nullptr)
         {
             ctx.logicalDevice.waitIdle();
         }
+        if (ImGui::GetCurrentContext() != nullptr)
+        {
+            ImGui_ImplVulkan_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+        }
     }
 
-    void GUI::init(float width, float height)
+    void GUI::init(GLFWwindow* window, float width, float height)
     {
+        this->window = window;
+        mainScale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
 
@@ -56,52 +46,58 @@ namespace VRTR
         vulkanStyle.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
 
         setStyle(0);
+        setupStyle();
+
+        ImGui_ImplGlfw_InitForVulkan(window, false);
     }
 
-    void GUI::initResources()
+    void GUI::initResources(vk::raii::CommandPool& commandPool, vk::Format swapchainFormat, uint32_t imageCount)
     {
-        ImGuiIO &io = ImGui::GetIO();
-        unsigned char *fontData;
-        int texWidth, texHeight;
-        io.Fonts->GetTexDataAsRGBA32(&fontData, &texWidth, &texHeight);
+        this->swapchainFormat = static_cast<VkFormat>(swapchainFormat);
+        this->imageCount = imageCount;
 
-        // 1 pixel = 4 bytes (RGBA)
-        // ImGui zamienia czcionke na teksture, która jest zoptymalizowana pod GPU
-        vk::DeviceSize uploadSize = texWidth * texHeight * 4 * sizeof(char);
-
-        vk::Extent3D fontExtent{
-            static_cast<uint32_t>(texWidth),
-            static_cast<uint32_t>(texHeight),
-            1
+        std::array<vk::DescriptorPoolSize, 1> poolSizes = {
+            vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1024}
         };
-        fontImage = std::make_unique<Image>(ctx, vk::Format::eR8G8B8A8Unorm);
-        fontImage->createImage(fontExtent, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst);
-        fontImage->createImageMemory(vk::MemoryPropertyFlagBits::eDeviceLocal);
-        fontImage->createImageView(vk::ImageAspectFlagBits::eColor);
-
-        // Staging buffer
-        vk::BufferCreateInfo stagingBufferCI{
-            .size = uploadSize,
-            .usage = vk::BufferUsageFlagBits::eTransferSrc,
-            .sharingMode = vk::SharingMode::eExclusive
+        vk::DescriptorPoolCreateInfo poolCI{
+            .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+            .maxSets = 1024,
+            .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+            .pPoolSizes = poolSizes.data()
         };
+        descriptorPool = ctx.logicalDevice.createDescriptorPool(poolCI);
 
-        VmaAllocationCreateInfo stagingBufferAllocInfo{
-            .flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO,
+        pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+        pipelineRenderingInfo.colorAttachmentCount = 1;
+        pipelineRenderingInfo.pColorAttachmentFormats = &this->swapchainFormat;
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.ApiVersion = VK_API_VERSION_1_4;
+        initInfo.Instance = *ctx.instance;
+        initInfo.PhysicalDevice = *ctx.gpu;
+        initInfo.Device = *ctx.logicalDevice;
+        initInfo.QueueFamily = static_cast<uint32_t>(ctx.graphics_queue_index);
+        initInfo.Queue = *ctx.queue;
+        initInfo.DescriptorPool = *descriptorPool;
+        initInfo.MinImageCount = std::max(2u, imageCount);
+        initInfo.ImageCount = imageCount;
+        initInfo.UseDynamicRendering = true;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = pipelineRenderingInfo;
+
+        ImGui_ImplVulkan_Init(&initInfo);
+
+        vk::CommandBufferAllocateInfo allocInfo{
+            .commandPool = *commandPool,
+            .level = vk::CommandBufferLevel::ePrimary,
+            .commandBufferCount = imageCount
         };
-        VkBuffer stagingBuffer = VK_NULL_HANDLE;
-        VmaAllocation alloc;
-        VmaAllocationInfo allocInfo;
-        vmaCreateBuffer(ctx.vmaAllocator, reinterpret_cast<VkBufferCreateInfo*>(&stagingBufferCI), &stagingBufferAllocInfo, &stagingBuffer, &alloc, &allocInfo);
+        guiCommandBuffers = ctx.logicalDevice.allocateCommandBuffers(allocInfo);
 
-        memcpy(allocInfo.pMappedData, fontData, static_cast<size_t>(uploadSize));
-
-        fontImage->transitionImageLayout(vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-        fontImage->copyImageFromStagingToGPU(stagingBuffer);
-        fontImage->transitionImageLayout(vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-
-        vmaFreeMemory(ctx.vmaAllocator, alloc);
+        // vk::raii::CommandBuffer uploadCmd{nullptr};
+        // COMMANDS::beginSingleTimeCommands(uploadCmd, ctx.logicalDevice, commandPool);
+        // ImGui_ImplVulkan_CreateFontsTexture(*uploadCmd);
+        // COMMANDS::endSingleTimeCommands(uploadCmd, ctx.logicalDevice, commandPool, ctx.queue);
+        // ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
     void GUI::setStyle(uint32_t index)
@@ -128,4 +124,95 @@ namespace VRTR
         }
     }
 
+    void GUI::setupStyle()
+    {
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        style.ScaleAllSizes(mainScale);
+        style.FontScaleDpi = mainScale;
+    }
+
+    bool GUI::newFrame()
+    {
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // Show the demo window
+        ImGui::ShowDemoWindow();
+
+        // Tutaj trzeba dodac wlasne GUI np:
+        ImGui::Begin("Another Window", nullptr);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        ImGui::Text("Hello from another window!");
+        if (ImGui::Button("Close Me")) {
+            ;
+        }
+            // show_another_window = false;
+        ImGui::End();
+
+        ImGui::Render();
+
+        ImDrawData *drawData = ImGui::GetDrawData();
+        return drawData && drawData->CmdListsCount > 0;
+    }
+
+    vk::CommandBuffer GUI::buildDrawCommandBuffer(uint32_t imageIndex, vk::Image swapchainImage, vk::ImageView swapchainImageView, vk::Extent2D extent)
+    {
+        ImDrawData *drawData = ImGui::GetDrawData();
+        if (!drawData || drawData->CmdListsCount == 0)
+        {
+            return VK_NULL_HANDLE;
+        }
+        if(guiCommandBuffers.empty())
+        {
+            return VK_NULL_HANDLE;
+        }
+        auto& commandBuffer = guiCommandBuffers.at(imageIndex);
+        commandBuffer.reset();
+        commandBuffer.begin(vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        CommandBufferManager::transition_image_layout(
+            commandBuffer,
+            swapchainImage,
+            vk::ImageLayout::ePresentSrcKHR,
+            vk::ImageLayout::eColorAttachmentOptimal,
+            {},
+            vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput
+        );
+
+        vk::RenderingAttachmentInfo colorAttachment{
+            .imageView = swapchainImageView,
+            .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .loadOp = vk::AttachmentLoadOp::eLoad,
+            .storeOp = vk::AttachmentStoreOp::eStore
+        };
+
+        vk::RenderingInfo renderingInfo{
+            .renderArea = vk::Rect2D{
+                .offset = vk::Offset2D{0,0},
+                .extent = extent
+            },
+            .layerCount = 1,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &colorAttachment
+        };
+        commandBuffer.beginRendering(renderingInfo);
+        ImGui_ImplVulkan_RenderDrawData(drawData, *commandBuffer);
+        commandBuffer.endRendering();
+
+        CommandBufferManager::transition_image_layout(
+            commandBuffer,
+            swapchainImage,
+            vk::ImageLayout::eColorAttachmentOptimal,
+            vk::ImageLayout::ePresentSrcKHR,
+            vk::AccessFlagBits2::eColorAttachmentWrite,
+            {},
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits2::eBottomOfPipe
+        );
+
+        commandBuffer.end();
+        return commandBuffer;
+    }
 }

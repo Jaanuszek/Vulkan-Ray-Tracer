@@ -34,7 +34,13 @@ namespace VRTR
 
     StorageBuffer::~StorageBuffer()
     {
-        vmaFreeMemory(vmaAlloc, storageBufferAlloc);
+        if (storageBufferAlloc != nullptr)
+        {
+            VkBuffer rawStorageBuffer = static_cast<VkBuffer>(*storageBuffer);
+            storageBuffer.release();
+            vmaDestroyBuffer(vmaAlloc, rawStorageBuffer, storageBufferAlloc);
+            storageBufferAlloc = nullptr;
+        }
     }
 
     void StorageBuffer::copyDataToBuffer(const void *data, vk::DeviceSize size, vk::DeviceSize offset)

@@ -11,52 +11,42 @@
 
 namespace VRTR
 {
+    namespace GUIConstants
+    {
+        constexpr float styleScale = 1.5f;
+    }
+
     class GUI
     {
     public:
         GUI(RendererContext& ctx);
         ~GUI();
 
-        void init(float width, float height);
-        void initResources();
+        void init(GLFWwindow* window, float width, float height);
+        void initResources(vk::raii::CommandPool& commandPool, vk::Format swapchainFormat, uint32_t imageCount);
         void setStyle(uint32_t index);
+        void setupStyle();
 
         bool newFrame();
-        void updateBuffers();
-        void drawFrame(vk::raii::CommandBuffer &commandBuffer);
+        vk::CommandBuffer buildDrawCommandBuffer(uint32_t imageIndex, vk::Image swapchainImage, vk::ImageView swapchainImageView, vk::Extent2D extent);
 
         void handleKey(int ket, int scancode, int action, int mods);
         bool getWantKeyCapture();
         void charPressed(uint32_t key);
 
     private:
-        vk::raii::Sampler sampler{nullptr};
-        std::unique_ptr<Buffer> vertexBuffer;
-        std::unique_ptr<Buffer> indexBuffer;
-        uint32_t vertexCount{};
-        uint32_t indexCount{};
-        std::unique_ptr<Image> fontImage;
-
-        // vulkan pipeline
-        vk::raii::PipelineCache pipelineCache{nullptr};
-        vk::raii::PipelineLayout pipelineLayout{nullptr};
-        vk::raii::Pipeline pipeline{nullptr};
         vk::raii::DescriptorPool descriptorPool{nullptr};
-        vk::raii::DescriptorSetLayout descriptorSetLayout{nullptr};
-        vk::raii::DescriptorSet descriptorSet{nullptr};
+        std::vector<vk::raii::CommandBuffer> guiCommandBuffers;
+        VkFormat swapchainFormat{VK_FORMAT_B8G8R8A8_UNORM};
+        uint32_t imageCount{0};
 
         // vulkan context
         RendererContext& ctx;
+        GLFWwindow* window{nullptr};
 
         // UI specific
         ImGuiStyle vulkanStyle;
-        struct PushConstBlock
-        {
-            glm::vec2 scale;
-            glm::vec2 translate;
-        } pushConstBlock;
-        bool needsUpdateBuffers = false;
-        vk::PipelineRenderingCreateInfo renderingInfo{};
-        vk::Format colorFormat = vk::Format::eB8G8R8A8Uint;
+        VkPipelineRenderingCreateInfoKHR pipelineRenderingInfo{};
+        float mainScale;
     };
 }
