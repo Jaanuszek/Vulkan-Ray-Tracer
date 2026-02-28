@@ -182,16 +182,42 @@ namespace VRTR
         }
     }
 
+    // I dont like this reference to VMAAlloc, but I need it to free the memory in destructor
+    Buffer::Buffer(vk::raii::Device &logicalDevice,VmaAllocator& vmaAllocator, vk::DeviceSize size,
+        vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo)
+        : logDevice(logicalDevice), vmaAllocator(&vmaAllocator)
+    {
+        vk::BufferCreateInfo bufferCI{
+        .sType = vk::StructureType::eBufferCreateInfo,
+        .size = size,
+        .usage = usage,
+        .sharingMode = vk::SharingMode::eExclusive,
+        };
+
+        VkBuffer rawStorageBuffer;
+        vmaCreateBuffer(vmaAllocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferCI), &allocInfo, &rawStorageBuffer, &vmaAllocation, nullptr);
+        buffer = vk::raii::Buffer(logicalDevice, rawStorageBuffer);
+    }
+
     Buffer::~Buffer()
     {
-
+        if (vmaAllocation != nullptr) {
+            vmaFreeMemory(*vmaAllocator, vmaAllocation);
+        }
     }
 
     void Buffer::Update(const void* data, vk::DeviceSize size, vk::DeviceSize offset)
     {
-        void* mappedData = bufferMemory.mapMemory(offset, size);
-        memcpy(mappedData, data, static_cast<size_t>(size));
-        bufferMemory.unmapMemory();
+        if(vmaAllocation == nullptr)
+        {
+            void* mappedData = bufferMemory.mapMemory(offset, size);
+            memcpy(mappedData, data, static_cast<size_t>(size));
+            bufferMemory.unmapMemory();
+            return;
+        }
+        else {
+            vmaCopyMemoryToAllocation(*vmaAllocator, data, vmaAllocation, offset, size);
+        }
     }
 
     void* Buffer::map(vk::DeviceSize size, vk::DeviceSize offset)

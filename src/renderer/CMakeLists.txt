@@ -8,6 +8,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
+set(IMGUI_SOURCES
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui.cpp
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_draw.cpp
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_tables.cpp
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_widgets.cpp
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/imgui_demo.cpp
+    PARENT_SCOPE
+)
+
+set(IMGUI_BACKEND
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_glfw.cpp
+    ${CMAKE_SOURCE_DIR}/third-party/imgui/backends/imgui_impl_vulkan.cpp
+    PARENT_SCOPE
+)
 
 add_library(${PROJECT_NAME} SHARED
     RTRenderer.cpp
@@ -22,8 +36,12 @@ add_library(${PROJECT_NAME} SHARED
     RayTracingPipeline.cpp
     DescriptorManager.cpp
     Model.cpp
+    Image.cpp
     Texture.cpp
     StorageBuffer.cpp
+    GUI.cpp
+    ${IMGUI_SOURCES}
+    ${IMGUI_BACKEND}
 )
 
 include(GenerateExportHeader)
@@ -51,6 +69,8 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_SOURCE_DIR}/third-party/stb
     PUBLIC
         ${CMAKE_SOURCE_DIR}/third-party/spdlog/include
+        ${CMAKE_SOURCE_DIR}/third-party/imgui
+        ${CMAKE_SOURCE_DIR}/third-party/imgui/backends
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>

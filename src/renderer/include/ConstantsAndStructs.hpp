@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include "VmaUsage.h"
 
 namespace VRTR
 {
@@ -21,7 +22,7 @@ namespace VRTR
         int32_t graphics_queue_index = -1;
         vk::raii::SurfaceKHR surface{nullptr};
         vk::raii::DebugUtilsMessengerEXT debugMessenger{nullptr};
-
+        VmaAllocator vmaAllocator{nullptr};
         Properties properties;
     };
 

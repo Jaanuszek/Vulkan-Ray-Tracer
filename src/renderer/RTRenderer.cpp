@@ -21,7 +21,7 @@ namespace VRTR
         materialSBO.reset();
         asManager.reset();
 
-        vmaDestroyAllocator(vmaAlloc);
+        vmaDestroyAllocator(ctx.vmaAllocator);
     }
 
     void RTRenderer::init(GLFWwindow *window)
@@ -81,7 +81,7 @@ namespace VRTR
             .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
             .type = MaterialType::METALLIC,
         };
-        models.try_emplace("floor", std::make_unique<Model>(ctx, vmaAlloc, floorVertices, floorIndices, floorMat));
+        models.try_emplace("floor", std::make_unique<Model>(ctx, ctx.vmaAllocator, floorVertices, floorIndices, floorMat));
         uint32_t floorBlasIdx = asManager->createBLAS(models.at("floor"));
 
         glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
@@ -92,8 +92,8 @@ namespace VRTR
         asManager->buildTLAS();
 
         // stworzenie storage buffora
-        geometrySBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(GeometryInfo));
-        materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
+        geometrySBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(GeometryInfo));
+        materialSBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(Material));
 
         std::vector<GeometryInfo> geometryInfos;
         geometryInfos.reserve(modelInstanceOrder.size());
@@ -157,7 +157,7 @@ namespace VRTR
             .vulkanApiVersion = VK_API_VERSION_1_4,
         };
 
-        vmaCreateAllocator(&allocatorCI, &vmaAlloc);
+        vmaCreateAllocator(&allocatorCI, &ctx.vmaAllocator);
     }
 
     void RTRenderer::createSyncObjects()
@@ -196,7 +196,7 @@ namespace VRTR
             model_name,
             std::make_unique<Model>(
             ctx,
-            vmaAlloc,
+            ctx.vmaAllocator,
             modelPath,
             texturePath,
             mat));

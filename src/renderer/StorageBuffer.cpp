@@ -3,6 +3,10 @@
 
 namespace VRTR
 {
+    // TODO ajakby zrobic tu troche abstrakcji?
+    // Zrobilbym interfejs Buffer
+    // i klasy pochodne takie jak vertex buffer, index buffer, storage buffer itd
+    // brzmi git hehe
     StorageBuffer::StorageBuffer(RendererContext& ctx, VmaAllocator& vmaAlloc, size_t typeSize)
         : ctx(ctx), vmaAlloc(vmaAlloc)
     {

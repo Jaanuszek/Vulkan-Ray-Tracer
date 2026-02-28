@@ -51,7 +51,6 @@ namespace VRTR
     private:
         int width, height;
         RendererContext ctx;
-        VmaAllocator vmaAlloc;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;

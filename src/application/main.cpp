@@ -5,6 +5,9 @@
 #include "Camera.hpp"
 #include "ConstantsAndStructs.hpp"
 #include "RTRenderer.hpp"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 static vk::detail::DynamicLoader dl;
@@ -28,7 +31,8 @@ int main()
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Siema Eniu", nullptr, nullptr);
+        float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
+        GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Siema Eniu", nullptr, nullptr);
 
         std::shared_ptr<VRTR::Camera> camera = std::make_shared<VRTR::Camera>(glm::vec3(0.0f, 0.0f, 4.0f));
         camera->setPerspective(45.0f, static_cast<float>(WIDTH) / HEIGHT, 0.1f, 100.0f);

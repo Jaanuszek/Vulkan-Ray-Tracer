@@ -1,6 +1,7 @@
 #pragma once
 #include <Logger.hpp>
 #include "ConstantsAndStructs.hpp"
+#include "VmaUsage.h"
 
 namespace VRTR
 {
@@ -51,6 +52,9 @@ namespace VRTR
                BufferType type,
                vk::DeviceSize size);
 
+        Buffer(vk::raii::Device &logicalDevice, VmaAllocator& vmaAlloc, vk::DeviceSize size,
+               vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo);
+
         ~Buffer();
 
         // It updates the buffer with given data
@@ -72,6 +76,8 @@ namespace VRTR
         static uint32_t findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
     private:
+        VmaAllocator *vmaAllocator{nullptr};
+        VmaAllocation vmaAllocation{nullptr};
         vk::raii::Device &logDevice;
         vk::raii::Buffer buffer{nullptr};
         vk::raii::DeviceMemory bufferMemory{nullptr};
