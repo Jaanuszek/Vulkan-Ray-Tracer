@@ -41,7 +41,7 @@ namespace VRTR
             .binding = 2,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding textureBinding{

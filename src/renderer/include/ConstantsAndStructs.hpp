@@ -45,11 +45,11 @@ namespace VRTR
         glm::vec2 texCoord;
     };
 
-    struct UniformData
-    {
-        glm::mat4 view_inverse;
-        glm::mat4 proj_inverse;
-    };
+    // struct UniformData
+    // {
+    //     glm::mat4 view_inverse;
+    //     glm::mat4 proj_inverse;
+    // };
 
     namespace CONSTANTS
     {

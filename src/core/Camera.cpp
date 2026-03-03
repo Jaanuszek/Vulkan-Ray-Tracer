@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    Camera::Camera(const glm::vec3& pos) : pos(pos)
+    Camera::Camera(SceneSettings &sceneSettings, const glm::vec3& pos) : sceneSettings(sceneSettings), pos(pos)
     {
         updateCameraVectors();
         updateViewMatrix();
@@ -17,6 +17,7 @@ namespace VRTR
 
         matrices.perspective = glm::perspective(glm::radians(fov), aspect, near, far);
         matrices.perspective[1][1] *= -1; // Invert Y for Vulkan
+        sceneSettings.ubo.proj_inverse = glm::inverse(matrices.perspective);
     }
     
     void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch)
@@ -43,6 +44,7 @@ namespace VRTR
     void Camera::updateViewMatrix()
     {
         matrices.view = glm::lookAt(pos, pos + front, up);
+        sceneSettings.ubo.view_inverse = glm::inverse(matrices.view);
     }
 
     void Camera::updateCameraVectors()

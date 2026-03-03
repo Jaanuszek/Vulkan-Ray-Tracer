@@ -4,8 +4,8 @@
 
 namespace VRTR
 {
-    GUI::GUI(RendererContext& ctx)
-        : ctx(ctx)
+    GUI::GUI(RendererContext& ctx, SceneSettings &sceneSettings)
+        : ctx(ctx), sceneSettings(sceneSettings)
     {}
 
     GUI::~GUI()
@@ -147,7 +147,15 @@ namespace VRTR
         if (ImGui::Button("Close Me")) {
             ;
         }
-            // show_another_window = false;
+        if(ImGui::SliderFloat("Rotation Angle", &sceneSettings.transformations.rotationAngle, 0.0f, 360.0f))
+        {
+            updated = true;
+        }
+        if(ImGui::SliderFloat3("Light Position", &sceneSettings.ubo.light_pos.x, -10.0f, 10.0f))
+        {
+            updated = true;
+        }
+        ImGui::Text("FPS %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
 
         ImGui::Render();

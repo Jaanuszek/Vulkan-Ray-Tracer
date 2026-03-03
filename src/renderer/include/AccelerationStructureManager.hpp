@@ -43,7 +43,7 @@ namespace VRTR
 
             void addInstance(uint32_t blasIdx, const glm::mat4 &transform);
 
-            void updateTLAS(float deltaTime);
+            void updateTLAS(float deltaTime, const float& rotationAngle);
 
             const vk::raii::AccelerationStructureKHR& getTLAS() const { return tlas.as.handle; }
 
@@ -69,6 +69,7 @@ namespace VRTR
             RendererContext& ctx;
 
             std::vector<vk::AccelerationStructureInstanceKHR> vkInstances; // Przechowuje opis instancji
+            std::unordered_map<uint32_t, glm::mat4> instanceTransforms; // Przechowuje domyslne maceirze transformacji uzyte podczas tworzenia modelu
 
             std::vector<BottomLevelAS> blasList;
             TopLevelAS tlas;

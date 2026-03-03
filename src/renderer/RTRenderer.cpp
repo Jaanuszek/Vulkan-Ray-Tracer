@@ -3,7 +3,8 @@
 
 namespace VRTR
 {
-    RTRenderer::RTRenderer(std::shared_ptr<Camera> camera) : camera(camera) {}
+    RTRenderer::RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings) 
+    : camera(camera), sceneSettings(sceneSettings) {}
 
     RTRenderer::~RTRenderer()
     {
@@ -170,7 +171,7 @@ namespace VRTR
 
     void RTRenderer::initImGUI(GLFWwindow* window)
     {
-        gui = std::make_unique<GUI>(ctx);
+        gui = std::make_unique<GUI>(ctx, sceneSettings);
         gui->init(window, width, height);
     }
 
@@ -225,9 +226,10 @@ namespace VRTR
 
     void RTRenderer::updateUniformBuffer()
     {
-        uniform_data.proj_inverse = glm::inverse(camera->matrices.perspective);
-        uniform_data.view_inverse = glm::inverse(camera->matrices.view);
-        uniform_buffer->Update(&uniform_data, sizeof(UniformData));
+        sceneSettings.ubo.proj_inverse = glm::inverse(camera->matrices.perspective);
+        sceneSettings.ubo.view_inverse = glm::inverse(camera->matrices.view);
+        sceneSettings.ubo.light_pos = sceneSettings.ubo.light_pos;
+        uniform_buffer->Update(&sceneSettings.ubo, sizeof(UniformData));
     }
 
     void RTRenderer::createScene()
@@ -317,15 +319,15 @@ namespace VRTR
                     swapChainManager->getSwapChainImageView(imageIndex),
                     swapChainManager->getExtent());
 
-                // std::array<vk::CommandBuffer, 2> submitCommandBuffers = {
-                    // *commandBufferManager->getCommandBuffer(imageIndex),
-                    // guiCommandBuffer
-                // };
                 submitCommandBuffers.push_back(guiCommandBuffer);
                 submitCommandBufferCount += (guiCommandBuffer != VK_NULL_HANDLE) ? 1u : 0u;
             }
 
-            asManager->updateTLAS(deltaTime);
+            if(gui->updateRequired())
+            {
+                asManager->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
+                gui->setUpdated(false);
+            }
             updateUniformBuffer(); // Camera UBO update
             
             const vk::SubmitInfo submitInfo{

@@ -8,6 +8,7 @@
 #include "VmaUsage.h"
 #include "Image.hpp"
 #include "ConstantsAndStructs.hpp"
+#include "SceneSettings.hpp"
 
 namespace VRTR
 {
@@ -19,7 +20,7 @@ namespace VRTR
     class GUI
     {
     public:
-        GUI(RendererContext& ctx);
+        GUI(RendererContext& ctx, SceneSettings &sceneSettings);
         ~GUI();
 
         void init(GLFWwindow* window, float width, float height);
@@ -28,6 +29,10 @@ namespace VRTR
         void setupStyle();
 
         bool newFrame();
+
+        bool updateRequired() const { return updated; }
+        void setUpdated(bool value) { updated = value; }
+
         vk::CommandBuffer buildDrawCommandBuffer(uint32_t imageIndex, vk::Image swapchainImage, vk::ImageView swapchainImageView, vk::Extent2D extent);
 
         void handleKey(int ket, int scancode, int action, int mods);
@@ -40,6 +45,8 @@ namespace VRTR
         VkFormat swapchainFormat{VK_FORMAT_B8G8R8A8_UNORM};
         uint32_t imageCount{0};
 
+        SceneSettings &sceneSettings;
+
         // vulkan context
         RendererContext& ctx;
         GLFWwindow* window{nullptr};
@@ -48,5 +55,7 @@ namespace VRTR
         ImGuiStyle vulkanStyle;
         VkPipelineRenderingCreateInfoKHR pipelineRenderingInfo{};
         float mainScale;
+
+        bool updated = false;
     };
 }
