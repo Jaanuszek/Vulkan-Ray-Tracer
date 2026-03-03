@@ -3,6 +3,10 @@
 
 namespace VRTR
 {
+    // TODO ajakby zrobic tu troche abstrakcji?
+    // Zrobilbym interfejs Buffer
+    // i klasy pochodne takie jak vertex buffer, index buffer, storage buffer itd
+    // brzmi git hehe
     StorageBuffer::StorageBuffer(RendererContext& ctx, VmaAllocator& vmaAlloc, size_t typeSize)
         : ctx(ctx), vmaAlloc(vmaAlloc)
     {
@@ -30,7 +34,13 @@ namespace VRTR
 
     StorageBuffer::~StorageBuffer()
     {
-        vmaFreeMemory(vmaAlloc, storageBufferAlloc);
+        if (storageBufferAlloc != nullptr)
+        {
+            VkBuffer rawStorageBuffer = static_cast<VkBuffer>(*storageBuffer);
+            storageBuffer.release();
+            vmaDestroyBuffer(vmaAlloc, rawStorageBuffer, storageBufferAlloc);
+            storageBufferAlloc = nullptr;
+        }
     }
 
     void StorageBuffer::copyDataToBuffer(const void *data, vk::DeviceSize size, vk::DeviceSize offset)

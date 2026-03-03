@@ -182,16 +182,63 @@ namespace VRTR
         }
     }
 
+    // I dont like this reference to VMAAlloc, but I need it to free the memory in destructor
+    Buffer::Buffer(vk::raii::Device &logicalDevice,VmaAllocator& vmaAllocator, vk::DeviceSize size,
+        vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo)
+        : logDevice(logicalDevice), vmaAllocator(&vmaAllocator)
+    {
+        vk::BufferCreateInfo bufferCI{
+        .sType = vk::StructureType::eBufferCreateInfo,
+        .size = size,
+        .usage = usage,
+        .sharingMode = vk::SharingMode::eExclusive,
+        };
+
+        VkBuffer rawStorageBuffer;
+        vmaCreateBuffer(vmaAllocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferCI), &allocInfo, &rawStorageBuffer, &vmaAllocation, &vmaAllocationInfo);
+        buffer = vk::raii::Buffer(logicalDevice, rawStorageBuffer);
+
+        bufferInfo = {
+            .usage = usage,
+            .allocInfo = allocInfo,
+            .size = size
+        };
+    }
+
     Buffer::~Buffer()
     {
-
+        if (vmaAllocation != nullptr) {
+            VkBuffer rawBuffer = static_cast<VkBuffer>(*buffer);
+            buffer.release();
+            vmaDestroyBuffer(*vmaAllocator, rawBuffer, vmaAllocation);
+            vmaAllocation = nullptr;
+        }
     }
 
     void Buffer::Update(const void* data, vk::DeviceSize size, vk::DeviceSize offset)
     {
-        void* mappedData = bufferMemory.mapMemory(offset, size);
-        memcpy(mappedData, data, static_cast<size_t>(size));
-        bufferMemory.unmapMemory();
+        if(vmaAllocation == nullptr)
+        {
+            void* mappedData = bufferMemory.mapMemory(offset, size);
+            memcpy(mappedData, data, static_cast<size_t>(size));
+            bufferMemory.unmapMemory();
+            return;
+        }
+        else {
+            // Jezeli buffor nie jest stworzony z VMA_ALLOCATION_CREATE_MAPPED_BIT,
+            // to korzystamy z wrappera VMA ktory mapuje pamiec, kopiuje ją i potem unmapuje
+            if (!vmaAllocationInfo.pMappedData)
+                vmaCopyMemoryToAllocation(*vmaAllocator, data, vmaAllocation, offset, size);
+            else
+                // void* nie pozwala na arytmetyke wskażników, wiec musze to zrzutować na uint8_t* zeby dodac offset
+                // uint8_t*, char*, std::byte* to są bezpieczny typy do dostępu do dowolnych danych
+                // czyli offset, musi byc podany w bajtach
+                // uint8_t* p = reinterpret_cast<uint8_t*>(mappedPtr);
+                // p + 5;  <---- to przesuwa wskaźnik o 5 bajtów (5 * sizeof(uint8_t))
+                // float *f = reinterpret_cast<float*>(0x1000);
+                // f + 1; <---- to przesuwa wskaźnik o 4 bajty (1 * sizeof(float))
+                memcpy(static_cast<std::byte*>(vmaAllocationInfo.pMappedData) + offset, data, static_cast<size_t>(size));
+        }
     }
 
     void* Buffer::map(vk::DeviceSize size, vk::DeviceSize offset)
@@ -202,6 +249,31 @@ namespace VRTR
     void Buffer::unmap()
     {
         bufferMemory.unmapMemory();
+    }
+
+    void Buffer::recreate(vk::DeviceSize newSize)
+    {
+        // Mozliwe ze ta funkcja nie dziala poprawnie
+        // assert(vmaAllocation == nullptr && "Recreate is not supported for buffers allocated without VMA");
+        VkBuffer oldBuffer = static_cast<VkBuffer>(*buffer);
+        buffer.release();
+        vmaDestroyBuffer(*vmaAllocator, oldBuffer, vmaAllocation);
+        vmaAllocation = nullptr;
+
+        vk::BufferCreateInfo bufferCI{
+            .pNext = nullptr,
+            .size = newSize,
+            .usage = bufferInfo.usage, // Uzywanie wczesniejszej wartosci struktury bufferInfo
+            .sharingMode = vk::SharingMode::eExclusive
+        };
+
+        VkBuffer rawStorageBuffer;
+        vmaCreateBuffer(*vmaAllocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferCI), &bufferInfo.allocInfo, &rawStorageBuffer, &vmaAllocation, &vmaAllocationInfo);
+        buffer = vk::raii::Buffer(logDevice, rawStorageBuffer);
+
+        // Aktualizacja rozmiaru bez utraty usage i allocInfo
+        bufferInfo.size = newSize;
+
     }
 
     uint32_t Buffer::findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties)

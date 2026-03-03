@@ -80,10 +80,10 @@ namespace VRTR
         // ogolnie Vulkan w instancji AS przyjmuje maceirz 3x4 row major
         // glm jest column major, wiec trzeba transponowac, zeby to sie zgadzalo
         // nie trzeba tego przepisywac na oddzielna strukture 3x4,
-        glm::mat4 tempMat = glm::transpose(transform);
+        glm::mat4 transposedMat = glm::transpose(transform);
 
         // tutaj po prostu pomijamy 4 rząd macierzy glm::mat4
-        memcpy(&transformMatrix, &tempMat, sizeof(vk::TransformMatrixKHR)); // TODO jak bedzie cos nie tak to zmienic na sizeof(glm::mat4)
+        memcpy(&transformMatrix, &transposedMat, sizeof(vk::TransformMatrixKHR)); // TODO jak bedzie cos nie tak to zmienic na sizeof(glm::mat4)
 
         vk::AccelerationStructureInstanceKHR ac_instance{
             .transform = transformMatrix,
@@ -94,25 +94,28 @@ namespace VRTR
             .accelerationStructureReference = blasList[blasIdx].deviceAddress};
         vkInstances.push_back(ac_instance);
 
+        instanceTransforms[vkInstances.size() - 1] = transposedMat; // -1 bo robimy push_back przed tym, wiec indekst to rozmiar - 1
+
         tlas.instanceCount = static_cast<uint32_t>(vkInstances.size());
     }
 
-    void AccelerationStructureManager::updateTLAS(float deltaTime)
+    void AccelerationStructureManager::updateTLAS(float deltaTime, const float& rotationAngle)
     {        
-        // for (size_t i = 0; i < vkInstances.size(); ++i)
-        for(auto& inst : vkInstances)
-        {
-            vk::TransformMatrixKHR &transformMatrix = inst.transform;
-            // memcpy()
-            glm::mat4 tempMat{};
-            memcpy(&tempMat, &transformMatrix, sizeof(vk::TransformMatrixKHR));
-            glm::mat4 rotatedMat = glm::rotate(tempMat, glm::radians(10.0f * deltaTime), glm::vec3(0.0f, 1.0f, 0.0f));
+        for (size_t instIdx = 0; instIdx < vkInstances.size(); instIdx++)
+        { 
+            if (instanceTransforms.find(instIdx) == instanceTransforms.end())
+                continue;
+            
+            // rotacja zeby przejsc z koordynatow blendera na vulkanowe
+            glm::mat4 baseRotation = instanceTransforms[instIdx];
+
+            glm::mat4 userRotation = glm::rotate(glm::mat4(1.0f), glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+            glm::mat4 rotatedMat = baseRotation * userRotation;
+            vk::TransformMatrixKHR transformMatrix{};
             memcpy(&transformMatrix, &rotatedMat, sizeof(vk::TransformMatrixKHR));
-            // memcpy(&transformMatrix, &inst.transform, sizeof(glm::mat4));
 
-            inst.transform = transformMatrix;
-
-            // vkInstances[i].transform = transformMatrix;
+            vkInstances[instIdx].transform = transformMatrix;
         }
 
         tlas.instanceBuffer->Update(vkInstances.data(), vkInstances.size() * sizeof(vk::AccelerationStructureInstanceKHR));

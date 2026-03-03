@@ -20,6 +20,6 @@ namespace VRTR
             RendererContext& ctx;
             VmaAllocator& vmaAlloc;
             vk::raii::Buffer storageBuffer{nullptr};
-            VmaAllocation storageBufferAlloc;
+            VmaAllocation storageBufferAlloc{nullptr};
     };
 }

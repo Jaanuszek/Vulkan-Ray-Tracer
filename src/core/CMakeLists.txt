@@ -31,6 +31,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_include_directories(${PROJECT_NAME}
     PUBLIC
         ${CMAKE_SOURCE_DIR}/third-party/spdlog/include
+        ${CMAKE_SOURCE_DIR}/third-party/imgui
+        ${CMAKE_SOURCE_DIR}/third-party/imgui/backends
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>

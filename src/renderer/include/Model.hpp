@@ -38,25 +38,6 @@ namespace VRTR
         uint64_t indexBufferAddr;
     };
 
-    struct ModelBuffers
-    {
-        // nie wiem
-        // Wydaje mi sie ze takie czyszczenie zasobo jest lepsze niz w deestruktorze klasy Model
-        ModelBuffers(VmaAllocator& vmaAlloc) : vmaAlloc(vmaAlloc) {}
-
-        ~ModelBuffers(){
-            vmaFreeMemory(vmaAlloc, vertexAllocation);
-            vmaFreeMemory(vmaAlloc, indexAllocation);
-        }
-
-        VmaAllocator vmaAlloc;
-
-        vk::raii::Buffer vertexBuffer{nullptr};
-        vk::raii::Buffer indexBuffer{nullptr};
-        VmaAllocation vertexAllocation;
-        VmaAllocation indexAllocation;
-    };
-
     class Model
     {
         public:
@@ -87,11 +68,6 @@ namespace VRTR
             vk::DeviceAddress getVertexBufferAddress() const { return geometryInfo.vertexBufferAddr; }
             vk::DeviceAddress getIndexBufferAddress() const { return geometryInfo.indexBufferAddr; }
 
-            const ModelBuffers& getBuffers() { return modelBuffers; }
-
-            // Wiem ze sie powtarzam, ale dla czytelnosci takie cos zrobie
-            const vk::raii::Buffer& getVertexBuffer() const { return modelBuffers.vertexBuffer; }
-            const vk::raii::Buffer& getIndexBuffer() const { return modelBuffers.indexBuffer; }
 
             bool hasTexture() const { return withTexture; }
 
@@ -100,9 +76,7 @@ namespace VRTR
         private:
             void loadModel(const std::string &path);
 
-            // It's only applicable for creating vertex and index buffers
-            vk::BufferCreateInfo getBufferCreateInfo(vk::DeviceSize size);
-            VmaAllocationCreateInfo getVmaAllocCreateInfo();
+            const VmaAllocationCreateInfo getVmaAllocCreateInfo();
 
             void createVertexBuffer();
             void createIndexBuffer();
@@ -111,11 +85,13 @@ namespace VRTR
 
         private:
             RendererContext &ctx;
+            VmaAllocator *vmaAlloc{nullptr};
 
             std::string modelName;
             std::unique_ptr<mesh> modelMesh;
 
-            ModelBuffers modelBuffers;
+            std::unique_ptr<Buffer> vertexBuffer;
+            std::unique_ptr<Buffer> indexBuffer;
 
             std::unique_ptr<Texture> texture;
             Material material;

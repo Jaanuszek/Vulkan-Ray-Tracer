@@ -6,6 +6,7 @@
 #include "SwapChainManager.hpp"
 #include "CommandBufferManager.hpp"
 #include "ConstantsAndStructs.hpp"
+#include "SceneSettings.hpp"
 // #include "RendererContext.hpp"
 #include "InstanceManager.hpp"
 #include "DeviceManager.hpp"
@@ -20,6 +21,7 @@
 #include "Model.hpp"
 #include "Texture.hpp"
 #include "StorageBuffer.hpp"
+#include "GUI.hpp"
 
 namespace VRTR
 {
@@ -28,13 +30,15 @@ namespace VRTR
     public:
         bool framebufferResized = false;
 
-        RTRenderer(std::shared_ptr<Camera> camera);
+        RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings);
         ~RTRenderer();
         void init(GLFWwindow *window);
-        void drawFrame(GLFWwindow *window, double deltaTime);
+        void drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI);
 
     private:
         void setupVMA();
+
+        void initImGUI(GLFWwindow* window);
 
         void createSyncObjects();
 
@@ -51,7 +55,8 @@ namespace VRTR
     private:
         int width, height;
         RendererContext ctx;
-        VmaAllocator vmaAlloc;
+
+        std::unique_ptr<GUI> gui;
 
         std::unique_ptr<SwapChainManager> swapChainManager;
         std::shared_ptr<CommandBufferManager> commandBufferManager;
@@ -70,7 +75,8 @@ namespace VRTR
 
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;
-        UniformData uniform_data{};
+        // UniformData uniform_data{};
+        SceneSettings &sceneSettings;
         // TODO przemyslec gdzie chce trzymac te buffery
         vk::raii::Buffer geometry_info_buffer{nullptr};
         std::unique_ptr<Buffer> material_buffer;

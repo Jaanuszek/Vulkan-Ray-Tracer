@@ -9,7 +9,7 @@ namespace VRTR
     Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc, 
                 const std::string& modelPath, const std::string& texturePath,
                 const Material& mat)
-        : ctx(ctx), modelBuffers(vmaAlloc), material(mat)
+        : ctx(ctx), vmaAlloc(&vmaAlloc), material(mat)
     {
         VRTR_DEBUG("Creating model from path: {}", modelPath);
 
@@ -32,7 +32,7 @@ namespace VRTR
     Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc,
         const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
         const Material& mat)
-        : ctx(ctx), modelBuffers(vmaAlloc), material(mat)
+        : ctx(ctx), vmaAlloc(&vmaAlloc), material(mat)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
@@ -113,19 +113,7 @@ namespace VRTR
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
     }
 
-    vk::BufferCreateInfo Model::getBufferCreateInfo(vk::DeviceSize size)
-    {
-        vk::BufferCreateInfo bufferInfo{
-            .pNext = nullptr,
-            .size = size,
-            .usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            .sharingMode = vk::SharingMode::eExclusive,
-        };
-
-        return bufferInfo;
-    }
-
-    VmaAllocationCreateInfo Model::getVmaAllocCreateInfo()
+    const VmaAllocationCreateInfo Model::getVmaAllocCreateInfo()
     {
         // Te flagi sa w miare wolne, bo pozwalaja na odczyt cdanych z CPU
         // w przyszlosci fajnie by bylo miec dwa bufory, jeden ktory lezy na GPU
@@ -141,44 +129,31 @@ namespace VRTR
     void Model::createVertexBuffer()
     {
         vk::DeviceSize bufferSize = modelMesh->vertices.size() * sizeof(VertexRT);
+        vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        auto vmaAllocInfo = getVmaAllocCreateInfo();
 
-        vk::BufferCreateInfo bufferInfo = getBufferCreateInfo(bufferSize);
-        VmaAllocationCreateInfo allocInfo = getVmaAllocCreateInfo();
-
-        VkBuffer vbo;
-        VmaAllocation &allocation = modelBuffers.vertexAllocation;
-        VkBufferCreateInfo rawBufferCI = *reinterpret_cast<const VkBufferCreateInfo *>(&bufferInfo);
-
-        vmaCreateBuffer(modelBuffers.vmaAlloc, &rawBufferCI, &allocInfo, &vbo, &allocation, nullptr);
-        modelBuffers.vertexBuffer = std::move(vk::raii::Buffer(ctx.logicalDevice, vbo, nullptr));
-
-        vmaCopyMemoryToAllocation(modelBuffers.vmaAlloc, modelMesh->vertices.data(), allocation, 0, bufferSize);
+        vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, *vmaAlloc, bufferSize, usage, vmaAllocInfo);
+        vertexBuffer->Update(modelMesh->vertices.data(), bufferSize);
     }
 
     void Model::createIndexBuffer()
     {
         vk::DeviceSize bufferSize = modelMesh->indices.size() * sizeof(uint32_t);
+        vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        auto vmaAllocInfo = getVmaAllocCreateInfo();
 
-        vk::BufferCreateInfo bufferInfo = getBufferCreateInfo(bufferSize);
-        VmaAllocationCreateInfo allocInfo = getVmaAllocCreateInfo();
-        
-        VkBuffer ebo;
-        VmaAllocation &allocation = modelBuffers.indexAllocation;
-        vmaCreateBuffer(modelBuffers.vmaAlloc, reinterpret_cast<const VkBufferCreateInfo *>(&bufferInfo), &allocInfo, &ebo, &allocation, nullptr);
-
-        modelBuffers.indexBuffer = std::move(vk::raii::Buffer(ctx.logicalDevice, ebo, nullptr));
-
-        vmaCopyMemoryToAllocation(modelBuffers.vmaAlloc, modelMesh->indices.data(), allocation, 0, bufferSize);
+        indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, *vmaAlloc, bufferSize, usage, vmaAllocInfo);
+        indexBuffer->Update(modelMesh->indices.data(), bufferSize);
     }
 
     void Model::setGeometryInfo()
     {
         vk::BufferDeviceAddressInfo addrInfo{
-            .buffer = modelBuffers.vertexBuffer
+            .buffer = vertexBuffer->getBufferHandle()
         };
         geometryInfo.vertexBufferAddr = ctx.logicalDevice.getBufferAddress(addrInfo);
 
-        addrInfo.buffer = modelBuffers.indexBuffer;
+        addrInfo.buffer = indexBuffer->getBufferHandle();
         geometryInfo.indexBufferAddr = ctx.logicalDevice.getBufferAddress(addrInfo);
     }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <Logger.hpp>
 #include "ConstantsAndStructs.hpp"
+#include "VmaUsage.h"
 
 namespace VRTR
 {
@@ -51,6 +52,9 @@ namespace VRTR
                BufferType type,
                vk::DeviceSize size);
 
+        Buffer(vk::raii::Device &logicalDevice, VmaAllocator& vmaAlloc, vk::DeviceSize size,
+               vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo);
+
         ~Buffer();
 
         // It updates the buffer with given data
@@ -62,6 +66,9 @@ namespace VRTR
         // Unmaps the buffer memory
         void unmap();
 
+        // Recreates the buffer with new size, old data will be lost
+        void recreate(vk::DeviceSize newSize);
+
         // GETTERS
         inline const vk::raii::Buffer &getBuffer() const { return buffer; }
 
@@ -72,9 +79,19 @@ namespace VRTR
         static uint32_t findMemoryType(vk::raii::PhysicalDevice gpu, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
     private:
+        VmaAllocator *vmaAllocator{nullptr};
+        VmaAllocation vmaAllocation{nullptr};
+        VmaAllocationInfo vmaAllocationInfo{};
         vk::raii::Device &logDevice;
         vk::raii::Buffer buffer{nullptr};
         vk::raii::DeviceMemory bufferMemory{nullptr};
         vk::DeviceAddress deviceAddress{};
+
+        struct BufferInfo
+        {
+            vk::BufferUsageFlags usage;
+            VmaAllocationCreateInfo allocInfo;
+            vk::DeviceSize size;
+        } bufferInfo;
     };
 }

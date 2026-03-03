@@ -1,5 +1,6 @@
 #pragma once
 #include <Logger.hpp>
+#include "SceneSettings.hpp"
 
 namespace VRTR
 {
@@ -11,7 +12,7 @@ namespace VRTR
     class CORE_EXPORT Camera
     {
     public:
-        Camera(const glm::vec3& pos);
+        Camera(SceneSettings &sceneSettings, const glm::vec3& pos);
         ~Camera() = default;
 
         struct Matrices
@@ -33,6 +34,7 @@ namespace VRTR
         void updateCameraVectors();
 
     private:
+        SceneSettings &sceneSettings;
         float fov{};
         float near{}, far{};
         glm::vec3 rotation{};

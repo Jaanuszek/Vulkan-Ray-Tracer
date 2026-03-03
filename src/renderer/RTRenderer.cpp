@@ -3,12 +3,12 @@
 
 namespace VRTR
 {
-    RTRenderer::RTRenderer(std::shared_ptr<Camera> camera) : camera(camera) {}
+    RTRenderer::RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings) 
+    : camera(camera), sceneSettings(sceneSettings) {}
 
     RTRenderer::~RTRenderer()
     {
         ctx.logicalDevice.waitIdle();
-
         // Must explicitly destroy all VMA-managed resources BEFORE vmaDestroyAllocator.
         // Member destructors run AFTER the destructor body, so without this the
         // allocator would be destroyed while allocations are still live → VMA assert → abort().
@@ -20,8 +20,9 @@ namespace VRTR
         geometrySBO.reset();
         materialSBO.reset();
         asManager.reset();
+        gui.reset();
 
-        vmaDestroyAllocator(vmaAlloc);
+        vmaDestroyAllocator(ctx.vmaAllocator);
     }
 
     void RTRenderer::init(GLFWwindow *window)
@@ -46,6 +47,8 @@ namespace VRTR
 
         setupVMA();
 
+        initImGUI(window);
+
         RayTracingPipeline::initRayTracing(ctx);
 
         swapChainManager = std::make_unique<SwapChainManager>(ctx);
@@ -53,6 +56,12 @@ namespace VRTR
 
         commandBufferManager = std::make_shared<CommandBufferManager>(ctx);
         commandBufferManager->init();
+
+        gui->initResources(
+            commandBufferManager->getCommandPool(),
+            swapChainManager->getImageFormat(),
+            static_cast<uint32_t>(swapChainManager->getSwapChainImages().size())
+        );
 
         createSyncObjects();
 
@@ -81,7 +90,7 @@ namespace VRTR
             .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
             .type = MaterialType::METALLIC,
         };
-        models.try_emplace("floor", std::make_unique<Model>(ctx, vmaAlloc, floorVertices, floorIndices, floorMat));
+        models.try_emplace("floor", std::make_unique<Model>(ctx, ctx.vmaAllocator, floorVertices, floorIndices, floorMat));
         uint32_t floorBlasIdx = asManager->createBLAS(models.at("floor"));
 
         glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
@@ -92,8 +101,8 @@ namespace VRTR
         asManager->buildTLAS();
 
         // stworzenie storage buffora
-        geometrySBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(GeometryInfo));
-        materialSBO = std::make_unique<StorageBuffer>(ctx, vmaAlloc, sizeof(Material));
+        geometrySBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(GeometryInfo));
+        materialSBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(Material));
 
         std::vector<GeometryInfo> geometryInfos;
         geometryInfos.reserve(modelInstanceOrder.size());
@@ -157,7 +166,13 @@ namespace VRTR
             .vulkanApiVersion = VK_API_VERSION_1_4,
         };
 
-        vmaCreateAllocator(&allocatorCI, &vmaAlloc);
+        vmaCreateAllocator(&allocatorCI, &ctx.vmaAllocator);
+    }
+
+    void RTRenderer::initImGUI(GLFWwindow* window)
+    {
+        gui = std::make_unique<GUI>(ctx, sceneSettings);
+        gui->init(window, width, height);
     }
 
     void RTRenderer::createSyncObjects()
@@ -196,7 +211,7 @@ namespace VRTR
             model_name,
             std::make_unique<Model>(
             ctx,
-            vmaAlloc,
+            ctx.vmaAllocator,
             modelPath,
             texturePath,
             mat));
@@ -211,9 +226,10 @@ namespace VRTR
 
     void RTRenderer::updateUniformBuffer()
     {
-        uniform_data.proj_inverse = glm::inverse(camera->matrices.perspective);
-        uniform_data.view_inverse = glm::inverse(camera->matrices.view);
-        uniform_buffer->Update(&uniform_data, sizeof(UniformData));
+        sceneSettings.ubo.proj_inverse = glm::inverse(camera->matrices.perspective);
+        sceneSettings.ubo.view_inverse = glm::inverse(camera->matrices.view);
+        sceneSettings.ubo.light_pos = sceneSettings.ubo.light_pos;
+        uniform_buffer->Update(&sceneSettings.ubo, sizeof(UniformData));
     }
 
     void RTRenderer::createScene()
@@ -278,7 +294,7 @@ namespace VRTR
         return glm::rotate(glm::mat4(1.0f), angle, axis);
     }
 
-    void RTRenderer::drawFrame(GLFWwindow *window, double deltaTime)
+    void RTRenderer::drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI)
     {
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
         while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
@@ -292,19 +308,39 @@ namespace VRTR
             ctx.logicalDevice.resetFences({drawFences[commandBufferManager->getCurrentFrame()]});
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
 
-            asManager->updateTLAS(deltaTime);
+            std::vector<vk::CommandBuffer> submitCommandBuffers = {*commandBufferManager->getCommandBuffer(imageIndex)};
+            uint32_t submitCommandBufferCount = 1;
+            if (renderGUI){
+                gui->newFrame();
+
+                vk::CommandBuffer guiCommandBuffer = gui->buildDrawCommandBuffer(
+                    imageIndex,
+                    swapChainManager->getSwapChainImage(imageIndex),
+                    swapChainManager->getSwapChainImageView(imageIndex),
+                    swapChainManager->getExtent());
+
+                submitCommandBuffers.push_back(guiCommandBuffer);
+                submitCommandBufferCount += (guiCommandBuffer != VK_NULL_HANDLE) ? 1u : 0u;
+            }
+
+            if(gui->updateRequired())
+            {
+                asManager->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
+                gui->setUpdated(false);
+            }
             updateUniformBuffer(); // Camera UBO update
+            
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
                 .pWaitSemaphores = &*presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()),
                 .pWaitDstStageMask = &waitDestinationStageMask,
-                .commandBufferCount = 1,
-                .pCommandBuffers = &*commandBufferManager->getCommandBuffer(imageIndex),
+                .commandBufferCount = submitCommandBufferCount,
+                .pCommandBuffers = submitCommandBuffers.data(),
                 .signalSemaphoreCount = 1,
                 .pSignalSemaphores = &*renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame())};
-            ctx.queue.submit({submitInfo}, *drawFences.at(commandBufferManager->getCurrentFrame()));
 
+            ctx.queue.submit({submitInfo}, *drawFences.at(commandBufferManager->getCurrentFrame()));
             const vk::PresentInfoKHR presentInfoKHR{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
@@ -315,7 +351,6 @@ namespace VRTR
                 .pResults = nullptr};
 
             result = ctx.queue.presentKHR(presentInfoKHR);
-
             commandBufferManager->setSemaphoreIndex((commandBufferManager->getSemaphoreIndex() + 1) % presentCompleteSemaphores.size());
             commandBufferManager->setCurrentFrame((commandBufferManager->getCurrentFrame() + 1) % MAX_FRAMES_IN_FLIGHT);
         }

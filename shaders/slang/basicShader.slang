@@ -4,6 +4,7 @@ __include "utils/helpers";
 
 struct CameraData
 {
+    float3 light_pos;
     column_major float4x4 viewInverse;
     column_major float4x4 projInverse;
 };
@@ -35,7 +36,7 @@ public struct RayPayload
     float3 normal;
     float reflector;
     // ========================== SHADOWS
-    // bool shadowed;
+    bool shadowed;
 };
 
 public struct HitAttribute
@@ -44,7 +45,6 @@ public struct HitAttribute
 };
 
 const static uint MAX_RECURSION_DEPTH = 4;
-const static float3 light_pos = float3(5, 10, 0);
 const static half shadowConst = (half)0.3;
 
 [shader("raygeneration")]
@@ -75,9 +75,9 @@ void rayGenShader()
     // ========================== SHADOWS
     // payload.hitValue = float3(1.0, 1.0, 1.0);
     // payload.shadowed = false;
+    // // ========================== REFLECTIONS
     float3 color = float3(0, 0, 0);
     float3 throughput = float3(1, 1, 1);
-    // ========================== REFLECTIONS
     for (uint i = 0; i < MAX_RECURSION_DEPTH; i++)
     {
         RayPayload payload;
@@ -149,7 +149,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // ========================== REFLECTIONS
     float3 normal = tri.normal;
     float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    float3 toLight = light_pos - hitPosition;
+    float3 toLight = cameraData.light_pos - hitPosition;
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
     float dot_product = max(dot(lightVector, normal), 0.6);
@@ -162,7 +162,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // ========================== SHADOWS
     // float3 normal = tri.normal;
     // float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    // float3 toLight = light_pos - hitPosition;
+    // float3 toLight = cameraData.light_pos - hitPosition;
     // float lightDistance = length(toLight);
     // float3 lightVector = toLight / max(lightDistance, 1e-4);
     // float dot_product = max(dot(lightVector, normal), 0.2);
