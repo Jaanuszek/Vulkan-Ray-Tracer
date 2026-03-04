@@ -23,9 +23,14 @@ args = parser.parse_args()
 build_type:str = "Debug" if args.debug else "Release"
 verbose:bool = args.verbose
 
+NVCC_PATH:str = subprocess.run(["which", "nvcc"], capture_output=True, text=True).stdout.strip()
+if not NVCC_PATH:
+    print("Error: nvcc not found in PATH. Please ensure CUDA is installed and nvcc is accessible.")
+    exit(1)
+
 # Delete files in build directory if it exists
 build_dir:str = "build"
-if not args.command == "rebuild":
+if not args.command == "rebuild" and os.path.exists(build_dir):
     for filename in os.listdir(build_dir):
         file_path = os.path.join(build_dir, filename)
         try:
@@ -41,7 +46,8 @@ os.makedirs(build_dir, exist_ok=True)
 # check=True tells that subprocess should raise an exception on error, that's why I implemented a try-catch here
 try:
     cmake_conf_args:list = [
-        f"-DCMAKE_BUILD_TYPE={build_type}"
+        f"-DCMAKE_BUILD_TYPE={build_type}",
+        f"-DCMAKE_CUDA_COMPILER={NVCC_PATH}"
     ]
     cmake_build_args:list = []
     if verbose:

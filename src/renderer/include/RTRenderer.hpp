@@ -22,6 +22,7 @@
 #include "Texture.hpp"
 #include "StorageBuffer.hpp"
 #include "GUI.hpp"
+#include "init_cuda.cuh"
 
 namespace VRTR
 {

@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM ubuntu:24.04
+FROM nvidia/cuda:13.1.1-devel-ubuntu24.04
 
 ENV rootpath=/app
+
 WORKDIR ${rootpath}
 
 USER root
@@ -19,12 +20,13 @@ RUN apt-get install -y libglm-dev libxcb-dri3-0 libxcb-present0 libpciaccess0 \
     ocaml-core ninja-build libxml2-dev wayland-protocols python3-jsonschema \
     clang-format qtbase5-dev qt6-base-dev
 
-RUN apt update && apt install -y wget gnupg
+RUN apt update && apt install -y wget gnupg && rm -rf /var/lib/apt/lists/*
 
+# Vulkan SDK download
 RUN wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | tee /etc/apt/trusted.gpg.d/lunarg.asc
 RUN wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list http://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list  
 RUN apt update
-RUN apt -y install vulkan-sdk
+RUN apt -y install vulkan-sdk && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

@@ -34,7 +34,17 @@ namespace VRTR
 
         vk::KHRAccelerationStructureExtensionName,
         vk::KHRRayTracingPipelineExtensionName,
-        vk::KHRDeferredHostOperationsExtensionName
+        vk::KHRDeferredHostOperationsExtensionName,
+        vk::KHRExternalMemoryExtensionName,
+        vk::KHRExternalSemaphoreExtensionName,
+        vk::KHRTimelineSemaphoreExtensionName,
+#ifdef _WIN64
+        vk::KHRExternalMemoryWin32ExtensionName,
+        vk::KHRExternalSemaphoreWin32ExtensionName,
+#else
+        vk::KHRExternalMemoryFdExtensionName,
+        vk::KHRExternalSemaphoreFdExtensionName,
+#endif
     };
 
     class DeviceManager
@@ -43,6 +53,7 @@ namespace VRTR
             static DeviceProperties initDevice(GLFWwindow *window, vk::raii::Instance& instance);
 
         private:
+            static std::vector<const char*> getRequiredExtensions();
             static bool isDeviceSuitable(const vk::raii::PhysicalDevice &device);
             static uint32_t findQueueFamilies(vk::raii::PhysicalDevice &device, vk::raii::SurfaceKHR &surface);
             static vk::raii::PhysicalDevice initPhysicalDevice(vk::raii::Instance& instance);

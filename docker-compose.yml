@@ -8,3 +8,12 @@ services:
       - ./:/app:ro
     stdin_open: true
     tty: true
+  appbuilder_cuda:
+    image: vulkansdk_cuda:latest
+    hostname: appbuilder
+    volumes:
+      - ./build:/app/build:rw
+      - ./venv:/app/venv:rw
+      - ./:/app:ro
+    stdin_open: true
+    tty: true

@@ -1,6 +1,8 @@
 build/*
 venv/*
+venv*
 .vscode/*
 vulkansdk*
 *.spv
 imgui.ini
+__pycache__*

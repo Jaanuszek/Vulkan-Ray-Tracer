@@ -52,6 +52,7 @@ generate_export_header(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE
     common
     Core
+    cuda_lib
     Vulkan::Vulkan
 )
 
@@ -61,6 +62,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR}
     PUBLIC_HEADER include/RTRenderer.hpp
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "$ORIGIN" # potrzebne zeby renderer widzial cuda_lib xdd
 )
 
 target_include_directories(${PROJECT_NAME}

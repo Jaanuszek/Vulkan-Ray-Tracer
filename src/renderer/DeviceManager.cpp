@@ -18,8 +18,15 @@ namespace VRTR
 
     bool DeviceManager::isDeviceSuitable(const vk::raii::PhysicalDevice &device)
     {
-        // TODO implement device suitability checks
-        return true;
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        auto extensions = device.enumerateDeviceExtensionProperties();
+        for (auto const& extension : extensions)
+        {
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
     }
 
     uint32_t DeviceManager::findQueueFamilies(vk::raii::PhysicalDevice &device, vk::raii::SurfaceKHR &surface)

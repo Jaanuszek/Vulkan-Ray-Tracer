@@ -43,7 +43,7 @@ namespace VRTR
         ctx.queue = std::move(deviceProps.graphicsQueue);
         ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
 
-        VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Device>(*ctx.logicalDevice));
+        initCUDA();
 
         setupVMA();
 
