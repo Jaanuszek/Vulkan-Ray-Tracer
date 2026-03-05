@@ -182,6 +182,46 @@ namespace VRTR
         }
     }
 
+    Buffer::Buffer(RendererContext &ctx,
+            vk::DeviceSize size,
+            vk::BufferUsageFlags usage,
+            vk::MemoryPropertyFlags properties,
+            vk::ExternalMemoryHandleTypeFlagBitsKHR externalHandleType)
+            : logDevice(ctx.logicalDevice)
+    {
+        vk::ExternalMemoryBufferCreateInfo externalMemoryBufferInfo{
+            .handleTypes = externalHandleType
+        };
+
+        vk::BufferCreateInfo bufferCI{
+            .pNext = &externalMemoryBufferInfo,
+            .size = size,
+            .usage = usage,
+            .sharingMode = vk::SharingMode::eExclusive};
+
+        // zrobie tu bez vma, bo chyba nie wspiera extenral bufforow
+        buffer = vk::raii::Buffer(logDevice, bufferCI);
+
+        vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+        uint32_t memoryType = findMemoryType(ctx.gpu, memRequirements.memoryTypeBits, properties);
+
+    #ifdef __linux__
+        vk::ExportMemoryAllocateInfo exportAllocInfo{
+            .pNext = nullptr,
+            .handleTypes = vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd,
+        };
+    #else
+        VRTR_ERROR("External memory buffers are currently only supported on Linux");
+    #endif
+        vk::MemoryAllocateInfo allocInfo{
+            .pNext = &exportAllocInfo,
+            .allocationSize = memRequirements.size,
+            .memoryTypeIndex = memoryType,
+        };
+        bufferMemory = vk::raii::DeviceMemory(ctx.logicalDevice, allocInfo);
+        buffer.bindMemory(*bufferMemory, 0);
+    }
+
     // I dont like this reference to VMAAlloc, but I need it to free the memory in destructor
     Buffer::Buffer(vk::raii::Device &logicalDevice,VmaAllocator& vmaAllocator, vk::DeviceSize size,
         vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo)

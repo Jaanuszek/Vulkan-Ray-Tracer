@@ -24,6 +24,8 @@
 #include "GUI.hpp"
 #include "init_cuda.cuh"
 
+#define VK_TIMELINE_SEMAPHORE 1 // TODO zrobic zeby to nie bylo zahardkodowane
+
 namespace VRTR
 {
     class RENDERER_EXPORT RTRenderer
@@ -42,6 +44,8 @@ namespace VRTR
         void initImGUI(GLFWwindow* window);
 
         void createSyncObjects();
+
+        void createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType);
 
         uint32_t createModel(std::string modelPath, std::string texturePath);
 
@@ -67,9 +71,15 @@ namespace VRTR
 
         std::shared_ptr<Camera> camera;
 
+        // internal semaphores and fences for synchronisation
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
+
+        //external semaphores for synchronisation with CUDA
+        vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
+        // std::vector<vk::raii::Semaphore> cudaCompleteSemaphores;
+        // std::vector<vk::raii::Fence> cudaCompleteFences;
 
         std::unordered_map<std::string, std::unique_ptr<Model>> models;
         std::vector<std::string> modelInstanceOrder;

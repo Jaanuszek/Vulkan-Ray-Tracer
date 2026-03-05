@@ -51,4 +51,21 @@ namespace VRTR::CUDA
 
         return -1;
     }
+
+    void importCudaExternalMemory(void **cudaPtr, cudaExternalMemory_t &cudaMem,
+                                vk::DeviceMemory &vkMem, vk::DeviceSize size,
+                                vk::ExternalMemoryHandleTypeFlagBits handleType)
+    {
+        cudaExternalMemoryHandleDesc externalMemoryHandleDesc{};
+        if(handleType & vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd)
+        {
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+        } else {
+            VRTR_ERROR("Unsupported external memory handle type");
+            exit(EXIT_FAILURE);
+        }
+
+        externalMemoryHandleDesc.size = size;
+        externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(vkMem, handleType);
+    }
 }

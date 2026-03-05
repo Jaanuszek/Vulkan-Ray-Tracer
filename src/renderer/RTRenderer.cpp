@@ -203,6 +203,35 @@ namespace VRTR
         }
     }
 
+    void RTRenderer::createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType)
+    {
+        vk::ExportSemaphoreCreateInfo exportSemaphoreCreateInfo{
+            .handleTypes = handleType
+        };
+
+        // Można zrobic semafory zwykle (ktore mają dwa stany albo signaled albo unsignaled)
+        // Albo mozna zrobic timeline semaphores, które mają licznik 64 bitowy, pozwalający na ustawiaie kolejności
+        // semaforów.
+        // Timeline semafory brzmią ciekawie, eliminują potrzebe fenców,
+        // i nie ma potrzeby tworzenia kazdego semaforu na klatke,
+        // Wystarczyłby jeden semafor timeline, i dla kazdej klatki ustawić wartość tego semafora na jakąś kolejną wartość
+        // np. dla klatki 0 ustawić semafor na 1, dla klatki 1 ustawić semafor na 2 itd.
+#ifdef VK_TIMELINE_SEMAPHORE
+        vk::SemaphoreTypeCreateInfo timelineCreateInfo{
+            .semaphoreType = vk::SemaphoreType::eTimeline,
+            .initialValue = 0
+        };
+        exportSemaphoreCreateInfo.pNext = &timelineCreateInfo;
+#else
+        exportSemaphoreCreateInfo.pNext = nullptr;
+#endif
+        vk::SemaphoreCreateInfo semaphoreCreateInfo{
+            .pNext = &exportSemaphoreCreateInfo,
+            .flags = {}
+        };
+        cudaCompleteSemaphore = vk::raii::Semaphore(ctx.logicalDevice, semaphoreCreateInfo);
+    }
+
     uint32_t RTRenderer::createModel(std::string modelPath, std::string texturePath)
     {
         Material mat{
