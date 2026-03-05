@@ -43,7 +43,11 @@ namespace VRTR
         ctx.queue = std::move(deviceProps.graphicsQueue);
         ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
 
-        initCUDA();
+        auto deviceUUID = DeviceManager::getDeviceUUID(ctx.gpu);
+        if(CUDA::initCUDA(deviceUUID.data(), VK_UUID_SIZE) < 0){
+            VRTR_ERROR("Failed to initialize CUDA");
+            exit(EXIT_FAILURE);
+        }
 
         setupVMA();
 

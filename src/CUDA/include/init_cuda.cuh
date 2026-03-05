@@ -6,5 +6,24 @@
 #include <ctime>
 #include <stdio.h>
 #include <cmath>
+#include "Logger.hpp"
 
-__host__ void initCUDA();
+// "#" w define zamienia argument na string
+#define CUDA_CHECK_ERROR(err) checkCudaError(err,  #err, __FILE__, __LINE__)
+
+inline void checkCudaError(cudaError_t err, const char* msg, const char* file, const int line)
+{
+    if (err != cudaSuccess)
+    {
+        VRTR_ERROR("CUDA Error: {}: {} from file {}, line {}", msg, cudaGetErrorString(err), file, line);
+        exit(EXIT_FAILURE);
+    }
+}
+
+namespace VRTR
+{
+    namespace CUDA
+    {
+        int initCUDA(uint8_t *vkDeviceUUID, size_t UUID_SIZE);
+    }
+}

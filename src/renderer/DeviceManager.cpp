@@ -16,6 +16,14 @@ namespace VRTR
         return deviceProps;
     }
 
+    std::array<uint8_t, VK_UUID_SIZE> DeviceManager::getDeviceUUID(const vk::raii::PhysicalDevice &device)
+    {
+        auto props2 = device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceIDProperties>();
+        auto gpuDeviceIDProp = props2.get<vk::PhysicalDeviceIDProperties>();
+
+        return gpuDeviceIDProp.deviceUUID;
+    }
+
     bool DeviceManager::isDeviceSuitable(const vk::raii::PhysicalDevice &device)
     {
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());

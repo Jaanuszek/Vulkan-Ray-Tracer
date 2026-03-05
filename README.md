@@ -44,7 +44,7 @@ Every container mounted the `build/` and `venv/` folders as `read-write`, and an
 ### Building container using `docker compose`
 
 ```bash
-docker compose run --rm appbuilder [build | rebuild | test] [ -v | --verbose ] [ -d | --debug ] 
+docker compose run --rm appbuilder_cuda [build | rebuild | test] [ -v | --verbose ] [ -d | --debug ] 
 ```
 
 #### Building options:

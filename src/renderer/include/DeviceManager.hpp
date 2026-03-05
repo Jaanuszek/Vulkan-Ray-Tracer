@@ -51,6 +51,7 @@ namespace VRTR
     {
         public:
             static DeviceProperties initDevice(GLFWwindow *window, vk::raii::Instance& instance);
+            static std::array<uint8_t, VK_UUID_SIZE> getDeviceUUID(const vk::raii::PhysicalDevice &device);
 
         private:
             static std::vector<const char*> getRequiredExtensions();
