@@ -53,6 +53,9 @@ namespace VRTR
                             ? surfaceCapabilities.maxImageCount
                             : minImageCount;
 
+        // NOTE - można dodać VkSwapchainPresentScalingCreateInfoKHR do .pnext tegocreate info poniżej
+        // tam można zdefiniować scalingBehaviour.
+
         vk::SwapchainCreateInfoKHR createInfo{
             .flags = vk::SwapchainCreateFlagsKHR{},
             .surface = ctx.surface,

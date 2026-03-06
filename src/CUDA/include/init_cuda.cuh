@@ -6,9 +6,9 @@
 #include <ctime>
 #include <stdio.h>
 #include <cmath>
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_raii.hpp>
+
 #include "Logger.hpp"
+#include "defines.hpp"
 
 // "#" w define zamienia argument na string
 #define CUDA_CHECK_ERROR(err) checkCudaError(err,  #err, __FILE__, __LINE__)
@@ -29,10 +29,18 @@ namespace VRTR
         int initCUDA(uint8_t *vkDeviceUUID, size_t UUID_SIZE);
 
         // TODO kurde to chyba powinno byc w kodzie vulkanowym
-        void *getMemHandle(vk::DeviceMemory vkMem, vk::ExternalMemoryHandleTypeFlagBits handleType);
+        void *getMemHandle(vk::Device logDevice, vk::DeviceMemory vkMem, vk::ExternalMemoryHandleTypeFlagBits handleType);
 
-        void importCudaExternalMemory(void **cudaPtr, cudaExternalMemory_t &cudaMem,
+        void *getSemHandle(vk::Device logDevice, vk::Semaphore vkSem, vk::ExternalSemaphoreHandleTypeFlagBits handleType);
+
+        void importCudaExternalMemory(vk::Device logDevice,
+                                      void **cudaPtr, cudaExternalMemory_t &cudaMem,
                                       vk::DeviceMemory &vkMem, vk::DeviceSize size,
                                       vk::ExternalMemoryHandleTypeFlags handleType);
+
+        void importCudaExternalSemaphore(vk::Device logDevice,
+                                         cudaExternalSemaphore_t &cudaSem,
+                                         vk::Semaphore &vkSem,
+                                         vk::ExternalSemaphoreHandleTypeFlagBits handleType);
     }
 }

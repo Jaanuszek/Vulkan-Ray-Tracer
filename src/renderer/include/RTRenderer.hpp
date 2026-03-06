@@ -23,8 +23,7 @@
 #include "StorageBuffer.hpp"
 #include "GUI.hpp"
 #include "init_cuda.cuh"
-
-#define VK_TIMELINE_SEMAPHORE 1 // TODO zrobic zeby to nie bylo zahardkodowane
+#include "defines.hpp"
 
 namespace VRTR
 {

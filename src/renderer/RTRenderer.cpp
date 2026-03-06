@@ -337,10 +337,28 @@ namespace VRTR
         // I cant disable it, because i am using vk::raii and it requires exceptions to be enabled :(
         try
         {
-            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()), nullptr);
-            ctx.logicalDevice.resetFences({drawFences[commandBufferManager->getCurrentFrame()]});
+            uint32_t presentSemaphoreIdx = commandBufferManager->getSemaphoreIndex();
+            uint32_t frameIdx = commandBufferManager->getCurrentFrame();
+
+            /* 
+                acquireNextImage to jest asynchroniczna funkcja, która zwraca wyrenderowany obraz oraz jego indeks w swapchainie
+                Należy ją zsynchronizować, podając semafor, lub/i fence
+                Przez użyciem tego obrazu, należy poczekać na zasygnalizowanie semafora przez tą funkcje
+                bo inaczej to jest UB
+            */
+
+            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphores.at(presentSemaphoreIdx), nullptr);
+            ctx.logicalDevice.resetFences({drawFences[frameIdx]});
+
+            /*
+                Zmienna która mówi w jakim etapie pipeline'u GPU powinien czekać na semafor z acquireNextImage
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT oznacza, czekaj przed wykonaniem jakiegokolwiek polecenia GPU
+                żaden etap nie ruszy zanim seamfor będzie gotowy.
+                TODO Nie jest to idealna flaga, pewnie bede musiał ją zmienić wp rzyszłości  
+            */
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eAllCommands);
 
+            // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne
             std::vector<vk::CommandBuffer> submitCommandBuffers = {*commandBufferManager->getCommandBuffer(imageIndex)};
             uint32_t submitCommandBufferCount = 1;
             if (renderGUI){
@@ -363,29 +381,57 @@ namespace VRTR
             }
             updateUniformBuffer(); // Camera UBO update
             
+            /* 
+                Tworzymy submitInfo który zawiera informacje:
+                - Na jaką wartość semafora czekać
+                - na jaki semafor czekać
+                - na jakim etapie pipeline'u czekać
+                - ilość command bufferów do wykonania
+                - wskaźnik na command buffery do wykonania
+                - ile semaforów zasygnalizować po wykonaniu tych command bufferów
+                - jakie semafory zasygnalizować po wykonaniu tych command bufferów
+
+                1. W tym przypadku czekamy na sygnał semafora presentCompleteSemaphore, który informuje
+                czy obraz z acquireNextImage jest gotowy do użycia
+                2. Sygnalizujemy semafor który pozwala na prezentacje obrazu na ekranie, czyli renderCompleteSemaphore
+            */
             const vk::SubmitInfo submitInfo{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*presentCompleteSemaphores.at(commandBufferManager->getSemaphoreIndex()),
+                .pWaitSemaphores = &*presentCompleteSemaphores.at(presentSemaphoreIdx),
                 .pWaitDstStageMask = &waitDestinationStageMask,
                 .commandBufferCount = submitCommandBufferCount,
                 .pCommandBuffers = submitCommandBuffers.data(),
                 .signalSemaphoreCount = 1,
-                .pSignalSemaphores = &*renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame())};
+                .pSignalSemaphores = &*renderCompleteSemaphores.at(frameIdx)};
 
-            ctx.queue.submit({submitInfo}, *drawFences.at(commandBufferManager->getCurrentFrame()));
+            /*
+                Wysyłamy polecenia do wykonania na GPU, wraz z informacjami o synchronizacji
+                Jeżeli queue zakończy wykonywanie poleceń, to sygnalizuje podany Fence
+            */
+            ctx.queue.submit({submitInfo}, *drawFences.at(frameIdx));
+
+            /*
+                Podobnie co poprzednio, tworzymy strukture z informacjami o synchronizacji,
+                tym razem dla prezentacji obrazu na ekranie.
+            */
             const vk::PresentInfoKHR presentInfoKHR{
                 .pNext = nullptr,
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*renderCompleteSemaphores.at(commandBufferManager->getCurrentFrame()),
+                .pWaitSemaphores = &*renderCompleteSemaphores.at(frameIdx),
                 .swapchainCount = 1,
                 .pSwapchains = &*swapChain,
                 .pImageIndices = &imageIndex,
                 .pResults = nullptr};
 
+            /*
+                Odpala kolejke prezentacji obrazu na ekranie
+                Oczekuje, że obraz będzie VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            */
             result = ctx.queue.presentKHR(presentInfoKHR);
-            commandBufferManager->setSemaphoreIndex((commandBufferManager->getSemaphoreIndex() + 1) % presentCompleteSemaphores.size());
-            commandBufferManager->setCurrentFrame((commandBufferManager->getCurrentFrame() + 1) % MAX_FRAMES_IN_FLIGHT);
+            
+            commandBufferManager->setSemaphoreIndex((presentSemaphoreIdx + 1) % presentCompleteSemaphores.size());
+            commandBufferManager->setCurrentFrame((frameIdx + 1) % MAX_FRAMES_IN_FLIGHT);
         }
         catch (const vk::OutOfDateKHRError &e)
         {

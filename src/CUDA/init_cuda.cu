@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "init_cuda.cuh"
 
 namespace VRTR::CUDA
@@ -52,7 +53,51 @@ namespace VRTR::CUDA
         return -1;
     }
 
-    void importCudaExternalMemory(void **cudaPtr, cudaExternalMemory_t &cudaMem,
+    void *getMemHandle(vk::Device logDevice, vk::DeviceMemory vkMem, vk::ExternalMemoryHandleTypeFlagBits handleType)
+    {
+    #ifdef _WIN64
+        VRTR_ERROR("Windows platform is not yet supported");
+        exit(EXIT_FAILURE);
+    #else
+        int fd = -1;
+        vk::MemoryGetFdInfoKHR fdInfo{
+            .pNext = nullptr,
+            .memory = vkMem,
+            .handleType = handleType,
+        };
+
+        /* 
+            getMemoryFdKHR tworzy file descriptor dla pamieci ktora bedzie exportowana
+            Jezeli pamięc zostanie wyeksportowana, to ownership jest przekazywany
+            impord fd do cudy -> cuda przejmuje ownership -> cuda zwalnia pamięć
+            Jezeli nie nastąpi import, to trzeba to fd zwolnic w vulkanie 
+        */
+
+        logDevice.getMemoryFdKHR(&fdInfo, &fd); // <--- to za kazdym razem daje inny fd, nawet dla tego samego buffora
+        return (void *)(uintptr_t)fd;
+#endif
+    }
+
+    void *getSemHandle(vk::Device logDevice, vk::Semaphore vkSem, vk::ExternalSemaphoreHandleTypeFlagBits handleType)
+    {
+        #ifdef _WIN64
+            VRTR_ERROR("Windows platform is not yet supported");
+            exit(EXIT_FAILURE);
+        #else
+            int fd = -1;
+            vk::SemaphoreGetFdInfoKHR fdInfo{
+                .pNext = nullptr,
+                .semaphore = vkSem,
+                .handleType = handleType,
+            };
+
+            logDevice.getSemaphoreFdKHR(&fdInfo, &fd);
+            return (void *)(uintptr_t)fd;
+        #endif
+    }
+
+    void importCudaExternalMemory(vk::Device logDevice,
+                                void **cudaPtr, cudaExternalMemory_t &cudaMem,
                                 vk::DeviceMemory &vkMem, vk::DeviceSize size,
                                 vk::ExternalMemoryHandleTypeFlagBits handleType)
     {
@@ -66,6 +111,46 @@ namespace VRTR::CUDA
         }
 
         externalMemoryHandleDesc.size = size;
-        externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(vkMem, handleType);
+        externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(logDevice, vkMem, handleType);
+
+        cudaExternalMemoryBufferDesc extenralMemBufferDesc{
+            .offset = 0,
+            .size = size,
+            .flags = 0
+        };
+
+        // cudaPTR musi byc zwolnione korzystajac z cudaFree()!!!!
+        CUDA_CHECK_ERROR(cudaExternalMemoryGetMappedBuffer(cudaPtr, cudaMem, &extenralMemBufferDesc));
+    }
+
+    void importCudaExternalSemaphore(vk::Device logDevice,
+                                    cudaExternalSemaphore_t &cudaSem,
+                                    vk::Semaphore &vkSem,
+                                    vk::ExternalSemaphoreHandleTypeFlagBits handleType)
+    {
+        cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc{};
+#ifdef VK_TIMELINE_SEMAPHORE
+        if(handleType & vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd)
+        {
+            externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreFd;
+        }
+#else
+        if(handleType & vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd)
+        {
+            externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeOpaqueFd;
+        }
+#endif
+        else
+        {
+            VRTR_ERROR("Unsupported external semaphore handle type");
+            exit(EXIT_FAILURE);
+        }
+        #ifdef _WIN64
+            VRTR_ERROR("Windows platform is not yet supported");
+            exit(EXIT_FAILURE);
+        #else
+            externalSemaphoreHandleDesc.handle.fd = (int)(uintptr_t)getSemHandle(logDevice, vkSem, handleType);
+            CUDA_CHECK_ERROR(cudaImportExternalSemaphore(&cudaSem, &externalSemaphoreHandleDesc));
+        #endif
     }
 }

@@ -4,6 +4,7 @@ SET(COMMON_LIBRARY_NAME common)
 add_library(${COMMON_LIBRARY_NAME} 
     pch.cpp
     VmaUsage.cpp
+    defines.cpp
 )
 
 target_precompile_headers(${COMMON_LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/pch.h)

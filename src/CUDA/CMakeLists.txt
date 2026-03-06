@@ -14,9 +14,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_link_libraries(${PROJECT_NAME}
+    common
     Core
     CUDA::cudart
+    Vulkan::Vulkan
 )
+
+target_precompile_headers(${PROJECT_NAME} REUSE_FROM common)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
