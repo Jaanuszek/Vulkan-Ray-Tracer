@@ -62,6 +62,7 @@ namespace VRTR
 
     private:
         int width, height;
+        uint64_t frameCount{};
         RendererContext ctx;
 
         std::unique_ptr<GUI> gui;
@@ -79,10 +80,6 @@ namespace VRTR
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
 
-        //external semaphores for synchronisation with CUDA
-        // vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
-        // std::vector<vk::raii::Semaphore> cudaCompleteSemaphores;
-        // std::vector<vk::raii::Fence> cudaCompleteFences;
 
         std::unordered_map<std::string, std::unique_ptr<Model>> models;
         std::vector<std::string> modelInstanceOrder;

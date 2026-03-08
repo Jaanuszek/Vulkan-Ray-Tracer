@@ -27,6 +27,9 @@ StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
 [[vk::binding(5, 0)]]
 StructuredBuffer<Material, Std140DataLayout> materialBuffer;
 
+[[vk::binding(6, 0)]]
+StructuredBuffer<float4> cudaColorBuffer;
+
 [[vk::push_constant]] internal pc_blas blasAddr;
 
 public struct RayPayload
@@ -105,7 +108,8 @@ void rayGenShader()
             break;
         }
     }
-    outputImage[dispatchIndex.xy] = float4(color, 1.0);
+    // outputImage[dispatchIndex.xy] = float4(color, 1.0);
+    outputImage[dispatchIndex.xy] = float4(color, 1.0) + float4(cudaColorBuffer[0]) * 0.3f;
     // outputImage[dispatchIndex.xy] = float4(payload.hitValue.bgr, 1.0);
 }
 

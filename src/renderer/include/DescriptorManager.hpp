@@ -16,6 +16,7 @@ namespace VRTR
         vk::Sampler texSampler = nullptr; // to powinno byc kontenerem
         vk::Buffer geometryInfoBuffer = nullptr;
         vk::Buffer materialBuffer = nullptr;
+        vk::Buffer cudaColorBuffer = nullptr;
     };
 
     class DescriptorManager

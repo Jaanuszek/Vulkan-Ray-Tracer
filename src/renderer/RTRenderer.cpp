@@ -153,6 +153,7 @@ namespace VRTR
         descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSamplerHandle();
         descriptorResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         descriptorResources.materialBuffer = materialSBO->getBufferHandle();
+        descriptorResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
 
         auto gi = models.at("viking_room")->getGeometryInfo();
         PushConstant vikingRoomModelPC{
@@ -331,6 +332,7 @@ namespace VRTR
         }
         desResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         desResources.materialBuffer = materialSBO->getBufferHandle();
+        desResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
 
         rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);   
     }
@@ -404,7 +406,7 @@ namespace VRTR
                 submitCommandBuffers.push_back(guiCommandBuffer);
                 submitCommandBufferCount += (guiCommandBuffer != VK_NULL_HANDLE) ? 1u : 0u;
             }
-            
+
             if(gui->updateRequired())
             {
                 asManager->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
@@ -533,7 +535,6 @@ namespace VRTR
            cudaExternalSemaphoreWaitParams waitParams{};
            waitParams.flags = 0;
            waitParams.params.fence.value = cudaSemWait;
-           waitParams.params.keyedMutex.timeoutMs = 5'000;
 
            cudaExternalSemaphoreSignalParams signalParams{};
            signalParams.flags = 0;
@@ -543,10 +544,13 @@ namespace VRTR
            // Do something in cuda
            VRTR_INFO("CUDA timeline | vk wait: {}, vk signal: {}, cuda wait: {}, cuda signal: {}",
                      cudaToVkWaitValue, vkToCudaSignalValue, cudaSemWait, cudaSemSignal);
+           CUDA::stepSim(cudaData, frameCount, cudaStream);
            CUDA_CHECK_ERROR(cudaSignalExternalSemaphoresAsync(&extCudaTimelineSemaphore, &signalParams, 1, cudaStream));
 
            cudaToVkWaitValue = cudaSemSignal;
            vkToCudaSignalValue += 2;
+
+           frameCount++;
         }
         catch (const vk::OutOfDateKHRError &e)
         {
