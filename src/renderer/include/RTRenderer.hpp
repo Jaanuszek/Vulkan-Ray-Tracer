@@ -40,6 +40,8 @@ namespace VRTR
     private:
         void setupVMA();
 
+        void setupCuda();
+
         void initImGUI(GLFWwindow* window);
 
         void createSyncObjects();
@@ -55,6 +57,8 @@ namespace VRTR
         void recreateResources(GLFWwindow *window);
 
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createFloor();
+
+        void updateUniformBuffer();
 
     private:
         int width, height;
@@ -76,7 +80,7 @@ namespace VRTR
         std::vector<vk::raii::Fence> drawFences;
 
         //external semaphores for synchronisation with CUDA
-        vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
+        // vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
         // std::vector<vk::raii::Semaphore> cudaCompleteSemaphores;
         // std::vector<vk::raii::Fence> cudaCompleteFences;
 
@@ -93,7 +97,13 @@ namespace VRTR
         std::unique_ptr<StorageBuffer> geometrySBO;
         std::unique_ptr<StorageBuffer> materialSBO;
 
-        void updateUniformBuffer();
+        // ================== CUDA ==================
+        cudaStream_t cudaStream;
+        std::unique_ptr<Buffer> cudaInteropBuffer;
+        glm::vec4 *cudaData{};
+        cudaExternalMemory_t cudaExternalMemory{nullptr};
+        vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
+        cudaExternalSemaphore_t extCudaWaitSemaphore, extCudaSignalSemaphore, extCudaTimelineSemaphore;
     };
 
     inline static void framebufferResizeCallback(GLFWwindow *window, int width, int height)

@@ -43,11 +43,7 @@ namespace VRTR
         ctx.queue = std::move(deviceProps.graphicsQueue);
         ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
 
-        auto deviceUUID = DeviceManager::getDeviceUUID(ctx.gpu);
-        if(CUDA::initCUDA(deviceUUID.data(), VK_UUID_SIZE) < 0){
-            VRTR_ERROR("Failed to initialize CUDA");
-            exit(EXIT_FAILURE);
-        }
+        setupCuda();
 
         setupVMA();
 
@@ -127,6 +123,28 @@ namespace VRTR
         geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
         materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
 
+        // TEMPORARY - Dodam jakiś prosty external buffor, zeby sprawdzic czy CUDA <-> Vulkan interop działa
+        vk::DeviceSize cudaBuffSize = sizeof(glm::vec4);
+        cudaInteropBuffer = std::make_unique<Buffer>(ctx, cudaBuffSize,
+                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        // to jest workaround, bo importCudaExtenralMemory potrzebuje lvalue
+        // Ale nie powinien to byc problem, bo deviceMemory w vulkanie to ejst tylko uchwyt do pamięci,
+        // wiec nie ma potrzeby przekazywania go jako referencje
+        auto cudaBuffDevMem = cudaInteropBuffer->getBufferMemory();
+        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
+                                        cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
+
+        // vk::Semaphore vkSemaphoreHandle = *cudaCompleteSemaphore;
+        CUDA::importCudaExternalSemaphore(ctx.logicalDevice,
+                                          extCudaTimelineSemaphore,
+                                          cudaCompleteSemaphore,
+                                          vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
+
         DescriptorResources descriptorResources{};
         descriptorResources.TLAS = asManager->getTLASHandle();
         descriptorResources.ubo = uniform_buffer->getBufferHandle();
@@ -173,6 +191,17 @@ namespace VRTR
         vmaCreateAllocator(&allocatorCI, &ctx.vmaAllocator);
     }
 
+    void RTRenderer::setupCuda()
+    {
+        auto deviceUUID = DeviceManager::getDeviceUUID(ctx.gpu);
+        if(CUDA::initCUDA(deviceUUID.data(), VK_UUID_SIZE) < 0){
+            VRTR_ERROR("Failed to initialize CUDA");
+            exit(EXIT_FAILURE);
+        }
+
+        CUDA_CHECK_ERROR(cudaStreamCreateWithFlags(&cudaStream, cudaStreamNonBlocking));
+    }
+
     void RTRenderer::initImGUI(GLFWwindow* window)
     {
         gui = std::make_unique<GUI>(ctx, sceneSettings);
@@ -203,6 +232,7 @@ namespace VRTR
         }
     }
 
+    // TODO to powinno byc w innym pliku
     void RTRenderer::createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType)
     {
         vk::ExportSemaphoreCreateInfo exportSemaphoreCreateInfo{
@@ -329,8 +359,9 @@ namespace VRTR
 
     void RTRenderer::drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI)
     {
+        constexpr uint64_t timeout = 5'000'000'000;
         vk::raii::SwapchainKHR &swapChain = swapChainManager->getSwapChain();
-        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, UINT64_MAX))
+        while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(*drawFences.at(commandBufferManager->getCurrentFrame()), VK_TRUE, timeout))
             ;
 
         // Unfortunately it needs to be inside try catch block, because "acquireNextImage" is throwing exceptions
@@ -346,8 +377,8 @@ namespace VRTR
                 Przez użyciem tego obrazu, należy poczekać na zasygnalizowanie semafora przez tą funkcje
                 bo inaczej to jest UB
             */
+            auto [result, imageIndex] = swapChain.acquireNextImage(timeout, presentCompleteSemaphores.at(presentSemaphoreIdx), nullptr);
 
-            auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, presentCompleteSemaphores.at(presentSemaphoreIdx), nullptr);
             ctx.logicalDevice.resetFences({drawFences[frameIdx]});
 
             /*
@@ -373,7 +404,7 @@ namespace VRTR
                 submitCommandBuffers.push_back(guiCommandBuffer);
                 submitCommandBufferCount += (guiCommandBuffer != VK_NULL_HANDLE) ? 1u : 0u;
             }
-
+            
             if(gui->updateRequired())
             {
                 asManager->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
@@ -395,43 +426,127 @@ namespace VRTR
                 czy obraz z acquireNextImage jest gotowy do użycia
                 2. Sygnalizujemy semafor który pozwala na prezentacje obrazu na ekranie, czyli renderCompleteSemaphore
             */
+
+            /*
+                CUDA - synchronizacja
+                Trzeba dodac kolejny semafor na ktory vulkan bedzie czekał i ktory bedzie sygnalizowany,
+                by cuda mogła zacząć coś obliczać
+                Dlatego dodaje tutaj do submit info dwa semafory: jeden na ktory czeka vulkan zeby wyswietlic obraz
+                i drugi ktory czeka az cuda obliczy cos a nastepnie zasygnalizuje ten semafor
+                zeby vulkan mogl wyswietlic obraz
+            */
+
+            static uint64_t cudaToVkWaitValue = 0;
+            static uint64_t vkToCudaSignalValue = 1;
+
+            std::array<vk::Semaphore, 2> waitSemaphores = {
+                presentCompleteSemaphores.at(presentSemaphoreIdx),
+                cudaCompleteSemaphore
+            };
+
+            std::array<vk::Semaphore, 2> signalSemaphores = {
+                renderCompleteSemaphores.at(frameIdx),
+                cudaCompleteSemaphore
+            };
+
+            std::array<uint64_t, 2> waitValues = {
+                0,
+                cudaToVkWaitValue
+            };
+
+            std::array<uint64_t, 2> signalValues = {
+                0,
+                vkToCudaSignalValue
+            };
+
+            std::array<vk::PipelineStageFlags, 2> waitStages = {
+                vk::PipelineStageFlagBits::eAllCommands,
+                vk::PipelineStageFlagBits::eAllCommands
+            };
+
+            vk::TimelineSemaphoreSubmitInfo timelineInfo{
+                .waitSemaphoreValueCount = waitSemaphores.size(),
+                .pWaitSemaphoreValues = waitValues.data(),
+                .signalSemaphoreValueCount = signalSemaphores.size(),
+                .pSignalSemaphoreValues = signalValues.data()
+            };
             const vk::SubmitInfo submitInfo{
-                .pNext = nullptr,
-                .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*presentCompleteSemaphores.at(presentSemaphoreIdx),
-                .pWaitDstStageMask = &waitDestinationStageMask,
+                .pNext = &timelineInfo,
+                .waitSemaphoreCount = waitSemaphores.size(),
+                .pWaitSemaphores = waitSemaphores.data(),
+                .pWaitDstStageMask = waitStages.data(),
                 .commandBufferCount = submitCommandBufferCount,
                 .pCommandBuffers = submitCommandBuffers.data(),
-                .signalSemaphoreCount = 1,
-                .pSignalSemaphores = &*renderCompleteSemaphores.at(frameIdx)};
+                .signalSemaphoreCount = signalSemaphores.size(),
+                .pSignalSemaphores = signalSemaphores.data()
+            };
+            /*   
+                Ten kod poniżej, zapobiega freezowaniu systemu gdy Cuda nie zasygnalizuje semafora
+                Vulkan ogólnie czeka w nieskonczonosc na sygnalizacje semafora w queue submit,
+                Dlatego jak mamy deadlock, no to caly system sie blokuje xdd
+                Dobrze by było dodac jakis mechanizm który wykrywa deadlock
+                np jakis osobny thread który liczy czas od momentu zsubmitowania queue
+                i jak osiagnie jakis timeout to konczy program
+
+               uint64_t value;
+               vkGetSemaphoreCounterValue(*ctx.logicalDevice, *cudaCompleteSemaphore, &value);
+               if(value < cudaToVkWaitValue)
+               {
+                    // VRTR_INFO("Waiting for CUDA to finish...");
+                    VRTR_WARN("Waiting for CUDA to finish... Semaphore value: {}, waiting for: {}", value, cudaToVkWaitValue);
+                    // return;
+                    exit(EXIT_FAILURE);
+               }
+            */
 
             /*
                 Wysyłamy polecenia do wykonania na GPU, wraz z informacjami o synchronizacji
                 Jeżeli queue zakończy wykonywanie poleceń, to sygnalizuje podany Fence
             */
-            ctx.queue.submit({submitInfo}, *drawFences.at(frameIdx));
+           ctx.queue.submit({submitInfo}, *drawFences.at(frameIdx));
 
-            /*
-                Podobnie co poprzednio, tworzymy strukture z informacjami o synchronizacji,
-                tym razem dla prezentacji obrazu na ekranie.
-            */
-            const vk::PresentInfoKHR presentInfoKHR{
-                .pNext = nullptr,
-                .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*renderCompleteSemaphores.at(frameIdx),
-                .swapchainCount = 1,
-                .pSwapchains = &*swapChain,
-                .pImageIndices = &imageIndex,
-                .pResults = nullptr};
+           /*
+               Podobnie co poprzednio, tworzymy strukture z informacjami o synchronizacji,
+               tym razem dla prezentacji obrazu na ekranie.
+           */
+           const vk::PresentInfoKHR presentInfoKHR{
+               .pNext = nullptr,
+               .waitSemaphoreCount = 1,
+               .pWaitSemaphores = &*renderCompleteSemaphores.at(frameIdx),
+               .swapchainCount = 1,
+               .pSwapchains = &*swapChain,
+               .pImageIndices = &imageIndex,
+               .pResults = nullptr};
 
-            /*
-                Odpala kolejke prezentacji obrazu na ekranie
-                Oczekuje, że obraz będzie VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-            */
-            result = ctx.queue.presentKHR(presentInfoKHR);
-            
-            commandBufferManager->setSemaphoreIndex((presentSemaphoreIdx + 1) % presentCompleteSemaphores.size());
-            commandBufferManager->setCurrentFrame((frameIdx + 1) % MAX_FRAMES_IN_FLIGHT);
+           /*
+               Odpala kolejke prezentacji obrazu na ekranie
+               Oczekuje, że obraz będzie VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+           */
+           result = ctx.queue.presentKHR(presentInfoKHR);
+
+           commandBufferManager->setSemaphoreIndex((presentSemaphoreIdx + 1) % presentCompleteSemaphores.size());
+           commandBufferManager->setCurrentFrame((frameIdx + 1) % MAX_FRAMES_IN_FLIGHT);
+
+           // === CUDA SYNC ===
+           uint64_t cudaSemWait = vkToCudaSignalValue;
+           uint64_t cudaSemSignal = vkToCudaSignalValue + 1;
+           cudaExternalSemaphoreWaitParams waitParams{};
+           waitParams.flags = 0;
+           waitParams.params.fence.value = cudaSemWait;
+           waitParams.params.keyedMutex.timeoutMs = 5'000;
+
+           cudaExternalSemaphoreSignalParams signalParams{};
+           signalParams.flags = 0;
+           signalParams.params.fence.value = cudaSemSignal;
+
+           CUDA_CHECK_ERROR(cudaWaitExternalSemaphoresAsync(&extCudaTimelineSemaphore, &waitParams, 1, cudaStream));
+           // Do something in cuda
+           VRTR_INFO("CUDA timeline | vk wait: {}, vk signal: {}, cuda wait: {}, cuda signal: {}",
+                     cudaToVkWaitValue, vkToCudaSignalValue, cudaSemWait, cudaSemSignal);
+           CUDA_CHECK_ERROR(cudaSignalExternalSemaphoresAsync(&extCudaTimelineSemaphore, &signalParams, 1, cudaStream));
+
+           cudaToVkWaitValue = cudaSemSignal;
+           vkToCudaSignalValue += 2;
         }
         catch (const vk::OutOfDateKHRError &e)
         {

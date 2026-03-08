@@ -36,11 +36,11 @@ namespace VRTR
         void importCudaExternalMemory(vk::Device logDevice,
                                       void **cudaPtr, cudaExternalMemory_t &cudaMem,
                                       vk::DeviceMemory &vkMem, vk::DeviceSize size,
-                                      vk::ExternalMemoryHandleTypeFlags handleType);
+                                      vk::ExternalMemoryHandleTypeFlagBits handleType);
 
         void importCudaExternalSemaphore(vk::Device logDevice,
                                          cudaExternalSemaphore_t &cudaSem,
-                                         vk::Semaphore &vkSem,
+                                         vk::Semaphore vkSem,
                                          vk::ExternalSemaphoreHandleTypeFlagBits handleType);
     }
 }

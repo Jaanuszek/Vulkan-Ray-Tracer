@@ -81,6 +81,8 @@ namespace VRTR
         inline const vk::raii::Buffer &getBuffer() const { return buffer; }
 
         vk::Buffer getBufferHandle() const { return *buffer; }
+        
+        vk::DeviceMemory getBufferMemory() const { return *bufferMemory; }
 
         inline vk::DeviceAddress getDeviceAddress() { return deviceAddress; }
 

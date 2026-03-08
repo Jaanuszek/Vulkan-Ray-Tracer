@@ -75,7 +75,7 @@ namespace VRTR::CUDA
 
         logDevice.getMemoryFdKHR(&fdInfo, &fd); // <--- to za kazdym razem daje inny fd, nawet dla tego samego buffora
         return (void *)(uintptr_t)fd;
-#endif
+    #endif
     }
 
     void *getSemHandle(vk::Device logDevice, vk::Semaphore vkSem, vk::ExternalSemaphoreHandleTypeFlagBits handleType)
@@ -113,6 +113,8 @@ namespace VRTR::CUDA
         externalMemoryHandleDesc.size = size;
         externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(logDevice, vkMem, handleType);
 
+        CUDA_CHECK_ERROR(cudaImportExternalMemory(&cudaMem, &externalMemoryHandleDesc));
+
         cudaExternalMemoryBufferDesc extenralMemBufferDesc{
             .offset = 0,
             .size = size,
@@ -125,7 +127,7 @@ namespace VRTR::CUDA
 
     void importCudaExternalSemaphore(vk::Device logDevice,
                                     cudaExternalSemaphore_t &cudaSem,
-                                    vk::Semaphore &vkSem,
+                                    vk::Semaphore vkSem,
                                     vk::ExternalSemaphoreHandleTypeFlagBits handleType)
     {
         cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc{};

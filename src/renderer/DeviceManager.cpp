@@ -111,7 +111,7 @@ namespace VRTR
             featuresChain{
                 {.features = {.samplerAnisotropy = VK_TRUE, .shaderInt64 = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
-                {.scalarBlockLayout = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
+                {.scalarBlockLayout = VK_TRUE, .timelineSemaphore = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},
                 {.extendedDynamicState = VK_TRUE},
