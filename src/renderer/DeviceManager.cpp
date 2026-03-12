@@ -16,10 +16,25 @@ namespace VRTR
         return deviceProps;
     }
 
+    std::array<uint8_t, VK_UUID_SIZE> DeviceManager::getDeviceUUID(const vk::raii::PhysicalDevice &device)
+    {
+        auto props2 = device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceIDProperties>();
+        auto gpuDeviceIDProp = props2.get<vk::PhysicalDeviceIDProperties>();
+
+        return gpuDeviceIDProp.deviceUUID;
+    }
+
     bool DeviceManager::isDeviceSuitable(const vk::raii::PhysicalDevice &device)
     {
-        // TODO implement device suitability checks
-        return true;
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        auto extensions = device.enumerateDeviceExtensionProperties();
+        for (auto const& extension : extensions)
+        {
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
     }
 
     uint32_t DeviceManager::findQueueFamilies(vk::raii::PhysicalDevice &device, vk::raii::SurfaceKHR &surface)
@@ -96,7 +111,7 @@ namespace VRTR
             featuresChain{
                 {.features = {.samplerAnisotropy = VK_TRUE, .shaderInt64 = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
-                {.scalarBlockLayout = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
+                {.scalarBlockLayout = VK_TRUE, .timelineSemaphore = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},
                 {.extendedDynamicState = VK_TRUE},

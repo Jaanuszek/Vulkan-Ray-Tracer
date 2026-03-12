@@ -48,11 +48,13 @@ namespace VRTR
         return commandBuffers.at(index);
     }
 
+    // TODO chyba niepotrzebne
     void CommandBufferManager::beginCommandBuffer(uint32_t index, vk::CommandBufferBeginInfo beginInfo)
     {
         commandBuffers.at(index).begin(beginInfo);
     }
 
+    // TODO chyba niepotrzebne
     void CommandBufferManager::endCommandBuffer(uint32_t index)
     {
         commandBuffers.at(index).end();

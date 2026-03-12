@@ -112,8 +112,10 @@ namespace VRTR
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
         std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        extensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+        extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 
-    #ifndef NDEBUG
+#ifndef NDEBUG
         if (enableValidationLayers)
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     #endif

@@ -181,7 +181,8 @@ namespace VRTR
 
         for (uint32_t i = 0; i < commandBuffers.size(); i++)
         {
-            commandBufferManager->beginCommandBuffer(i, beginInfo);
+            auto &commandBuffer = commandBufferManager->getCommandBuffer(i);
+            commandBuffer.begin(beginInfo);
             
             const uint32_t handle_size = ctx.properties.rtPipelineProperties.shaderGroupHandleSize;
             const uint32_t handle_alignment = ctx.properties.rtPipelineProperties.shaderGroupHandleAlignment;
@@ -204,11 +205,11 @@ namespace VRTR
 
             vk::StridedDeviceAddressRegionKHR callableShaderSBTEntry{};
 
-            commandBufferManager->getCommandBuffer(i).bindPipeline(
+            commandBuffer.bindPipeline(
                 vk::PipelineBindPoint::eRayTracingKHR,
                 rayTracingPipeline);
 
-            commandBufferManager->getCommandBuffer(i).bindDescriptorSets(
+            commandBuffer.bindDescriptorSets(
                 vk::PipelineBindPoint::eRayTracingKHR,
                 *rayTracingPipelineLayout,
                 0,
@@ -220,7 +221,7 @@ namespace VRTR
                     pushConstantData.indices
                 }};
 
-            commandBufferManager->getCommandBuffer(i).pushConstants<uint64_t>(
+            commandBuffer.pushConstants<uint64_t>(
                 *rayTracingPipelineLayout,
                 vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
                 0,
@@ -228,7 +229,7 @@ namespace VRTR
             );
 
             commandBufferManager->transition_image_layout(
-                commandBufferManager->getCommandBuffer(i),
+                commandBuffer,
                 *storageImage->getImage(),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eGeneral,
@@ -237,7 +238,7 @@ namespace VRTR
                 vk::PipelineStageFlagBits2::eTopOfPipe,
                 vk::PipelineStageFlagBits2::eRayTracingShaderKHR);
 
-            commandBufferManager->getCommandBuffer(i).traceRaysKHR(
+            commandBuffer.traceRaysKHR(
                 raygenShaderSBTEntry,
                 missShaderSBTEntry,
                 hitShaderSBTEntry,
@@ -247,7 +248,7 @@ namespace VRTR
                 1);
 
             commandBufferManager->transition_image_layout(
-                commandBufferManager->getCommandBuffer(i),
+                commandBuffer,
                 swapChainImages->at(i),
                 vk::ImageLayout::eUndefined,
                 vk::ImageLayout::eTransferDstOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
@@ -257,31 +258,35 @@ namespace VRTR
                 {});
 
             commandBufferManager->transition_image_layout(
-                commandBufferManager->getCommandBuffer(i),
+                commandBuffer,
                 *storageImage->getImage(),
                 vk::ImageLayout::eGeneral,
                 vk::ImageLayout::eTransferSrcOptimal, // to jest potrzebne do kopiowania z storage image do swapchain image
                 {},
                 vk::AccessFlagBits2::eTransferRead,
-                vk::PipelineStageFlagBits2::eAllCommands,
+                vk::PipelineStageFlagBits2::eRayTracingShaderKHR,
                 vk::PipelineStageFlagBits2::eTransfer);
 
             vk::ImageCopy copyRegion{
                 .srcSubresource = vk::ImageSubresourceLayers{
                     vk::ImageAspectFlagBits::eColor,
-                    0, 0, 1},
+                    0, 0, 1
+                },
                 .srcOffset = vk::Offset3D{0, 0, 0},
-                .dstSubresource = vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+                .dstSubresource = vk::ImageSubresourceLayers{
+                    vk::ImageAspectFlagBits::eColor,
+                     0, 0, 1
+                },
                 .dstOffset = vk::Offset3D{0, 0, 0},
                 .extent = vk::Extent3D{storageImage->getWidth(), storageImage->getHeight(), 1}};
 
-            commandBufferManager->getCommandBuffer(i).copyImage(
+            commandBuffer.copyImage(
                 *storageImage->getImage(), vk::ImageLayout::eTransferSrcOptimal,
                 swapChainImages->at(i), vk::ImageLayout::eTransferDstOptimal,
                 {copyRegion});
 
             commandBufferManager->transition_image_layout(
-                commandBufferManager->getCommandBuffer(i),
+                commandBuffer,
                 swapChainImages->at(i),
                 vk::ImageLayout::eTransferDstOptimal,
                 vk::ImageLayout::ePresentSrcKHR,
@@ -290,7 +295,7 @@ namespace VRTR
                 {},
                 {});
 
-            commandBufferManager->endCommandBuffer(i);
+            commandBuffer.end();
         }
     }
 

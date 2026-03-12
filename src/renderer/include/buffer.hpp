@@ -52,6 +52,14 @@ namespace VRTR
                BufferType type,
                vk::DeviceSize size);
 
+        // Konstruktor do bufowania buforów external memory
+        Buffer(RendererContext &ctx,
+               vk::DeviceSize size,
+               vk::BufferUsageFlags usage,
+               vk::MemoryPropertyFlags properties,
+               vk::ExternalMemoryHandleTypeFlagBitsKHR externalHandleType);
+
+        // Konstruktor do budowania bufforow za pomocą VMA
         Buffer(vk::raii::Device &logicalDevice, VmaAllocator& vmaAlloc, vk::DeviceSize size,
                vk::BufferUsageFlags usage, const VmaAllocationCreateInfo& allocInfo);
 
@@ -73,6 +81,8 @@ namespace VRTR
         inline const vk::raii::Buffer &getBuffer() const { return buffer; }
 
         vk::Buffer getBufferHandle() const { return *buffer; }
+        
+        vk::DeviceMemory getBufferMemory() const { return *bufferMemory; }
 
         inline vk::DeviceAddress getDeviceAddress() { return deviceAddress; }
 

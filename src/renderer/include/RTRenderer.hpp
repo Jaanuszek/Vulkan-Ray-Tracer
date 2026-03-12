@@ -22,6 +22,8 @@
 #include "Texture.hpp"
 #include "StorageBuffer.hpp"
 #include "GUI.hpp"
+#include "init_cuda.cuh"
+#include "defines.hpp"
 
 namespace VRTR
 {
@@ -38,9 +40,13 @@ namespace VRTR
     private:
         void setupVMA();
 
+        void setupCuda();
+
         void initImGUI(GLFWwindow* window);
 
         void createSyncObjects();
+
+        void createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType);
 
         uint32_t createModel(std::string modelPath, std::string texturePath);
 
@@ -52,8 +58,11 @@ namespace VRTR
 
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createFloor();
 
+        void updateUniformBuffer();
+
     private:
         int width, height;
+        uint64_t frameCount{};
         RendererContext ctx;
 
         std::unique_ptr<GUI> gui;
@@ -66,9 +75,11 @@ namespace VRTR
 
         std::shared_ptr<Camera> camera;
 
+        // internal semaphores and fences for synchronisation
         std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
         std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
         std::vector<vk::raii::Fence> drawFences;
+
 
         std::unordered_map<std::string, std::unique_ptr<Model>> models;
         std::vector<std::string> modelInstanceOrder;
@@ -83,7 +94,13 @@ namespace VRTR
         std::unique_ptr<StorageBuffer> geometrySBO;
         std::unique_ptr<StorageBuffer> materialSBO;
 
-        void updateUniformBuffer();
+        // ================== CUDA ==================
+        cudaStream_t cudaStream;
+        std::unique_ptr<Buffer> cudaInteropBuffer;
+        glm::vec4 *cudaData{};
+        cudaExternalMemory_t cudaExternalMemory{nullptr};
+        vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
+        cudaExternalSemaphore_t extCudaWaitSemaphore, extCudaSignalSemaphore, extCudaTimelineSemaphore;
     };
 
     inline static void framebufferResizeCallback(GLFWwindow *window, int width, int height)
