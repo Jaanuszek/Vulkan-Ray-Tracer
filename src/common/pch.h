@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <cassert>
 #include <queue>
+#include <random>
 
 // GLFW
 #define GLFW_INCLUDE_VULKAN

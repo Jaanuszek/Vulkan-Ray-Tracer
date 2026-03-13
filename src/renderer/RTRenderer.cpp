@@ -9,16 +9,9 @@ namespace VRTR
     RTRenderer::~RTRenderer()
     {
         ctx.logicalDevice.waitIdle();
-        // Must explicitly destroy all VMA-managed resources BEFORE vmaDestroyAllocator.
-        // Member destructors run AFTER the destructor body, so without this the
-        // allocator would be destroyed while allocations are still live → VMA assert → abort().
 
-        // Ptoblem jest taki, ze najpierw wywoluje sie destruktur RTRenderera,
-        // a dopiero potem destruktory pól tej klasy
         scene.reset();
         uniform_buffer.reset();
-        geometrySBO.reset();
-        materialSBO.reset();
         gui.reset();
 
         vmaDestroyAllocator(ctx.vmaAllocator);
@@ -27,26 +20,19 @@ namespace VRTR
     void RTRenderer::init(GLFWwindow *window)
     {
         VRTR_DEBUG("RTRENDERER INIT");
-        // modelInstanceOrder.clear();
 
         glfwGetFramebufferSize(window, &width, &height);
 
-        ctx.instance = InstanceManager::createInstance(ctx);
+        InstanceManager::createInstance(ctx);
 
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Instance>(*ctx.instance));
 
-        DeviceProperties deviceProps = DeviceManager::initDevice(window, ctx.instance);
-        ctx.gpu = std::move(deviceProps.physicalDevice);
-        ctx.surface = std::move(deviceProps.surface);
-        ctx.logicalDevice = std::move(deviceProps.logicalDevice);
-        ctx.queue = std::move(deviceProps.graphicsQueue);
-        ctx.graphics_queue_index = deviceProps.graphicsQueueFamilyIndex;
+        DeviceManager::initDevice(window, ctx);
 
-        setupCuda();
+        vkCudaInteop = std::make_unique<vkCudaInterop>(ctx);
+        vkCudaInteop->init();
 
         setupVMA();
-
-        initImGUI(window);
 
         RayTracingPipeline::initRayTracing(ctx);
 
@@ -56,11 +42,7 @@ namespace VRTR
         commandBufferManager = std::make_shared<CommandBufferManager>(ctx);
         commandBufferManager->init();
 
-        gui->initResources(
-            commandBufferManager->getCommandPool(),
-            swapChainManager->getImageFormat(),
-            static_cast<uint32_t>(swapChainManager->getSwapChainImages().size())
-        );
+        initImGUI(window);
 
         createSyncObjects();
 
@@ -71,49 +53,20 @@ namespace VRTR
 
         createScene();
 
-        // stworzenie storage buffora
-        // TODO GDZIE PRZECHOWYWAC TE BUFFORY?
-        geometrySBO = std::make_unique<StorageBuffer>(ctx, sizeof(GeometryInfo));
-        materialSBO = std::make_unique<StorageBuffer>(ctx, sizeof(Material));
-        
-        auto geometryInfos = scene->getGeometryInfos();
-        auto materials = scene->getMaterials();
-        geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
-        materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
+        uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
+                                            vk::BufferUsageFlagBits{},
+                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                            vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
 
-        // TEMPORARY - Dodam jakiś prosty external buffor, zeby sprawdzic czy CUDA <-> Vulkan interop działa
-        vk::DeviceSize cudaBuffSize = sizeof(glm::vec4);
-        cudaInteropBuffer = std::make_unique<Buffer>(ctx, cudaBuffSize,
-                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        updateUniformBuffer();
 
-        // to jest workaround, bo importCudaExtenralMemory potrzebuje lvalue
-        // Ale nie powinien to byc problem, bo deviceMemory w vulkanie to ejst tylko uchwyt do pamięci,
-        // wiec nie ma potrzeby przekazywania go jako referencje
-        auto cudaBuffDevMem = cudaInteropBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
-                                        cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
-        createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
 
-        // vk::Semaphore vkSemaphoreHandle = *cudaCompleteSemaphore;
-        CUDA::importCudaExternalSemaphore(ctx.logicalDevice,
-                                          extCudaTimelineSemaphore,
-                                          cudaCompleteSemaphore,
-                                          vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
-
-        // auto model = scene->getModel("viking_room");
-        DescriptorResources descriptorResources{};
-        descriptorResources.TLAS = scene->getTLASHandle();
-        descriptorResources.ubo = uniform_buffer->getBufferHandle();
-        descriptorResources.storageImageView = storageImage->getImageViewHandle();
-        scene->updateDescriptorResources(descriptorResources);
-        // TODO meh ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        // Chyba lepiej miec taką jedną fukncje co updatuje to wszystko
-        descriptorResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
-        descriptorResources.materialBuffer = materialSBO->getBufferHandle();
-        descriptorResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
+        DescriptorResources dr{};
+        dr.ubo = uniform_buffer->getBufferHandle();
+        dr.storageImageView = storageImage->getImageViewHandle();
+        scene->appendDescriptorResources(dr);
+        vkCudaInteop->appendDescriptorResources(dr);
 
         auto gi = scene->getGeometryInfo("viking_room");
         PushConstant vikingRoomModelPC{
@@ -123,7 +76,7 @@ namespace VRTR
 
         rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
         rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
-                                descriptorResources,
+                                dr,
                                 commandBufferManager,
                                 width,
                                 height,
@@ -152,21 +105,15 @@ namespace VRTR
         vmaCreateAllocator(&allocatorCI, &ctx.vmaAllocator);
     }
 
-    void RTRenderer::setupCuda()
-    {
-        auto deviceUUID = DeviceManager::getDeviceUUID(ctx.gpu);
-        if(CUDA::initCUDA(deviceUUID.data(), VK_UUID_SIZE) < 0){
-            VRTR_ERROR("Failed to initialize CUDA");
-            exit(EXIT_FAILURE);
-        }
-
-        CUDA_CHECK_ERROR(cudaStreamCreateWithFlags(&cudaStream, cudaStreamNonBlocking));
-    }
-
     void RTRenderer::initImGUI(GLFWwindow* window)
     {
         gui = std::make_unique<GUI>(ctx, sceneSettings);
         gui->init(window, width, height);
+        gui->initResources(
+            commandBufferManager->getCommandPool(),
+            swapChainManager->getImageFormat(),
+            static_cast<uint32_t>(swapChainManager->getSwapChainImages().size())
+        );
     }
 
     void RTRenderer::createSyncObjects()
@@ -193,36 +140,6 @@ namespace VRTR
         }
     }
 
-    // TODO to powinno byc w innym pliku
-    void RTRenderer::createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType)
-    {
-        vk::ExportSemaphoreCreateInfo exportSemaphoreCreateInfo{
-            .handleTypes = handleType
-        };
-
-        // Można zrobic semafory zwykle (ktore mają dwa stany albo signaled albo unsignaled)
-        // Albo mozna zrobic timeline semaphores, które mają licznik 64 bitowy, pozwalający na ustawiaie kolejności
-        // semaforów.
-        // Timeline semafory brzmią ciekawie, eliminują potrzebe fenców,
-        // i nie ma potrzeby tworzenia kazdego semaforu na klatke,
-        // Wystarczyłby jeden semafor timeline, i dla kazdej klatki ustawić wartość tego semafora na jakąś kolejną wartość
-        // np. dla klatki 0 ustawić semafor na 1, dla klatki 1 ustawić semafor na 2 itd.
-#ifdef VK_TIMELINE_SEMAPHORE
-        vk::SemaphoreTypeCreateInfo timelineCreateInfo{
-            .semaphoreType = vk::SemaphoreType::eTimeline,
-            .initialValue = 0
-        };
-        exportSemaphoreCreateInfo.pNext = &timelineCreateInfo;
-#else
-        exportSemaphoreCreateInfo.pNext = nullptr;
-#endif
-        vk::SemaphoreCreateInfo semaphoreCreateInfo{
-            .pNext = &exportSemaphoreCreateInfo,
-            .flags = {}
-        };
-        cudaCompleteSemaphore = vk::raii::Semaphore(ctx.logicalDevice, semaphoreCreateInfo);
-    }
-
     void RTRenderer::updateUniformBuffer()
     {
         sceneSettings.ubo.proj_inverse = glm::inverse(camera->matrices.perspective);
@@ -235,14 +152,6 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating scene");
 
-        // TODO Gdzie powinny byc te buffory? w RTRendererze? czy w Scenie?
-        uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
-                                                  vk::BufferUsageFlagBits{},
-                                                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-                                                  vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
-
-        updateUniformBuffer();
-
         std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
         std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
         std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
@@ -252,7 +161,7 @@ namespace VRTR
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
-        auto [floorVertices, floorIndices] = createFloor();
+        auto [floorVertices, floorIndices] = CustomModels::createRectangle();
         Material floorMat{
             .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
             .type = MaterialType::METALLIC,
@@ -261,7 +170,7 @@ namespace VRTR
         glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
         scene->addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
 
-        auto [wallVertices, wallIndices] = createFloor();
+        auto [wallVertices, wallIndices] = CustomModels::createRectangle();
         Material wallMat{
             .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
             .type = MaterialType::METALLIC,
@@ -284,38 +193,13 @@ namespace VRTR
         // Update camera perspective with new aspect ratio
         camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
-        DescriptorResources desResources{};
-        desResources.TLAS = scene->getTLASHandle();
-        desResources.ubo = uniform_buffer->getBufferHandle();
-        desResources.storageImageView = storageImage->getImageViewHandle();
-        scene->updateDescriptorResources(desResources);
-        desResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
-        desResources.materialBuffer = materialSBO->getBufferHandle();
-        desResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
+        DescriptorResources dr{};
+        dr.ubo = uniform_buffer->getBufferHandle();
+        dr.storageImageView = storageImage->getImageViewHandle();
+        scene->appendDescriptorResources(dr);
+        vkCudaInteop->appendDescriptorResources(dr);
 
-        rayTracingPipeline->updatePipelineDescriptors(desResources, width, height);   
-    }
-
-    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> RTRenderer::createFloor()
-    {
-        std::vector<VertexRT> vertices = {
-            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
-        };
-
-        std::vector<uint32_t> indices = {
-            0, 1, 2,
-            2, 3, 0
-        };
-
-        return {vertices, indices};
-    }
-
-    glm::mat4 RTRenderer::rotateModel(float angle, const glm::vec3 &axis)
-    {
-        return glm::rotate(glm::mat4(1.0f), angle, axis);
+        rayTracingPipeline->updatePipelineDescriptors(dr, width, height);   
     }
 
     void RTRenderer::drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI)
@@ -402,12 +286,12 @@ namespace VRTR
 
             std::array<vk::Semaphore, 2> waitSemaphores = {
                 presentCompleteSemaphores.at(presentSemaphoreIdx),
-                cudaCompleteSemaphore
+                vkCudaInteop->getCudaCompleteSemaphore()
             };
 
             std::array<vk::Semaphore, 2> signalSemaphores = {
                 renderCompleteSemaphores.at(frameIdx),
-                cudaCompleteSemaphore
+                vkCudaInteop->getCudaCompleteSemaphore()
             };
 
             std::array<uint64_t, 2> waitValues = {
@@ -491,18 +375,10 @@ namespace VRTR
            // === CUDA SYNC ===
            uint64_t cudaSemWait = vkToCudaSignalValue;
            uint64_t cudaSemSignal = vkToCudaSignalValue + 1;
-           cudaExternalSemaphoreWaitParams waitParams{};
-           waitParams.flags = 0;
-           waitParams.params.fence.value = cudaSemWait;
 
-           cudaExternalSemaphoreSignalParams signalParams{};
-           signalParams.flags = 0;
-           signalParams.params.fence.value = cudaSemSignal;
-
-           CUDA_CHECK_ERROR(cudaWaitExternalSemaphoresAsync(&extCudaTimelineSemaphore, &waitParams, 1, cudaStream));
-           // Do something in cuda
-           CUDA::stepSim(cudaData, frameCount, cudaStream);
-           CUDA_CHECK_ERROR(cudaSignalExternalSemaphoresAsync(&extCudaTimelineSemaphore, &signalParams, 1, cudaStream));
+           vkCudaInteop->waitForSemapore(cudaSemWait);
+           vkCudaInteop->runKernel(frameCount);
+           vkCudaInteop->signalSemaphore(cudaSemSignal);
 
            cudaToVkWaitValue = cudaSemSignal;
            vkToCudaSignalValue += 2;

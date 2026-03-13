@@ -41,6 +41,7 @@ add_library(${PROJECT_NAME} SHARED
     StorageBuffer.cpp
     GUI.cpp
     Scene.cpp
+    vkCudaInterop.cpp
     ${IMGUI_SOURCES}
     ${IMGUI_BACKEND}
 )

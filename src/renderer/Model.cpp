@@ -166,4 +166,20 @@ namespace VRTR
         texture = std::make_unique<Texture>(ctx, path);
     }
 
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle()
+    {
+        std::vector<VertexRT> vertices = {
+            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+        };
+
+        std::vector<uint32_t> indices = {
+            0, 1, 2,
+            2, 3, 0
+        };
+
+        return {vertices, indices};
+    }
 }

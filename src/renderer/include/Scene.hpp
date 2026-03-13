@@ -3,6 +3,7 @@
 #include "AccelerationStructureManager.hpp"
 #include "Model.hpp"
 #include "DescriptorManager.hpp"
+#include "StorageBuffer.hpp"
 
 /*
     Ta klasa bedzie przechowywala wszystkie obiekty znajdujące się na scenie
@@ -33,20 +34,9 @@ namespace VRTR
             // Wrapper do aktualizacji TLASu (transformacji obiektów)
             void updateTLAS(float deltaTime, const float& rotationAngle);
 
-            /*
-                Ta funkcja updatuje tylko ImagieView i Samplery modeli
-            */
-            void updateDescriptorResources(DescriptorResources& resources);
+            void appendDescriptorResources(DescriptorResources& resources);
 
-            vk::ImageView getModelTextureImageView(const std::string &name) const { return models.at(name)->getTexture().getTextureImageViewHandle(); }
-            vk::Sampler getModelTextureSampler(const std::string &name) const { return models.at(name)->getTexture().getTextureSamplerHandle(); }
-
-            // For descriptor set
-            const vk::AccelerationStructureKHR getTLASHandle() const { return asManager->getTLASHandle(); }
-
-            const std::vector<GeometryInfo>& getGeometryInfos() const { return geometryInfos; }
             const GeometryInfo& getGeometryInfo(const std::string& modelName) const { return models.at(modelName)->getGeometryInfo(); }
-            const std::vector<Material>& getMaterials() const { return materials; }
 
         private:
             void fillSSBOContainers();
@@ -65,11 +55,10 @@ namespace VRTR
             */
             uint32_t textureIndexCounter = 0;
 
-            /* 
-                TODO mysle ze to poniżej ma sens (?)
-                Kontenery przechowujace dane ktore beda przesylane do GPU przez SBO
-            */
             std::vector<GeometryInfo> geometryInfos;
             std::vector<Material> materials;
+
+            std::unique_ptr<StorageBuffer> geometrySBO;
+            std::unique_ptr<StorageBuffer> materialSBO;
     };
 }

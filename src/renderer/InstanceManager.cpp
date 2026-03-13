@@ -29,7 +29,7 @@ namespace VRTR
         return VK_FALSE;
     }
 
-    vk::raii::Instance InstanceManager::createInstance(RendererContext& ctx)
+    void InstanceManager::createInstance(RendererContext& ctx)
     {
         VRTR_DEBUG("CREATING VULKAN INSTANCE");
         if (glfwVulkanSupported() != GLFW_TRUE)
@@ -91,7 +91,7 @@ namespace VRTR
 
         try
         {
-            return vk::raii::Instance(ctx.context, createInfo);
+            ctx.instance = vk::raii::Instance(ctx.context, createInfo);
         }
         catch (const vk::SystemError &e)
         {

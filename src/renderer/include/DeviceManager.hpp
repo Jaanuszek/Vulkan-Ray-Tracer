@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Logger.hpp"
+#include "ConstantsAndStructs.hpp"
 
 namespace VRTR
 {
@@ -10,21 +11,6 @@ namespace VRTR
             - Logical Device
             - Queue Families
     */
-
-    struct DeviceProperties
-    {
-        vk::raii::PhysicalDevice physicalDevice{nullptr};
-        vk::raii::SurfaceKHR surface{nullptr};
-        vk::raii::Device logicalDevice{nullptr};
-        vk::raii::Queue graphicsQueue{nullptr};
-        uint32_t graphicsQueueFamilyIndex = -1;
-
-        DeviceProperties() = default;
-        DeviceProperties(const DeviceProperties&) = delete;
-        DeviceProperties& operator=(const DeviceProperties&) = delete;
-        DeviceProperties(DeviceProperties&&) = default;
-        DeviceProperties& operator=(DeviceProperties&&) = default;
-    };
 
     inline static std::vector<const char *> deviceExtensions // gpu logical device extensions
     {
@@ -50,7 +36,14 @@ namespace VRTR
     class DeviceManager
     {
         public:
-            static DeviceProperties initDevice(GLFWwindow *window, vk::raii::Instance& instance);
+            /*
+                Init vulkan device related resources, such as:
+                    - Physical Device
+                    - Logical Device
+                    - Queue Families
+                Save it into RendererContext struct, to be used later in the application
+            */
+            static void initDevice(GLFWwindow *window, RendererContext& ctx);
             static std::array<uint8_t, VK_UUID_SIZE> getDeviceUUID(const vk::raii::PhysicalDevice &device);
 
         private:

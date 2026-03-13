@@ -25,7 +25,13 @@ namespace VRTR
             throw std::runtime_error("Model file does not exist: " + modelPath);
         }
 
+        // Add some random color to model, to simulate it without texture
+        std::random_device dev;
+        std::mt19937 rng(dev());
+        std::uniform_real_distribution<float> dist (0.0f, 1.0f);
+
         Material mat{
+            .albedo = glm::vec4(dist(rng), dist(rng), dist(rng), 1.0f),
             // TODO dodac obsluge PBR
             .type = MaterialType::PBR,
         };
@@ -81,6 +87,13 @@ namespace VRTR
     void Scene::buildTLAS()
     {
         fillSSBOContainers();
+
+        geometrySBO = std::make_unique<StorageBuffer>(ctx, sizeof(GeometryInfo));
+        materialSBO = std::make_unique<StorageBuffer>(ctx, sizeof(Material));
+
+        geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
+        materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
+
         asManager->buildTLAS();
     }
 
@@ -89,8 +102,9 @@ namespace VRTR
         asManager->updateTLAS(deltaTime, rotationAngle);
     }
 
-    void Scene::updateDescriptorResources(DescriptorResources& resources)
+    void Scene::appendDescriptorResources(DescriptorResources& resources)
     {
+        resources.TLAS = asManager->getTLASHandle();
         resources.texImageViews.clear();
         resources.texSamplers.clear();
 
@@ -107,8 +121,8 @@ namespace VRTR
             }
         }
 
-        // resources.texImageViews.resize(CONSTANTS::MAX_TEXTURES, VK_NULL_HANDLE);
-        // resources.texSamplers.resize(CONSTANTS::MAX_TEXTURES, VK_NULL_HANDLE);
+        resources.geometryInfoBuffer = geometrySBO->getBufferHandle();
+        resources.materialBuffer = materialSBO->getBufferHandle();
     }
 
     void Scene::fillSSBOContainers()

@@ -99,4 +99,9 @@ namespace VRTR
             GeometryInfo geometryInfo;
             bool withTexture = false;
     };
+
+    namespace CustomModels
+    {
+        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createRectangle();
+    }
 }

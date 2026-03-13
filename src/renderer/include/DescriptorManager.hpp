@@ -3,6 +3,7 @@
 #include "Logger.hpp"
 #include "ConstantsAndStructs.hpp"
 #include "Texture.hpp"
+#include "DescriptorManager.hpp"
 
 namespace VRTR
 {
