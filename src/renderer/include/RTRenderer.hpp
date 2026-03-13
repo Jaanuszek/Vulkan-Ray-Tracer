@@ -69,7 +69,7 @@ namespace VRTR
         std::shared_ptr<StorageImage> storageImage;
         std::unique_ptr<Scene> scene;
         std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
-        std::unique_ptr<vkCudaInterop> vkCudaInteop;
+        std::unique_ptr<VRTR::vkCudaInterop> vkCudaInteropManager;
 
         std::shared_ptr<Camera> camera;
 

@@ -29,8 +29,8 @@ namespace VRTR
 
         DeviceManager::initDevice(window, ctx);
 
-        vkCudaInteop = std::make_unique<vkCudaInterop>(ctx);
-        vkCudaInteop->init();
+        vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx);
+        vkCudaInteropManager->init();
 
         setupVMA();
 
@@ -66,7 +66,7 @@ namespace VRTR
         dr.ubo = uniform_buffer->getBufferHandle();
         dr.storageImageView = storageImage->getImageViewHandle();
         scene->appendDescriptorResources(dr);
-        vkCudaInteop->appendDescriptorResources(dr);
+        vkCudaInteropManager->appendDescriptorResources(dr);
 
         auto gi = scene->getGeometryInfo("viking_room");
         PushConstant vikingRoomModelPC{
@@ -197,7 +197,7 @@ namespace VRTR
         dr.ubo = uniform_buffer->getBufferHandle();
         dr.storageImageView = storageImage->getImageViewHandle();
         scene->appendDescriptorResources(dr);
-        vkCudaInteop->appendDescriptorResources(dr);
+        vkCudaInteropManager->appendDescriptorResources(dr);
 
         rayTracingPipeline->updatePipelineDescriptors(dr, width, height);   
     }
@@ -286,12 +286,12 @@ namespace VRTR
 
             std::array<vk::Semaphore, 2> waitSemaphores = {
                 presentCompleteSemaphores.at(presentSemaphoreIdx),
-                vkCudaInteop->getCudaCompleteSemaphore()
+                vkCudaInteropManager->getCudaCompleteSemaphore()
             };
 
             std::array<vk::Semaphore, 2> signalSemaphores = {
                 renderCompleteSemaphores.at(frameIdx),
-                vkCudaInteop->getCudaCompleteSemaphore()
+                vkCudaInteropManager->getCudaCompleteSemaphore()
             };
 
             std::array<uint64_t, 2> waitValues = {
@@ -376,9 +376,9 @@ namespace VRTR
            uint64_t cudaSemWait = vkToCudaSignalValue;
            uint64_t cudaSemSignal = vkToCudaSignalValue + 1;
 
-           vkCudaInteop->waitForSemapore(cudaSemWait);
-           vkCudaInteop->runKernel(frameCount);
-           vkCudaInteop->signalSemaphore(cudaSemSignal);
+           vkCudaInteropManager->waitForSemapore(cudaSemWait);
+           vkCudaInteropManager->runKernel(frameCount);
+           vkCudaInteropManager->signalSemaphore(cudaSemSignal);
 
            cudaToVkWaitValue = cudaSemSignal;
            vkToCudaSignalValue += 2;
