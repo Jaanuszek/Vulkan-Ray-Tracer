@@ -18,7 +18,8 @@ namespace VRTR
         NONE = 0,
         ALBEDO = 1,
         METALLIC = 2,
-        ROUGHNESS = 3
+        ROUGHNESS = 3,
+        PBR = 4,
     };
 
     struct Material
@@ -27,7 +28,7 @@ namespace VRTR
         float metallic; // 4B
         float roughness; // 4B
         MaterialType type; // 4B
-        float _pad;
+        uint32_t textureIndex;
     };
 
     // Struktura przechowująca device addresy buforów wierzchołków i indeksów
@@ -42,11 +43,11 @@ namespace VRTR
     {
         public:
             // temporary constructor, W przyszlosci pewnie informacje o materiale beda odczytywane z pliku modelu
-            Model(RendererContext& ctx, VmaAllocator& vmaAlloc, 
+            Model(RendererContext& ctx,
                     const std::string& modelPath, const std::string& texturePath,
                     const Material& mat = Material{});
 
-            Model(RendererContext& ctx, VmaAllocator& vmaAlloc,
+            Model(RendererContext& ctx,
                     const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
                     const Material& mat = Material{});
 
@@ -55,7 +56,7 @@ namespace VRTR
             static std::string getModelNameFromPath(const std::string& path) { return std::filesystem::path(path).stem().string(); }
 
             void setMaterial(const Material& mat) { material = mat; }
-            GeometryInfo getGeometryInfo() const { return geometryInfo; }
+            const GeometryInfo& getGeometryInfo() const { return geometryInfo; }
             Material getMaterial() const { return material; }
 
             std::string& getName() { return modelName; }
@@ -68,6 +69,7 @@ namespace VRTR
             vk::DeviceAddress getVertexBufferAddress() const { return geometryInfo.vertexBufferAddr; }
             vk::DeviceAddress getIndexBufferAddress() const { return geometryInfo.indexBufferAddr; }
 
+            void setTextureIndex(uint32_t index) { material.textureIndex = index; }
 
             bool hasTexture() const { return withTexture; }
 
@@ -85,7 +87,6 @@ namespace VRTR
 
         private:
             RendererContext &ctx;
-            VmaAllocator *vmaAlloc{nullptr};
 
             std::string modelName;
             std::unique_ptr<mesh> modelMesh;

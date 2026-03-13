@@ -155,6 +155,16 @@ namespace VRTR
         {
             updated = true;
         }
+        if(ImGui::Button("Enable CUDA"))
+        {
+            sceneSettings.ubo.enableCUDA = !sceneSettings.ubo.enableCUDA;
+            updated = true;
+        }
+        if(ImGui::Button("Swap to shadows"))
+        {
+            sceneSettings.ubo.shadowMode = !sceneSettings.ubo.shadowMode;
+            updated = true;
+        }
         ImGui::Text("FPS %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
 

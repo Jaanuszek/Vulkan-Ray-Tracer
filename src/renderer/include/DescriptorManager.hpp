@@ -11,9 +11,8 @@ namespace VRTR
         vk::AccelerationStructureKHR TLAS = nullptr;
         vk::Buffer ubo = nullptr;
         vk::ImageView storageImageView = nullptr;
-        // no i aktualnie moge przechowywac tylko jedną teksture, co jest problematyczne.
-        vk::ImageView texImageView = nullptr; // to powinno byc kontenerem
-        vk::Sampler texSampler = nullptr; // to powinno byc kontenerem
+        std::vector<vk::ImageView> texImageViews;
+        std::vector<vk::Sampler> texSamplers;
         vk::Buffer geometryInfoBuffer = nullptr;
         vk::Buffer materialBuffer = nullptr;
         vk::Buffer cudaColorBuffer = nullptr;

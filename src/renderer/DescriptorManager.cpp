@@ -47,6 +47,7 @@ namespace VRTR
         vk::DescriptorSetLayoutBinding textureBinding{
             .binding = 3,
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            // .descriptorCount = CONSTANTS::MAX_TEXTURES,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
@@ -96,10 +97,11 @@ namespace VRTR
         constexpr uint32_t maxSets = 1; // one for now, but later we will need more
         std::vector<vk::DescriptorPoolSize> poolSizes =
             {
-                {vk::DescriptorType::eAccelerationStructureKHR, maxSets}, // wsparcie dla AS
-                {vk::DescriptorType::eStorageImage, maxSets},             // umozliwienie zapisywania wyniku shaderow do storage image
-                {vk::DescriptorType::eUniformBuffer, maxSets},            // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
-                {vk::DescriptorType::eCombinedImageSampler, maxSets},     // wsparcie dla tekstur
+                {vk::DescriptorType::eAccelerationStructureKHR, maxSets},              // wsparcie dla AS
+                {vk::DescriptorType::eStorageImage, maxSets},                          // umozliwienie zapisywania wyniku shaderow do storage image
+                {vk::DescriptorType::eUniformBuffer, maxSets},                         // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
+                // {vk::DescriptorType::eCombinedImageSampler, CONSTANTS::MAX_TEXTURES},  // wsparcie dla tekstur
+                {vk::DescriptorType::eCombinedImageSampler, 1}, 
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla geometry info buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla CUDA color buffera
@@ -172,19 +174,36 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .pBufferInfo = &bufferInfo};
 
-        vk::DescriptorImageInfo textureImageInfo{
-            .sampler = descriptorResources.texSampler,
-            .imageView = descriptorResources.texImageView,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+        // TODO zajac sie dodaniem wiekszej ilosci tekstud do shaderow
+        // assert(descriptorResources.texImageViews.size() == CONSTANTS::MAX_TEXTURES);
+        // assert(descriptorResources.texSamplers.size() == CONSTANTS::MAX_TEXTURES);
+
+        // std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        // textureImageInfos.reserve(CONSTANTS::MAX_TEXTURES);
+        // for (size_t i = 0; i < CONSTANTS::MAX_TEXTURES; ++i)
+        // {
+        //     textureImageInfos.emplace_back(vk::DescriptorImageInfo{
+        //         .sampler = descriptorResources.texSamplers[i],
+        //         .imageView = descriptorResources.texImageViews[i],
+        //         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        //     });
+        // }
+        // TEMPORARY tylko jedna pierwsza tekstura idzie do shadera
+        std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        textureImageInfos.push_back(vk::DescriptorImageInfo{
+            .sampler = descriptorResources.texSamplers[0],
+            .imageView = descriptorResources.texImageViews[0],
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        });
 
         vk::WriteDescriptorSet textureWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
             .dstBinding = 3,
             .dstArrayElement = 0,
-            .descriptorCount = 1,
+            .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = &textureImageInfo};
+            .pImageInfo = textureImageInfos.data()};
 
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,
@@ -269,19 +288,36 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageImage,
             .pImageInfo = &imageInfo};
 
-        vk::DescriptorImageInfo textureImageInfo{
-            .sampler = descriptorResources.texSampler,
-            .imageView = descriptorResources.texImageView,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+        // texImageViews must already be padded to MAX_TEXTURES (done in Scene::updateDescriptorResources)
+        // assert(descriptorResources.texImageViews.size() == CONSTANTS::MAX_TEXTURES);
+        // assert(descriptorResources.texSamplers.size() == CONSTANTS::MAX_TEXTURES);
+
+        // std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        // textureImageInfos.reserve(CONSTANTS::MAX_TEXTURES);
+        // for (size_t i = 0; i < CONSTANTS::MAX_TEXTURES; ++i)
+        // {
+        //     textureImageInfos.emplace_back(vk::DescriptorImageInfo{
+        //         .sampler = descriptorResources.texSamplers[i],
+        //         .imageView = descriptorResources.texImageViews[i],
+        //         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        //     });
+        // }
+
+        std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        textureImageInfos.push_back(vk::DescriptorImageInfo{
+            .sampler = descriptorResources.texSamplers[0],
+            .imageView = descriptorResources.texImageViews[0],
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        });
 
         vk::WriteDescriptorSet textureWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
             .dstBinding = 3,
             .dstArrayElement = 0,
-            .descriptorCount = 1,
+            .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
             .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = &textureImageInfo};
+            .pImageInfo = textureImageInfos.data()};
 
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,

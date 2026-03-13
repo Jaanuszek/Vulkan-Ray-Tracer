@@ -15,11 +15,10 @@ namespace VRTR
 
         // Ptoblem jest taki, ze najpierw wywoluje sie destruktur RTRenderera,
         // a dopiero potem destruktory pól tej klasy
-        models.clear();
+        scene.reset();
         uniform_buffer.reset();
         geometrySBO.reset();
         materialSBO.reset();
-        asManager.reset();
         gui.reset();
 
         vmaDestroyAllocator(ctx.vmaAllocator);
@@ -28,7 +27,7 @@ namespace VRTR
     void RTRenderer::init(GLFWwindow *window)
     {
         VRTR_DEBUG("RTRENDERER INIT");
-        modelInstanceOrder.clear();
+        // modelInstanceOrder.clear();
 
         glfwGetFramebufferSize(window, &width, &height);
 
@@ -68,58 +67,17 @@ namespace VRTR
         storageImage = std::make_shared<StorageImage>(ctx, width, height);
         storageImage->init(commandBufferManager->getCommandPool());
 
+        scene = std::make_unique<Scene>(ctx);
+
         createScene();
 
-        asManager = std::make_unique<AccelerationStructureManager>(ctx);
-
-        // TODO dodać jakąś lepszą obsługę modeli
-        // Uwzględnić to również w callbacku framebufferResize
-        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
-        std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
-
-        uint32_t blasIndex = createModel(viking_room_model_path, viking_room_texture_path);
-
-        std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
-        std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
-
-        // uint32_t guyBlasIndex = createModel(guy_model_path, "");
-
-        auto [floorVertices, floorIndices] = createFloor();
-        Material floorMat{
-            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
-        models.try_emplace("floor", std::make_unique<Model>(ctx, ctx.vmaAllocator, floorVertices, floorIndices, floorMat));
-        uint32_t floorBlasIdx = asManager->createBLAS(models.at("floor"));
-
-        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-
-        asManager->addInstance(floorBlasIdx, floorModel);
-        modelInstanceOrder.push_back("floor");
-
-        asManager->buildTLAS();
-
         // stworzenie storage buffora
-        geometrySBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(GeometryInfo));
-        materialSBO = std::make_unique<StorageBuffer>(ctx, ctx.vmaAllocator, sizeof(Material));
-
-        std::vector<GeometryInfo> geometryInfos;
-        geometryInfos.reserve(modelInstanceOrder.size());
-        std::vector<Material> materials;
-        materials.reserve(modelInstanceOrder.size());
-        for (const auto& modelName : modelInstanceOrder)
-        {
-            auto it = models.find(modelName);
-            if (it == models.end())
-            {
-                throw std::runtime_error("Model missing for TLAS instance order: " + modelName);
-            }
-            auto& model = it->second;
-            geometryInfos.push_back(model->getGeometryInfo());
-            materials.push_back(model->getMaterial());
-        }
-
+        // TODO GDZIE PRZECHOWYWAC TE BUFFORY?
+        geometrySBO = std::make_unique<StorageBuffer>(ctx, sizeof(GeometryInfo));
+        materialSBO = std::make_unique<StorageBuffer>(ctx, sizeof(Material));
+        
+        auto geometryInfos = scene->getGeometryInfos();
+        auto materials = scene->getMaterials();
         geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
         materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
 
@@ -145,17 +103,19 @@ namespace VRTR
                                           cudaCompleteSemaphore,
                                           vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
 
+        // auto model = scene->getModel("viking_room");
         DescriptorResources descriptorResources{};
-        descriptorResources.TLAS = asManager->getTLASHandle();
+        descriptorResources.TLAS = scene->getTLASHandle();
         descriptorResources.ubo = uniform_buffer->getBufferHandle();
         descriptorResources.storageImageView = storageImage->getImageViewHandle();
-        descriptorResources.texImageView = models.at("viking_room")->getTexture().getTextureImageViewHandle();
-        descriptorResources.texSampler = models.at("viking_room")->getTexture().getTextureSamplerHandle();
+        scene->updateDescriptorResources(descriptorResources);
+        // TODO meh ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        // Chyba lepiej miec taką jedną fukncje co updatuje to wszystko
         descriptorResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         descriptorResources.materialBuffer = materialSBO->getBufferHandle();
         descriptorResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
 
-        auto gi = models.at("viking_room")->getGeometryInfo();
+        auto gi = scene->getGeometryInfo("viking_room");
         PushConstant vikingRoomModelPC{
             .vertices = gi.vertexBufferAddr,
             .indices = gi.indexBufferAddr
@@ -263,31 +223,6 @@ namespace VRTR
         cudaCompleteSemaphore = vk::raii::Semaphore(ctx.logicalDevice, semaphoreCreateInfo);
     }
 
-    uint32_t RTRenderer::createModel(std::string modelPath, std::string texturePath)
-    {
-        Material mat{
-            .albedo = glm::vec4(0.1f,0.4f, 0.8f, 1.0f),
-            // .type = MaterialType::METALLIC,
-        };
-
-        std::string model_name = Model::getModelNameFromPath(modelPath);
-        auto [it, inserted] = models.try_emplace(
-            model_name,
-            std::make_unique<Model>(
-            ctx,
-            ctx.vmaAllocator,
-            modelPath,
-            texturePath,
-            mat));
-
-        uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
-
-        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        asManager->addInstance(blasIndex, rotatedModel);
-        modelInstanceOrder.push_back(model_name);
-        return blasIndex;
-    }
-
     void RTRenderer::updateUniformBuffer()
     {
         sceneSettings.ubo.proj_inverse = glm::inverse(camera->matrices.perspective);
@@ -300,12 +235,45 @@ namespace VRTR
     {
         VRTR_DEBUG("Creating scene");
 
+        // TODO Gdzie powinny byc te buffory? w RTRendererze? czy w Scenie?
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                                   vk::BufferUsageFlagBits{},
                                                   vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                                                   vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
 
         updateUniformBuffer();
+
+        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
+        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
+        std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
+
+        scene->importModel(viking_room_model_path, viking_room_texture_path);
+
+        std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
+        std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
+
+        auto [floorVertices, floorIndices] = createFloor();
+        Material floorMat{
+            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+            .type = MaterialType::METALLIC,
+        };
+
+        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
+        scene->addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
+
+        auto [wallVertices, wallIndices] = createFloor();
+        Material wallMat{
+            .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
+            .type = MaterialType::METALLIC,
+        };
+        glm::mat4 wallModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
+        wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        wallModel = glm::translate(wallModel, glm::vec3(0.0f, -10.0f, -2.0f));
+
+        scene->addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
+
+        // To musi byc na końcu
+        scene->buildTLAS();
     }
 
     void RTRenderer::recreateResources(GLFWwindow *window)
@@ -317,19 +285,10 @@ namespace VRTR
         camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
         DescriptorResources desResources{};
-        desResources.TLAS = asManager->getTLASHandle();
+        desResources.TLAS = scene->getTLASHandle();
         desResources.ubo = uniform_buffer->getBufferHandle();
         desResources.storageImageView = storageImage->getImageViewHandle();
-        // temporary solution
-        for(auto& [name, model] : models)
-        {
-            if (model->hasTexture())
-            {
-                desResources.texImageView = model->getTexture().getTextureImageViewHandle();
-                desResources.texSampler = model->getTexture().getTextureSamplerHandle();
-                break;
-            }
-        }
+        scene->updateDescriptorResources(desResources);
         desResources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         desResources.materialBuffer = materialSBO->getBufferHandle();
         desResources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
@@ -409,7 +368,7 @@ namespace VRTR
 
             if(gui->updateRequired())
             {
-                asManager->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
+                scene->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
                 gui->setUpdated(false);
             }
             updateUniformBuffer(); // Camera UBO update
@@ -542,8 +501,6 @@ namespace VRTR
 
            CUDA_CHECK_ERROR(cudaWaitExternalSemaphoresAsync(&extCudaTimelineSemaphore, &waitParams, 1, cudaStream));
            // Do something in cuda
-           VRTR_INFO("CUDA timeline | vk wait: {}, vk signal: {}, cuda wait: {}, cuda signal: {}",
-                     cudaToVkWaitValue, vkToCudaSignalValue, cudaSemWait, cudaSemSignal);
            CUDA::stepSim(cudaData, frameCount, cudaStream);
            CUDA_CHECK_ERROR(cudaSignalExternalSemaphoresAsync(&extCudaTimelineSemaphore, &signalParams, 1, cudaStream));
 

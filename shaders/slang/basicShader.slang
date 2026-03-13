@@ -1,9 +1,12 @@
 module basicShader;
 __include "utils/pc_helpers";
 __include "utils/helpers";
+__include "utils/constants";
 
 struct CameraData
 {
+    bool enableCUDA;
+    bool shadowMode;
     float3 light_pos;
     column_major float4x4 viewInverse;
     column_major float4x4 projInverse;
@@ -19,7 +22,8 @@ uniform RaytracingAccelerationStructure topLevelAS;
 ConstantBuffer<CameraData> cameraData;
 
 [[vk::binding(3, 0)]]
-uniform Sampler2D colorSampler;
+uniform Sampler2D colorSampler[1];
+// uniform Sampler2D colorSampler[MAX_TEXTURES];
 
 [[vk::binding(4, 0)]]
 StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
@@ -47,9 +51,6 @@ public struct HitAttribute
     float2 bary;
 };
 
-const static uint MAX_RECURSION_DEPTH = 4;
-const static half shadowConst = (half)0.3;
-
 [shader("raygeneration")]
 void rayGenShader()
 {
@@ -74,6 +75,17 @@ void rayGenShader()
     ray.Direction = direction;
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
+    if (cameraData.shadowMode)
+    {
+        RayPayload payload;
+        payload.hitValue = float3(1.0, 1.0, 1.0);
+        payload.shadowed = false;
+        TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
+        float3 shadowColor = payload.shadowed ? shadowConst : float3(1.0, 1.0, 1.0);
+        float3 finalColor = payload.hitValue * shadowColor;
+        outputImage[dispatchIndex.xy] = float4(finalColor, 1.0);
+        return;
+    }
     // RayPayload payload;
     // ========================== SHADOWS
     // payload.hitValue = float3(1.0, 1.0, 1.0);
@@ -108,17 +120,29 @@ void rayGenShader()
             break;
         }
     }
-    // outputImage[dispatchIndex.xy] = float4(color, 1.0);
-    outputImage[dispatchIndex.xy] = float4(color, 1.0) + float4(cudaColorBuffer[0]) * 0.3f;
-    // outputImage[dispatchIndex.xy] = float4(payload.hitValue.bgr, 1.0);
+
+    if (cameraData.enableCUDA)
+    {
+        color = lerp(color, cudaColorBuffer[0].xyz, 0.5f);
+        outputImage[dispatchIndex.xy] = float4(color, 1.0) + float4(cudaColorBuffer[0]) * 0.3f;
+    } else
+    {
+        outputImage[dispatchIndex.xy] = float4(color, 1.0);
+    }
 }
 
 [shader("miss")]
 void missShader(inout RayPayload payload)
 {
     // ========================== SHADOWS
+    if (payload.shadowed)
+    {
+        payload.hitValue = float3(0.0, 0.0, 0.0);
+        payload.shadowed = false;
+        return;
+    }
     // payload.shadowed = false;
-    payload.hitValue = float3(0.0, 0.0, 0.0);
+    // payload.hitValue = float3(0.0, 0.0, 0.0);
 
     float3 worldRayDir = WorldRayDirection();
 
@@ -139,29 +163,78 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
     uint instanceIndex = InstanceIndex();
+    Material mat = materialBuffer[instanceIndex];
+    uint32_t textureIndex = mat.textureIndex; // text
+
     Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
-    float4 color = colorSampler.SampleLevel(tri.uv, 0.0);
+
+    float4 color = float4(mat.albedo.rgb, 1.0);
+    // jezeli textureIndex == MAX_TEXTURES to znaczy ze obiekt nie ma tekstury
+    if (textureIndex < MAX_TEXTURES)
+    {
+        color = colorSampler[textureIndex].SampleLevel(tri.uv, 0.0);
+    }
     // // payload.hitValue = color.bgr; // Color from texture
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
-    if (materialBuffer[instanceIndex].type == MaterialType::METALLIC)
+
+    if(cameraData.shadowMode)
+    {
+        float3 normal = tri.normal;
+        float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+        float3 toLight = cameraData.light_pos - hitPosition;
+        float lightDistance = length(toLight);
+        float3 lightVector = toLight / max(lightDistance, 1e-4);
+        float dot_product = max(dot(lightVector, normal), 0.2);
+
+        float3 baseColor = materialBuffer[instanceIndex].albedo.rgb;
+        float3 shadedColor = baseColor * dot_product;
+        payload.hitValue = shadedColor;
+
+        RayDesc rayDesc;
+        rayDesc.Origin = hitPosition + normal * 0.01;
+        rayDesc.Direction = lightVector;
+        rayDesc.TMin = 0.001;
+        rayDesc.TMax = max(lightDistance - 0.02, 0.001);
+
+        payload.shadowed = true;
+        TraceRay(topLevelAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 0, 0, rayDesc, payload);
+        if (payload.shadowed)
+        {
+            payload.hitValue = shadedColor * shadowConst;
+        }
+        else
+        {
+            payload.hitValue = shadedColor;
+        }
+        return;
+    }
+
+
+    bool isMetallic = materialBuffer[instanceIndex].type == MaterialType::METALLIC;
+    if (isMetallic)
     {
         color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
     }
 
     // ========================== REFLECTIONS
-    float3 normal = tri.normal;
+    float3 normal = normalize(mul((float3x3)ObjectToWorld3x4(), tri.normal));
+    if (dot(normal, WorldRayDirection()) > 0.0f)
+    {
+        normal = -normal;
+    }
     float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 toLight = cameraData.light_pos - hitPosition;
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
-    float dot_product = max(dot(lightVector, normal), 0.6);
-    // payload.hitValue.rgb = materialBuffer[instanceIndex].albedo.rgb * dot_product;
-    payload.hitValue.rgb = (color * dot_product).rgb;
+    float dot_product = max(dot(lightVector, normal), 0.0f);
+    float3 directLighting = (color * dot_product).rgb;
+
+    payload.hitValue.rgb = isMetallic ? directLighting * 0.3f : directLighting;
     payload.distance = RayTCurrent();
     payload.normal = normal;
-    payload.reflector = materialBuffer[instanceIndex].type == MaterialType::METALLIC ? 0.75f : 0.0f;
+    payload.reflector = isMetallic ? 0.75f : 0.0f;
 
     // ========================== SHADOWS
     // float3 normal = tri.normal;

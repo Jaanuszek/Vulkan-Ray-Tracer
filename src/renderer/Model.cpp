@@ -6,10 +6,10 @@
 
 namespace VRTR
 {
-    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc, 
+    Model::Model(RendererContext& ctx,
                 const std::string& modelPath, const std::string& texturePath,
                 const Material& mat)
-        : ctx(ctx), vmaAlloc(&vmaAlloc), material(mat)
+        : ctx(ctx), material(mat)
     {
         VRTR_DEBUG("Creating model from path: {}", modelPath);
 
@@ -29,10 +29,10 @@ namespace VRTR
         }
     }
 
-    Model::Model(RendererContext& ctx, VmaAllocator& vmaAlloc,
+    Model::Model(RendererContext& ctx,
         const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
         const Material& mat)
-        : ctx(ctx), vmaAlloc(&vmaAlloc), material(mat)
+        : ctx(ctx), material(mat)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
@@ -132,7 +132,7 @@ namespace VRTR
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
         auto vmaAllocInfo = getVmaAllocCreateInfo();
 
-        vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, *vmaAlloc, bufferSize, usage, vmaAllocInfo);
+        vertexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.vmaAllocator, bufferSize, usage, vmaAllocInfo);
         vertexBuffer->Update(modelMesh->vertices.data(), bufferSize);
     }
 
@@ -142,7 +142,7 @@ namespace VRTR
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
         auto vmaAllocInfo = getVmaAllocCreateInfo();
 
-        indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, *vmaAlloc, bufferSize, usage, vmaAllocInfo);
+        indexBuffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.vmaAllocator, bufferSize, usage, vmaAllocInfo);
         indexBuffer->Update(modelMesh->indices.data(), bufferSize);
     }
 
