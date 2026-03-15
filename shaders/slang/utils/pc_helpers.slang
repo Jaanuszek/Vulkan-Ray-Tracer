@@ -40,7 +40,7 @@ struct Material
     float metallic; // 4B
     float roughness; // 4B
     MaterialType type; // 4B
-    float _pad;
+    uint32_t textureIndex;
 };
 
 public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Triangle

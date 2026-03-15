@@ -8,7 +8,7 @@ namespace VRTR
     class StorageBuffer
     {
         public:
-            StorageBuffer(RendererContext& ctx, VmaAllocator& vmaAlloc, vk::DeviceSize bufferSize);
+            StorageBuffer(RendererContext& ctx, vk::DeviceSize bufferSize);
             ~StorageBuffer();
 
             const vk::raii::Buffer& getBuffer() const { return storageBuffer; }
@@ -18,7 +18,6 @@ namespace VRTR
 
         private:
             RendererContext& ctx;
-            VmaAllocator& vmaAlloc;
             vk::raii::Buffer storageBuffer{nullptr};
             VmaAllocation storageBufferAlloc{nullptr};
     };

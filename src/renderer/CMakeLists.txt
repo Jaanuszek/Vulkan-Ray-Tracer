@@ -40,6 +40,10 @@ add_library(${PROJECT_NAME} SHARED
     Texture.cpp
     StorageBuffer.cpp
     GUI.cpp
+    Scene.cpp
+    vkCudaInterop.cpp
+    vkFrameSync.cpp
+    FrameManager.cpp
     ${IMGUI_SOURCES}
     ${IMGUI_BACKEND}
 )

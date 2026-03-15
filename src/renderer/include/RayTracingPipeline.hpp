@@ -23,13 +23,14 @@ namespace VRTR
             RayTracingPipeline(RendererContext& ctx, PushConstant& pushConstantData);
 
             void init(std::vector<vk::Image>& swapChainImages,
-                    const DescriptorResources& resources,
+                    DescriptorResources& resources,
                     std::shared_ptr<CommandBufferManager>& commandBufferManager,
-                    int width, int height,
-                    std::shared_ptr<StorageImage>& storageImage
+                    int width, int height
                 );
 
-            void updatePipelineDescriptors(const DescriptorResources& resources, int width, int height);
+            void recreateStorageImage(int width, int height);
+                
+            void updatePipelineDescriptors(DescriptorResources& resources, int width, int height);
 
             static void initRayTracing(RendererContext &ctx);
 
@@ -45,11 +46,11 @@ namespace VRTR
             PushConstant pushConstantData;
 
             std::vector<vk::Image>* swapChainImages = nullptr;
+            std::unique_ptr<StorageImage> storageImage;
             std::unique_ptr<DescriptorManager> descriptorManager;
             std::shared_ptr<CommandBufferManager> commandBufferManager;
-            std::shared_ptr<StorageImage> storageImage;
+
             int width{0}; int height{0};
-            // vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
             vk::raii::PipelineLayout rayTracingPipelineLayout{nullptr};
             vk::raii::Pipeline rayTracingPipeline{nullptr};
 

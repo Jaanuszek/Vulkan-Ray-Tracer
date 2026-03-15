@@ -7,8 +7,8 @@ namespace VRTR
     // Zrobilbym interfejs Buffer
     // i klasy pochodne takie jak vertex buffer, index buffer, storage buffer itd
     // brzmi git hehe
-    StorageBuffer::StorageBuffer(RendererContext& ctx, VmaAllocator& vmaAlloc, size_t typeSize)
-        : ctx(ctx), vmaAlloc(vmaAlloc)
+    StorageBuffer::StorageBuffer(RendererContext& ctx, size_t typeSize)
+        : ctx(ctx)
     {
         // Dla kazdego Storage buffer, tworzymy tablice MAX_OBJECST elementów
         vk::DeviceSize bufferSize = typeSize * CONSTANTS::MAX_OBJECTS;
@@ -28,7 +28,7 @@ namespace VRTR
             .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
         };
         VkBuffer rawStorageBuffer;
-        vmaCreateBuffer(vmaAlloc, reinterpret_cast<VkBufferCreateInfo*>(&storageBufferCI), &storageBufferAllocCI, &rawStorageBuffer, &storageBufferAlloc, nullptr);
+        vmaCreateBuffer(ctx.vmaAllocator, reinterpret_cast<VkBufferCreateInfo*>(&storageBufferCI), &storageBufferAllocCI, &rawStorageBuffer, &storageBufferAlloc, nullptr);
         storageBuffer = vk::raii::Buffer(ctx.logicalDevice, rawStorageBuffer);
     }
 
@@ -38,13 +38,13 @@ namespace VRTR
         {
             VkBuffer rawStorageBuffer = static_cast<VkBuffer>(*storageBuffer);
             storageBuffer.release();
-            vmaDestroyBuffer(vmaAlloc, rawStorageBuffer, storageBufferAlloc);
+            vmaDestroyBuffer(ctx.vmaAllocator, rawStorageBuffer, storageBufferAlloc);
             storageBufferAlloc = nullptr;
         }
     }
 
     void StorageBuffer::copyDataToBuffer(const void *data, vk::DeviceSize size, vk::DeviceSize offset)
     {
-        vmaCopyMemoryToAllocation(vmaAlloc, data, storageBufferAlloc, offset, size);
+        vmaCopyMemoryToAllocation(ctx.vmaAllocator, data, storageBufferAlloc, offset, size);
     }
 }

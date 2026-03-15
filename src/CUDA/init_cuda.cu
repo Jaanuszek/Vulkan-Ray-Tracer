@@ -158,9 +158,11 @@ namespace VRTR::CUDA
 
     __global__ void changePixelColor(glm::vec4 *colors, uint64_t frameIdx)
     {
-        // uint64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        uint64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
         // zmien kolor jednego piksela w zaleznosci od frameIdx
-        *colors = glm::vec4(float(frameIdx % 255) / 255.0f, 0 , float(frameIdx % 255) / 255.0f, 1.0f);
+        if(idx != 0) return;
+        *colors = glm::vec4(float(frameIdx % 255) / 255.0f, 0, float(frameIdx % 255) / 255.0f, 1.0f);
     }
 
     void stepSim(glm::vec4 *colors, uint64_t frameIdx, cudaStream_t cudaStream)

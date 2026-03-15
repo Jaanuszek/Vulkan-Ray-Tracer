@@ -22,7 +22,7 @@ namespace VRTR
     class InstanceManager
     {
         public:
-            static vk::raii::Instance createInstance(RendererContext& ctx);
+            static void createInstance(RendererContext& ctx);
         private:
             static std::vector<const char*> getRequiredExtensions();
             static bool checkExtensionsSupport(const std::vector<const char*>& glfwExtensions,

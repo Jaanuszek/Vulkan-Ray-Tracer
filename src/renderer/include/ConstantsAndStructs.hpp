@@ -26,30 +26,12 @@ namespace VRTR
         Properties properties;
     };
 
-    // struct Vertex
-    // {
-    //     glm::vec2 pos;
-    //     glm::vec3 color;
-    // };
-
-    // struct VertexRT
-    // {
-    //     alignas(16) glm::vec3 pos;
-    //     // float _pad0;
-    //     alignas(8) glm::vec2 texCoord;
-    // };
     struct VertexRT
     {
         glm::vec3 pos;
         glm::vec3 normal;
         glm::vec2 texCoord;
     };
-
-    // struct UniformData
-    // {
-    //     glm::mat4 view_inverse;
-    //     glm::mat4 proj_inverse;
-    // };
 
     namespace CONSTANTS
     {
@@ -69,7 +51,10 @@ namespace VRTR
         const std::filesystem::path EXEC_DIR = getExecutableDir();
         const std::filesystem::path SHADERS_DIR = EXEC_DIR / "../shaders";
         const std::filesystem::path ASSETS_DIR = EXEC_DIR / "../assets";
+        
+        constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
         constexpr uint32_t MAX_OBJECTS = 1024;
+        constexpr uint32_t MAX_TEXTURES = 16;
     }
 }

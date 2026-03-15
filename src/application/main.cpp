@@ -33,7 +33,7 @@ int main()
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
-        GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Siema Eniu", nullptr, nullptr);
+        GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "VRTR", nullptr, nullptr);
 
         SceneSettings sceneSettings{};
 

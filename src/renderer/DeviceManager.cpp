@@ -3,17 +3,14 @@
 
 namespace VRTR
 {
-    DeviceProperties DeviceManager::initDevice(GLFWwindow *window, vk::raii::Instance& instance)
+    void DeviceManager::initDevice(GLFWwindow *window, RendererContext& ctx)
     {
-        DeviceProperties deviceProps;
-
-        deviceProps.physicalDevice = initPhysicalDevice(instance);
-        deviceProps.surface = initSurface(window, instance);
-        deviceProps.graphicsQueueFamilyIndex = findQueueFamilies(deviceProps.physicalDevice, deviceProps.surface);
-        auto [logicalDevice, graphicsQueue] = initLogicalDevice(deviceProps.physicalDevice, deviceProps.graphicsQueueFamilyIndex);
-        deviceProps.logicalDevice = std::move(logicalDevice);
-        deviceProps.graphicsQueue = std::move(graphicsQueue);
-        return deviceProps;
+        ctx.gpu = initPhysicalDevice(ctx.instance);
+        ctx.surface = initSurface(window, ctx.instance);
+        ctx.graphics_queue_index = findQueueFamilies(ctx.gpu, ctx.surface);
+        auto [logicalDevice, graphicsQueue] = initLogicalDevice(ctx.gpu, ctx.graphics_queue_index);
+        ctx.logicalDevice = std::move(logicalDevice);
+        ctx.queue = std::move(graphicsQueue);
     }
 
     std::array<uint8_t, VK_UUID_SIZE> DeviceManager::getDeviceUUID(const vk::raii::PhysicalDevice &device)
@@ -111,13 +108,18 @@ namespace VRTR
             featuresChain{
                 {.features = {.samplerAnisotropy = VK_TRUE, .shaderInt64 = VK_TRUE}},
                 {.shaderDrawParameters = VK_TRUE},
-                {.scalarBlockLayout = VK_TRUE, .timelineSemaphore = VK_TRUE, .bufferDeviceAddress = VK_TRUE},
+                {
+                    .shaderFloat16 = VK_TRUE, .runtimeDescriptorArray = VK_TRUE,
+                    .scalarBlockLayout = VK_TRUE, .timelineSemaphore = VK_TRUE, 
+                    .bufferDeviceAddress = VK_TRUE,
+                },
                 {.synchronization2 = VK_TRUE,
                  .dynamicRendering = VK_TRUE},
                 {.extendedDynamicState = VK_TRUE},
                 {.rayTracingPipeline = VK_TRUE},
                 {.rayQuery = VK_TRUE},
-                {.accelerationStructure = VK_TRUE}};
+                {.accelerationStructure = VK_TRUE}
+            };
 
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = device.getQueueFamilyProperties();
         float queuePriority = 0.0f;

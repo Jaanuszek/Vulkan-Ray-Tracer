@@ -1,0 +1,48 @@
+#pragma once
+
+#include "Logger.hpp"
+#include "ConstantsAndStructs.hpp"
+#include "vkCudaInterop.hpp"
+#include "vkFrameSync.hpp"
+#include "SwapChainManager.hpp"
+
+namespace VRTR
+{
+    constexpr uint64_t TIMEOUT = std::numeric_limits<uint64_t>::max();
+
+    class FrameManager
+    {
+        public:
+            FrameManager(RendererContext &ctx, std::shared_ptr<SwapChainManager> swapChainManager);
+            ~FrameManager() = default;
+
+            void init();
+
+            /* AKA acquireNextFrame */
+            uint32_t acquireNextImage();
+
+            void submitQueue(const std::vector<vk::CommandBuffer>& submitCommandBuffers);
+
+            void presentFrame(uint32_t imageIndex);
+
+            void runCudaFrame(uint64_t frameCount);
+
+            void appendDescriptorResources(DescriptorResources& resources)
+            {
+                vkCudaInteropManager->appendDescriptorResources(resources);
+            }
+
+        private:
+            void waitForFence();
+
+        private:
+            RendererContext &ctx;
+            std::shared_ptr<SwapChainManager> swapChainManager;
+            std::unique_ptr<vkFrameSync> frameSyncManager;
+            std::unique_ptr<vkCudaInterop> vkCudaInteropManager;
+            uint32_t activeImageIndex = 0;
+
+        public:
+            FrameManager() = delete;
+    };
+}

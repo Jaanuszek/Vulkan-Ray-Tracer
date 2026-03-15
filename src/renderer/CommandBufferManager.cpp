@@ -36,7 +36,7 @@ namespace VRTR
             .pNext = nullptr,
             .commandPool = *commandPool,
             .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = MAX_FRAMES_IN_FLIGHT
+            .commandBufferCount = CONSTANTS::MAX_FRAMES_IN_FLIGHT
         };
 
         // Allocate the command buffers (see commandBufferCount above)
@@ -60,52 +60,52 @@ namespace VRTR
         commandBuffers.at(index).end();
     }
 
-    void CommandBufferManager::transition_image_layout(const std::vector<vk::Image>& images, 
-                                                uint32_t imageIndex,
-                                                vk::ImageLayout oldLayout, 
-                                                vk::ImageLayout newLayout,
-                                                vk::AccessFlags2 srcAccessMask,
-                                                vk::AccessFlags2 dstAccessMask,
-                                                vk::PipelineStageFlags2 srcStageMask,
-                                                vk::PipelineStageFlags2 dstStageMask,
-                                                uint32_t baseMipLevel,
-                                                uint32_t levelCount)
-    {
-        vk::ImageMemoryBarrier2 barrier
-        {
-            .pNext = nullptr,
-            .srcStageMask = srcStageMask,
-            .srcAccessMask = srcAccessMask,
-            .dstStageMask = dstStageMask,
-            .dstAccessMask = dstAccessMask,
-            .oldLayout = oldLayout,
-            .newLayout = newLayout,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = images.at(imageIndex),
-            .subresourceRange = {
-                .aspectMask = vk::ImageAspectFlagBits::eColor, 
-                .baseMipLevel = baseMipLevel,
-                .levelCount = levelCount,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            }
-        };
+    // void CommandBufferManager::transition_image_layout(const std::vector<vk::Image>& images, 
+    //                                             uint32_t imageIndex,
+    //                                             vk::ImageLayout oldLayout, 
+    //                                             vk::ImageLayout newLayout,
+    //                                             vk::AccessFlags2 srcAccessMask,
+    //                                             vk::AccessFlags2 dstAccessMask,
+    //                                             vk::PipelineStageFlags2 srcStageMask,
+    //                                             vk::PipelineStageFlags2 dstStageMask,
+    //                                             uint32_t baseMipLevel,
+    //                                             uint32_t levelCount)
+    // {
+    //     vk::ImageMemoryBarrier2 barrier
+    //     {
+    //         .pNext = nullptr,
+    //         .srcStageMask = srcStageMask,
+    //         .srcAccessMask = srcAccessMask,
+    //         .dstStageMask = dstStageMask,
+    //         .dstAccessMask = dstAccessMask,
+    //         .oldLayout = oldLayout,
+    //         .newLayout = newLayout,
+    //         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    //         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    //         .image = images.at(imageIndex),
+    //         .subresourceRange = {
+    //             .aspectMask = vk::ImageAspectFlagBits::eColor, 
+    //             .baseMipLevel = baseMipLevel,
+    //             .levelCount = levelCount,
+    //             .baseArrayLayer = 0,
+    //             .layerCount = 1
+    //         }
+    //     };
 
-        vk::DependencyInfo dependencyInfo
-        {
-            .pNext = nullptr,
-            .dependencyFlags = {},
-            .memoryBarrierCount = 0,
-            .pMemoryBarriers = nullptr,
-            .bufferMemoryBarrierCount = 0,
-            .pBufferMemoryBarriers = nullptr,
-            .imageMemoryBarrierCount = 1,
-            .pImageMemoryBarriers = &barrier
-        };
+    //     vk::DependencyInfo dependencyInfo
+    //     {
+    //         .pNext = nullptr,
+    //         .dependencyFlags = {},
+    //         .memoryBarrierCount = 0,
+    //         .pMemoryBarriers = nullptr,
+    //         .bufferMemoryBarrierCount = 0,
+    //         .pBufferMemoryBarriers = nullptr,
+    //         .imageMemoryBarrierCount = 1,
+    //         .pImageMemoryBarriers = &barrier
+    //     };
 
-        commandBuffers.at(currentFrame).pipelineBarrier2(dependencyInfo);
-    }
+    //     commandBuffers.at(imageIndex).pipelineBarrier2(dependencyInfo);
+    // }
 
     void CommandBufferManager::transition_image_layout(vk::raii::CommandBuffer& commandBuffer,
                                                 const vk::Image& image, 
