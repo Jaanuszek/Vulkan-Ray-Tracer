@@ -51,6 +51,8 @@ namespace VRTR
         const std::filesystem::path EXEC_DIR = getExecutableDir();
         const std::filesystem::path SHADERS_DIR = EXEC_DIR / "../shaders";
         const std::filesystem::path ASSETS_DIR = EXEC_DIR / "../assets";
+        
+        constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
         constexpr uint32_t MAX_OBJECTS = 1024;
         constexpr uint32_t MAX_TEXTURES = 16;

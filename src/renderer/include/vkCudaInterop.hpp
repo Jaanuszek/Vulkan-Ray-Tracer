@@ -16,23 +16,25 @@ namespace VRTR
 
             void init();
 
-            // Czy to dobry pomysl zeby oddzielac wait i signal?
-            // Czy moze lepiej to zrobic w jednej funkcji wraz z wywolaniem kernela?
-            void waitForSemapore(uint64_t waitValue);
-
-            void signalSemaphore(uint64_t signalValue);
-
-            // Trzeba jakos przekminic jak to zrobic zeby mozna bylo rozne kernele tu odpalić
-            void runKernel(uint64_t frameCount);
+            void runCudaFrame(uint64_t frameCount);
 
             void appendDescriptorResources(DescriptorResources& resources);
 
             vk::Semaphore getCudaCompleteSemaphore() const { return *cudaCompleteSemaphore; }
 
+            uint64_t getVkWaitValue() const { return cudaToVkWaitValue; }
+            uint64_t getVkSignalValue() const { return vkToCudaSignalValue; }
+
         private:
             void setupCuda();
 
             void createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits handleType);
+
+            void waitForSemapore(uint64_t waitValue);
+
+            void signalSemaphore(uint64_t signalValue);
+
+            void runKernel(uint64_t frameCount);
 
         private:
             RendererContext &ctx;
@@ -41,6 +43,10 @@ namespace VRTR
             std::unique_ptr<Buffer> cudaInteropBuffer;
             glm::vec4 *cudaData{};
             cudaExternalMemory_t cudaExternalMemory{nullptr};
+
+            uint64_t cudaToVkWaitValue{0};
+            uint64_t vkToCudaSignalValue{1};
+
             vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
             cudaExternalSemaphore_t  extCudaTimelineSemaphore;
     };

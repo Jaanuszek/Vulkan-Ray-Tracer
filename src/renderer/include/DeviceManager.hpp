@@ -36,6 +36,9 @@ namespace VRTR
     class DeviceManager
     {
         public:
+            DeviceManager() = delete;
+            DeviceManager(const DeviceManager&) = delete;
+            DeviceManager& operator=(const DeviceManager&) = delete;
             /*
                 Init vulkan device related resources, such as:
                     - Physical Device

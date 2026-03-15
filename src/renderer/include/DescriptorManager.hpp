@@ -9,6 +9,7 @@ namespace VRTR
 {
     struct DescriptorResources
     {
+        // TODO zaimplementowac dirty flag design pattern tutaj
         vk::AccelerationStructureKHR TLAS = nullptr;
         vk::Buffer ubo = nullptr;
         vk::ImageView storageImageView = nullptr;

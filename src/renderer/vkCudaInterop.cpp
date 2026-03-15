@@ -46,6 +46,19 @@ namespace VRTR
                                           vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
     }
 
+    void vkCudaInterop::runCudaFrame(uint64_t frameCount)
+    {
+        uint64_t cudaSemWait = vkToCudaSignalValue;
+        uint64_t cudaSemSignal = vkToCudaSignalValue + 1;
+
+        waitForSemapore(cudaSemWait);
+        runKernel(frameCount);
+        signalSemaphore(cudaSemSignal);
+
+        cudaToVkWaitValue = cudaSemSignal;
+        vkToCudaSignalValue += 2;
+    }
+
     void vkCudaInterop::waitForSemapore(uint64_t waitValue)
     {
         cudaExternalSemaphoreWaitParams waitParams{};

@@ -9,35 +9,42 @@ namespace VRTR
     }
 
     void RayTracingPipeline::init(std::vector<vk::Image>& swapChainImages,
-                                const DescriptorResources& resources,
+                                DescriptorResources& resources,
                                 std::shared_ptr<CommandBufferManager>& commandBufferManager,
-                                int width, int height,
-                                std::shared_ptr<StorageImage>& storageImage
+                                int width, int height
                                 )
     {
         this->swapChainImages = &swapChainImages;
         this->commandBufferManager = commandBufferManager;
-        this->storageImage = storageImage;
         this->width = width;
         this->height = height;
 
-        descriptorManager = std::make_unique<DescriptorManager>(ctx);
+        storageImage = std::make_unique<StorageImage>(ctx, width, height);
+        storageImage->init(commandBufferManager->getCommandPool());
 
+        // TODO meh
+        resources.storageImageView = storageImage->getImageViewHandle();
+
+        descriptorManager = std::make_unique<DescriptorManager>(ctx);
         descriptorManager->init(resources);
 
         createRayTracingPipeline();
         createShaderBindingTable();
 
-        // descriptorManager->init(resources);
-
         buildRTCommandBuffers();
     }
 
-    void RayTracingPipeline::updatePipelineDescriptors(const DescriptorResources& resources, int width, int height)
+    void RayTracingPipeline::recreateStorageImage(int width, int height)
+    {
+        storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
+    }
+
+    void RayTracingPipeline::updatePipelineDescriptors(DescriptorResources& resources, int width, int height)
     {
         this->width = width;
         this->height = height;
 
+        resources.storageImageView = storageImage->getImageViewHandle();
         descriptorManager->setDescriptorResources(resources);
 
         descriptorManager->updateDescriptorSets();
@@ -159,18 +166,10 @@ namespace VRTR
 
     void RayTracingPipeline::buildRTCommandBuffers()
     {
+        VRTR_DEBUG("Building Ray Tracing Command Buffers");
         vk::CommandBufferBeginInfo beginInfo{
             .flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse,
             .pInheritanceInfo = nullptr};
-
-        // vk::ImageSubresourceRange subresourceRange
-        // {
-        //     .aspectMask = vk::ImageAspectFlagBits::eColor,
-        //     .baseMipLevel = 0,
-        //     .levelCount = 1,
-        //     .baseArrayLayer = 0,
-        //     .layerCount = 1
-        // };
 
         auto &commandBuffers = commandBufferManager->getCommandBuffers();
 
