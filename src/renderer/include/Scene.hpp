@@ -12,6 +12,8 @@
     czyli w zasadzie o scenie
 */
 
+const std::string LIGHT_MODEL_NAME = "light_object";
+
 namespace VRTR
 {
     class Scene
@@ -55,10 +57,14 @@ namespace VRTR
             */
             uint32_t textureIndexCounter = 0;
 
+            std::vector<uint32_t> triToPatchGlobal;
+            std::vector<Patch> patchesGlobal;
+
             std::vector<GeometryInfo> geometryInfos;
             std::vector<Material> materials;
 
             std::unique_ptr<StorageBuffer> geometrySBO;
             std::unique_ptr<StorageBuffer> materialSBO;
+            std::unique_ptr<StorageBuffer> triToPatchBuffer;
     };
 }

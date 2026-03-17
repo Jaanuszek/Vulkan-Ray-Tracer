@@ -7,6 +7,7 @@ struct CameraData
 {
     bool enableCUDA;
     bool shadowMode;
+    bool debugPatches;
     float3 light_pos;
     column_major float4x4 viewInverse;
     column_major float4x4 projInverse;
@@ -33,6 +34,9 @@ StructuredBuffer<Material, Std140DataLayout> materialBuffer;
 
 [[vk::binding(6, 0)]]
 StructuredBuffer<float4> cudaColorBuffer;
+
+[[vk::binding(7, 0)]]
+StructuredBuffer<uint32_t> triToPatchBuffer;
 
 [[vk::push_constant]] internal pc_blas blasAddr;
 
@@ -163,10 +167,14 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
     uint instanceIndex = InstanceIndex();
+    uint triangleIndex = PrimitiveIndex();
+    uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
+    uint patchId = triToPatchBuffer[triGlobalIndex];
+
     Material mat = materialBuffer[instanceIndex];
     uint32_t textureIndex = mat.textureIndex; // text
 
-    Triangle tri = unpackTriangle(PrimitiveIndex(), instanceIndex, attribs);
+    Triangle tri = unpackTriangle(triangleIndex, instanceIndex, attribs);
 
     float4 color = float4(mat.albedo.rgb, 1.0);
     // jezeli textureIndex == MAX_TEXTURES to znaczy ze obiekt nie ma tekstury
@@ -178,7 +186,17 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
+    if (cameraData.debugPatches)
+    {
+        float3 c = patchColor(patchId);
+        payload.hitValue = c;
 
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0;
+        return;
+    }
+    
     if(cameraData.shadowMode)
     {
         float3 normal = tri.normal;
@@ -235,33 +253,4 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     payload.distance = RayTCurrent();
     payload.normal = normal;
     payload.reflector = isMetallic ? 0.75f : 0.0f;
-
-    // ========================== SHADOWS
-    // float3 normal = tri.normal;
-    // float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    // float3 toLight = cameraData.light_pos - hitPosition;
-    // float lightDistance = length(toLight);
-    // float3 lightVector = toLight / max(lightDistance, 1e-4);
-    // float dot_product = max(dot(lightVector, normal), 0.2);
-
-    // float3 baseColor = materialBuffer[instanceIndex].albedo.rgb;
-    // float3 shadedColor = baseColor * dot_product;
-    // payload.hitValue = shadedColor;
-
-    // RayDesc rayDesc;
-    // rayDesc.Origin = hitPosition + normal * 0.01;
-    // rayDesc.Direction = lightVector;
-    // rayDesc.TMin = 0.001;
-    // rayDesc.TMax = max(lightDistance - 0.02, 0.001);
-
-    // payload.shadowed = true;
-    // TraceRay(topLevelAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 0, 0, rayDesc, payload);
-    // if (payload.shadowed)
-    // {
-    //     payload.hitValue = shadedColor * shadowConst;
-    // }
-    // else
-    // {
-    //     payload.hitValue = shadedColor;
-    // }
 }

@@ -111,6 +111,10 @@ namespace VRTR
             }
         }
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
+
+        #ifdef enableRadiosity
+            buildPatches();
+        #endif
     }
 
     const VmaAllocationCreateInfo Model::getVmaAllocCreateInfo()
@@ -164,6 +168,44 @@ namespace VRTR
         assert(std::filesystem::exists(path));
 
         texture = std::make_unique<Texture>(ctx, path);
+    }
+
+    void Model::buildPatches()
+    {
+        triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
+        patchIdToTriangleId.resize(triCount);
+        patches.clear();
+        patches.reserve(triCount);
+
+        for (uint32_t i = 0; i < triCount; i++)
+        {
+            uint32_t i0 = modelMesh->indices[3 * i + 0];
+            uint32_t i1 = modelMesh->indices[3 * i + 1];
+            uint32_t i2 = modelMesh->indices[3 * i + 2];
+
+            const auto& v0 = modelMesh->vertices[i0];
+            const auto& v1 = modelMesh->vertices[i1];
+            const auto& v2 = modelMesh->vertices[i2];
+
+            glm::vec3 e1 = v1.pos - v0.pos; 
+            glm::vec3 e2 = v2.pos - v0.pos;
+            glm::vec3 n = glm::normalize(glm::cross(e1, e2));
+
+            // glm::length(glm::cross(e1,e2)) to pole równoległoboku rozpiętego na wektorach e1 i e2
+            // Zeby uzyskac pole trójkąta trzeba podzielić to przez 2
+            float area = 0.5f * glm::length(glm::cross(e1, e2));
+            glm::vec3 center = (v0.pos + v1.pos + v2.pos) / 3.0f;
+
+            Patch p{};
+            p.id = i;
+            p.area = area;
+            p.center = center;
+            p.normal = n;
+            p.albedo = material.albedo;
+
+            patches.push_back(p);
+            patchIdToTriangleId[i] = i;
+        }
     }
 
     std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle()

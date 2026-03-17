@@ -22,6 +22,8 @@ public struct pc_blas
 
 struct GeometryInfo
 {
+    uint32_t triToPatchOffset;
+    uint32_t triangleCount;
     uint64_t verticesAddress;
     uint64_t indicesAddress;
 };

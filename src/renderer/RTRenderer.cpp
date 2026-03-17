@@ -155,6 +155,13 @@ namespace VRTR
 
         scene->addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
 
+        glm::mat4 lightObjectModel = glm::translate(glm::mat4(1.0f), sceneSettings.ubo.light_pos);
+        lightObjectModel = glm::scale(lightObjectModel, glm::vec3(0.2f));
+        scene->addObject(LIGHT_MODEL_NAME, floorVertices, floorIndices, Material{
+            .albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+            .type = MaterialType::ALBEDO,
+        }, lightObjectModel);
+
         // To musi byc na końcu
         scene->buildTLAS();
     }

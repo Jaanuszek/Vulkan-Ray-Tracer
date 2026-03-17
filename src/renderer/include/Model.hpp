@@ -5,6 +5,8 @@
 #include "Texture.hpp"
 #include "VmaUsage.h"
 
+#define enableRadiosity 1
+
 namespace VRTR
 {
     struct mesh
@@ -35,6 +37,8 @@ namespace VRTR
     // Przechowuje również indeks materiału, ktory bedzie uzyty w shaderach
     struct GeometryInfo
     {
+        uint32_t triToPatchOffset;
+        uint32_t triangleCount;
         uint64_t vertexBufferAddr;
         uint64_t indexBufferAddr;
     };
@@ -55,13 +59,17 @@ namespace VRTR
 
             static std::string getModelNameFromPath(const std::string& path) { return std::filesystem::path(path).stem().string(); }
 
-            void setMaterial(const Material& mat) { material = mat; }
+            // void setMaterial(const Material& mat) { material = mat; }
             const GeometryInfo& getGeometryInfo() const { return geometryInfo; }
             Material getMaterial() const { return material; }
 
             std::string& getName() { return modelName; }
 
-            mesh& getMesh() { return *modelMesh; }
+            // mesh& getMesh() { return *modelMesh; }
+            const std::vector<Patch>& getPatches() const { return patches; }
+            const std::vector<uint32_t>& getPatchIdToTriangleId() const { return patchIdToTriangleId; }
+
+            const uint32_t getTriangleCount() const { return triCount; }
 
             size_t getVertexCount() const { return modelMesh->vertices.size(); }
             size_t getIndexCount() const { return modelMesh->indices.size(); }
@@ -84,15 +92,30 @@ namespace VRTR
             void createIndexBuffer();
             void setGeometryInfo();
             void loadTexture(const std::string &path);
+            void buildPatches();
 
         private:
             RendererContext &ctx;
 
+            uint32_t triCount{};
             std::string modelName;
             std::unique_ptr<mesh> modelMesh;
 
             std::unique_ptr<Buffer> vertexBuffer;
             std::unique_ptr<Buffer> indexBuffer;
+
+            std::vector<Patch> patches;
+
+            /*
+                Jest to wazne w przypadku gdybym chcial na przyklad 
+                miec dwa trojkaty jako jeden patch
+                triangle 0 -> patch 0
+                triangle 1 -> patch 0
+                triangle 2 -> patch 1
+                triangle 3 -> patch 1
+            */
+
+            std::vector<uint32_t> patchIdToTriangleId;
 
             std::unique_ptr<Texture> texture;
             Material material;

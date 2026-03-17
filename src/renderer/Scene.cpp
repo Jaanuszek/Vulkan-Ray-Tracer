@@ -90,9 +90,11 @@ namespace VRTR
 
         geometrySBO = std::make_unique<StorageBuffer>(ctx, sizeof(GeometryInfo));
         materialSBO = std::make_unique<StorageBuffer>(ctx, sizeof(Material));
+        triToPatchBuffer = std::make_unique<StorageBuffer>(ctx, triToPatchGlobal.size() * sizeof(uint32_t));
 
         geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
         materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
+        triToPatchBuffer->copyDataToBuffer(triToPatchGlobal.data(), triToPatchGlobal.size() * sizeof(uint32_t));
 
         asManager->buildTLAS();
     }
@@ -123,16 +125,19 @@ namespace VRTR
 
         resources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         resources.materialBuffer = materialSBO->getBufferHandle();
+        resources.triToPatchBuffer = triToPatchBuffer->getBufferHandle();
     }
 
     void Scene::fillSSBOContainers()
     {
         geometryInfos.clear();
-        geometryInfos.reserve(models.size());
         materials.clear();
+        geometryInfos.reserve(models.size());
         materials.reserve(models.size());
-        // GeometryInfos i materials musza byc w takiej samej kolejnosci jak dodawane są obiekty do sceny
-        // Ale korzystam z std::map wiec tutaj mamy zapewnienie ze wszystko jest
+
+        uint32_t globalPatchBase = 0;
+        uint32_t triToPatchOffset = 0;
+
         for (const auto& modelName : modelInstanceOrder)
         {
             if (models.find(modelName) == models.end())
@@ -142,8 +147,27 @@ namespace VRTR
 
             const auto& model = models.at(modelName);
 
-            geometryInfos.push_back(model->getGeometryInfo());
+            GeometryInfo gi = model->getGeometryInfo();
+            gi.triToPatchOffset = triToPatchOffset;
+            gi.triangleCount = static_cast<uint32_t>(model->getTriangleCount());
+            geometryInfos.push_back(gi);
+
             materials.push_back(model->getMaterial());
+
+            for(uint32_t localPatchId : model->getPatchIdToTriangleId())
+            {
+                triToPatchGlobal.push_back(globalPatchBase + localPatchId);
+            }
+
+            for(const auto& patchLocal : model->getPatches())
+            {
+                Patch p = patchLocal;
+                p.id = globalPatchBase + patchLocal.id;
+                patchesGlobal.push_back(p);
+            }
+
+            triToPatchOffset += gi.triangleCount;
+            globalPatchBase += static_cast<uint32_t>(model->getPatches().size());
         }
     }
 }

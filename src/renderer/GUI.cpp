@@ -165,6 +165,11 @@ namespace VRTR
             sceneSettings.ubo.shadowMode = !sceneSettings.ubo.shadowMode;
             updated = true;
         }
+        if(ImGui::Button("Debug Patches"))
+        {
+            sceneSettings.ubo.debugPatches = !sceneSettings.ubo.debugPatches;
+            updated = true;
+        }
         ImGui::Text("FPS %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
 

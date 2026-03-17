@@ -18,6 +18,7 @@ namespace VRTR
         vk::Buffer geometryInfoBuffer = nullptr;
         vk::Buffer materialBuffer = nullptr;
         vk::Buffer cudaColorBuffer = nullptr;
+        vk::Buffer triToPatchBuffer = nullptr;
     };
 
     class DescriptorManager

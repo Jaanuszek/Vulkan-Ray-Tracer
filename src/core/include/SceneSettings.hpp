@@ -9,7 +9,8 @@ struct UniformData
 {
     alignas(4) bool enableCUDA = false; // bool w std140 jest traktowany jako 4 bajty xd
     alignas(4) bool shadowMode = false;
-    glm::vec3 light_pos;
+    alignas(4) bool debugPatches = false;
+    glm::vec3 light_pos = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::mat4 view_inverse;
     glm::mat4 proj_inverse;
 };
