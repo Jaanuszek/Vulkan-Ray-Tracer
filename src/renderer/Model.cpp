@@ -222,8 +222,12 @@ namespace VRTR
             p.albedo = material.albedo;
             if(material.type == MaterialType::LIGHT)
             {
-                p.emiission = 1.0f;
+                p.emission = 1.0f;
             }
+
+            // Initial radiosity state: emitters start with energy available to shoot.
+            p.unshotEnergy = p.emission;
+            p.radiosity = p.emission;
 
             patches.push_back(p);
         }

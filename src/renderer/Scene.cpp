@@ -143,17 +143,17 @@ namespace VRTR
         auto geometryBufferSize = CONSTANTS::MAX_OBJECTS * sizeof(GeometryInfo);
         auto materialBufferSize = CONSTANTS::MAX_OBJECTS * sizeof(Material);
         auto triToPatchBufferSize = triToPatchGlobal.size() * sizeof(uint32_t);
-        auto patchBufferSize = patchesGlobal.size() * sizeof(Patch);
+        // auto patchBufferSize = patchesGlobal.size() * sizeof(Patch);
 
         geometrySBO = std::make_unique<StorageBuffer>(ctx, geometryBufferSize);
         materialSBO = std::make_unique<StorageBuffer>(ctx, materialBufferSize);
         triToPatchBuffer = std::make_unique<StorageBuffer>(ctx, triToPatchBufferSize);
-        patchBuffer = std::make_unique<StorageBuffer>(ctx, patchBufferSize);
+        // patchBuffer = std::make_unique<StorageBuffer>(ctx, patchBufferSize);
 
         geometrySBO->copyDataToBuffer(geometryInfos.data(), geometryInfos.size() * sizeof(GeometryInfo));
         materialSBO->copyDataToBuffer(materials.data(), materials.size() * sizeof(Material));
         triToPatchBuffer->copyDataToBuffer(triToPatchGlobal.data(), triToPatchGlobal.size() * sizeof(uint32_t));
-        patchBuffer->copyDataToBuffer(patchesGlobal.data(), patchesGlobal.size() * sizeof(Patch));
+        // patchBuffer->copyDataToBuffer(patchesGlobal.data(), patchesGlobal.size() * sizeof(Patch));
 
         asManager->buildTLAS();
     }
@@ -190,7 +190,7 @@ namespace VRTR
         resources.geometryInfoBuffer = geometrySBO->getBufferHandle();
         resources.materialBuffer = materialSBO->getBufferHandle();
         resources.triToPatchBuffer = triToPatchBuffer->getBufferHandle();
-        resources.patchBuffer = patchBuffer->getBufferHandle();
+        // resources.patchBuffer = patchBuffer->getBufferHandle();
     }
 
     void Scene::updatePatchData(uint8_t patchSize)
@@ -203,7 +203,7 @@ namespace VRTR
         fillSSBOContainers();
 
         triToPatchBuffer->copyDataToBuffer(triToPatchGlobal.data(), triToPatchGlobal.size() * sizeof(uint32_t));
-        patchBuffer->copyDataToBuffer(patchesGlobal.data(), patchesGlobal.size() * sizeof(Patch));
+        // patchBuffer->copyDataToBuffer(patchesGlobal.data(), patchesGlobal.size() * sizeof(Patch));
     }
 
     void Scene::fillSSBOContainers()

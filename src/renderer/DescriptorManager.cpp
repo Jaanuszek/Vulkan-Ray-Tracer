@@ -87,6 +87,13 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
+        vk::DescriptorSetLayoutBinding selectedPatchLayout{
+            .binding = 9,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             ASLayout,
             storageImageLayout,
@@ -96,7 +103,8 @@ namespace VRTR
             materialBufferLayout,
             cudaColorBufferLayout,
             triToPatchBufferLayout,
-            patchBufferLayout
+            patchBufferLayout,
+            selectedPatchLayout
         };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -121,7 +129,8 @@ namespace VRTR
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla CUDA color buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla triToPatch buffera    
-                {vk::DescriptorType::eStorageBuffer, maxSets}             // wsparcie dla patch buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla selected patch buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -292,6 +301,20 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &patchBufferInfo};
 
+        vk::DescriptorBufferInfo selectedPatchBufferInfo{
+            .buffer = descriptorResources.selectedPatchBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet selectedPatchBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 9,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &selectedPatchBufferInfo};
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
@@ -301,7 +324,8 @@ namespace VRTR
             materialBufferWrite,
             cudaColorBufferWrite,
             triToPatchBufferWrite,
-            patchBufferWrite
+            patchBufferWrite,
+            selectedPatchBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
@@ -436,6 +460,20 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &patchBufferInfo};
 
+        vk::DescriptorBufferInfo selectedPatchBufferInfo{
+            .buffer = descriptorResources.selectedPatchBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet selectedPatchBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 9,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &selectedPatchBufferInfo};
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             resultImageWrite,
             textureWrite,
@@ -443,7 +481,8 @@ namespace VRTR
             materialBufferWrite,
             cudaColorBufferWrite,
             triToPatchBufferWrite,
-            patchBufferWrite
+            patchBufferWrite,
+            selectedPatchBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

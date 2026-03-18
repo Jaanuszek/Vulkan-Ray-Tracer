@@ -165,8 +165,8 @@ namespace VRTR::CUDA
         *colors = glm::vec4(float(frameIdx % 255) / 255.0f, 0, float(frameIdx % 255) / 255.0f, 1.0f);
     }
 
-    void stepSim(glm::vec4 *colors, uint64_t frameIdx, cudaStream_t cudaStream)
-    {
-        changePixelColor<<<1, 1, 0, cudaStream>>>(colors, frameIdx);
-    }
+    // void stepSim(cudaStream_t cudaStream)
+    // {
+    //     changePixelColor<<<1, 1, 0, cudaStream>>>(colors, frameIdx);
+    // }
 }

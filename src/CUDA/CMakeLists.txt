@@ -6,6 +6,7 @@ project(cuda_lib VERSION 1.0.0 DESCRIPTION "CUDA library for Vulkan Ray Tracer")
 add_library(${PROJECT_NAME}
     SHARED
     init_cuda.cu
+    Radiosity.cu
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

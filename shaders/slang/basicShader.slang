@@ -20,9 +20,17 @@ struct Patch
     uint32_t id;
     float area;
     float emiission = 0.0f;
+    float unshotEnergy = 0.0f;
+    float radiosity = 0.0f; 
     float3 center;
     float3 normal;
     float3 albedo;
+};
+
+struct SelectedPatch
+{
+    uint32_t id;
+    float unshotEnergy;
 };
 
 
@@ -53,6 +61,9 @@ StructuredBuffer<uint32_t> triToPatchBuffer;
 
 [[vk::binding(8, 0)]]
 StructuredBuffer<Patch, Std140DataLayout> patchBuffer;
+
+[[vk::binding(9, 0)]]
+StructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
 
 [[vk::push_constant]] internal pc_blas blasAddr;
 
@@ -187,6 +198,9 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
     uint patchId = triToPatchBuffer[triGlobalIndex];
 
+    uint selectedPatchId = selectedPatchesBuffer[0].id;
+    float unshotEnergy = selectedPatchesBuffer[0].unshotEnergy;
+
     Material mat = materialBuffer[instanceIndex];
     uint32_t textureIndex = mat.textureIndex; // text
 
@@ -201,6 +215,16 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // // payload.hitValue = color.bgr; // Color from texture
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
+
+    if(patchId == selectedPatchId)
+    {
+        color = float4(1.0, unshotEnergy, 0.0, 1.0);
+        payload.hitValue = color.bgr;
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
+    }
 
     if(cameraData.debugNormals)
     {

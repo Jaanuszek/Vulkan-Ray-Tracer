@@ -41,12 +41,11 @@ namespace VRTR
 
         initImGUI(window);
 
-        frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
-        frameManager->init();
-
         scene = std::make_unique<Scene>(ctx);
-
         scene->createScene(sceneSettings.ubo.light_pos);
+
+        frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
+        frameManager->init(scene->getPatches());
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                             vk::BufferUsageFlagBits{},
@@ -186,9 +185,8 @@ namespace VRTR
             updateUniformBuffer(); // Camera UBO update
 
             frameManager->submitQueue(submitCommandBuffers);
-            frameManager->runCudaFrame(frameCount);
+            frameManager->runCudaFrame(scene->getPatchCount());
             frameManager->presentFrame(imageIndex);
-
             frameCount++;
         }
         catch (const vk::OutOfDateKHRError &e)

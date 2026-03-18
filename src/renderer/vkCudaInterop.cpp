@@ -20,12 +20,27 @@ namespace VRTR
         CUDA_CHECK_ERROR(cudaStreamDestroy(cudaStream));
     }
 
-    void vkCudaInterop::init()
+    void vkCudaInterop::init(const std::vector<Patch>& patches)
     {
         setupCuda();
 
+        uint32_t emittingPatchCount = 0;
+        float totalInitialUnshot = 0.0f;
+        for (const auto& p : patches)
+        {
+            if (p.unshotEnergy > 0.0f)
+            {
+                ++emittingPatchCount;
+                totalInitialUnshot += p.unshotEnergy;
+            }
+        }
+        std::cout << "[CUDA init] patches=" << patches.size()
+                  << " emittingPatches=" << emittingPatchCount
+                  << " totalInitialUnshot=" << totalInitialUnshot << std::endl;
+
         // TEMPORARY - Dodam jakiś prosty external buffor, zeby sprawdzic czy CUDA <-> Vulkan interop działa
         vk::DeviceSize cudaBuffSize = sizeof(glm::vec4);
+        std::cout << "Cuda interop buffer size: " << cudaBuffSize << " bytes" << std::endl;
         cudaInteropBuffer = std::make_unique<Buffer>(ctx, cudaBuffSize,
                                                      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
                                                      vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -38,7 +53,34 @@ namespace VRTR
         CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
                                         cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
-        
+        vk::DeviceSize cudaPatchesDataSize = patches.size() * sizeof(Patch);
+        std::cout << "Patches data size: " << cudaPatchesDataSize << " bytes" << std::endl;
+        cudaPatchesBuffer = std::make_unique<Buffer>(ctx, cudaPatchesDataSize,
+                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        auto cudaPatchesDevMem = cudaPatchesBuffer->getBufferMemory();
+        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaPatchesData, cudaPatchesExternalMemory,
+                        cudaPatchesDevMem, cudaPatchesDataSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        vk::DeviceSize cudaSelectedPatchSize = sizeof(SelectedPatch);
+        std::cout << "Selected patch data size: " << cudaSelectedPatchSize << " bytes" << std::endl;
+        cudaSelectedPatchBuffer = std::make_unique<Buffer>(ctx, cudaSelectedPatchSize,
+                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        auto cudaSelectedPatchDevMem = cudaSelectedPatchBuffer->getBufferMemory();
+        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaSelectedPatchData, cudaSelectedPatchExternalMemory,
+                                        cudaSelectedPatchDevMem, sizeof(SelectedPatch), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        // cudaMemcpyAsync(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice, cudaStream);
+        CUDA_CHECK_ERROR(cudaMemcpy(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice));
+
+        // Kernel filterPatches uzywa atomicMax na unshotEnergy, wiec wynik musi byc zerowany przed pierwszym uruchomieniem.
+        SelectedPatch selectedInit{};
+        CUDA_CHECK_ERROR(cudaMemcpy(cudaSelectedPatchData, &selectedInit, sizeof(SelectedPatch), cudaMemcpyHostToDevice));
 
 
         createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
@@ -49,13 +91,35 @@ namespace VRTR
                                           vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
     }
 
-    void vkCudaInterop::runCudaFrame(uint64_t frameCount)
+    void vkCudaInterop::runCudaFrame(uint32_t patchesCount)
     {
+        static uint64_t debugFrameIdx = 0;
+
         uint64_t cudaSemWait = vkToCudaSignalValue;
         uint64_t cudaSemSignal = vkToCudaSignalValue + 1;
 
         waitForSemapore(cudaSemWait);
-        runKernel(frameCount);
+
+        // Reset selected patch przed kazda iteracja, zeby atomicMax liczyl od zera.
+        SelectedPatch selectedInit{};
+        CUDA_CHECK_ERROR(cudaMemcpyAsync(cudaSelectedPatchData, &selectedInit, sizeof(SelectedPatch),
+                                         cudaMemcpyHostToDevice, cudaStream));
+
+        CUDA::runFilterPatchesKernel(cudaPatchesData, patchesCount, cudaSelectedPatchData, cudaStream);
+
+        // Debug readback: confirms whether CUDA kernel actually updates SelectedPatch.
+        CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
+        SelectedPatch hostSelected{};
+        CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
+        if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
+        {
+            std::cout << "[CUDA] frame=" << debugFrameIdx
+                      << " selectedPatchId=" << hostSelected.patchId
+                      << " unshotEnergy=" << hostSelected.unshotEnergy
+                      << " patchesCount=" << patchesCount << std::endl;
+        }
+        ++debugFrameIdx;
+
         signalSemaphore(cudaSemSignal);
 
         cudaToVkWaitValue = cudaSemSignal;
@@ -80,16 +144,18 @@ namespace VRTR
         CUDA_CHECK_ERROR(cudaSignalExternalSemaphoresAsync(&extCudaTimelineSemaphore, &signalParams, 1, cudaStream));
     }
 
-    void vkCudaInterop::runKernel(uint64_t frameCount)
-    {
+    // void vkCudaInterop::runKernel()
+    // {
         // Tutaj można odpalić jakiś kernel CUDA, który będzie coś robił z danymi w cudaData
         // Na potrzeby testów, można zrobić prosty kernel, który będzie zmieniał kolor na jakiś inny, zależnie od liczby klatki
-        CUDA::stepSim(cudaData, frameCount, cudaStream);
-    }
+        // CUDA::stepSim(cudaData, cudaStream);
+    // }
 
     void vkCudaInterop::appendDescriptorResources(DescriptorResources& resources)
     {
         resources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
+        resources.patchBuffer = cudaPatchesBuffer->getBufferHandle();
+        resources.selectedPatchBuffer = cudaSelectedPatchBuffer->getBufferHandle();
     }
 
     void vkCudaInterop::setupCuda()

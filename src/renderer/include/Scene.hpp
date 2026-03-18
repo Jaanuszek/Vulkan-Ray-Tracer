@@ -33,6 +33,9 @@ namespace VRTR
             uint32_t getLightTLASIdx() const { return lightSourceTLASIdx; }
             const GeometryInfo& getGeometryInfo(const std::string& modelName) const { return models.at(modelName)->getGeometryInfo(); }
 
+            std::vector<Patch>& getPatches() { return patchesGlobal; }
+            uint32_t getPatchCount() const { return static_cast<uint32_t>(patchesGlobal.size()); }
+
             void updatePatchData(uint8_t patchSize);
 
         private:

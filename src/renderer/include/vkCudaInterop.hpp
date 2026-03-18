@@ -3,6 +3,7 @@
 #include "Logger.hpp"
 #include "buffer.hpp"
 #include "init_cuda.cuh"
+#include "Radiosity.cuh"
 #include "DeviceManager.hpp"
 #include "DescriptorManager.hpp"
 #include "Model.hpp"
@@ -15,9 +16,9 @@ namespace VRTR
             vkCudaInterop(RendererContext& ctx);
             ~vkCudaInterop();
 
-            void init();
+            void init(const std::vector<Patch>& patches);
 
-            void runCudaFrame(uint64_t frameCount);
+            void runCudaFrame(uint32_t patchesCount);
 
             void appendDescriptorResources(DescriptorResources& resources);
 
@@ -35,7 +36,7 @@ namespace VRTR
 
             void signalSemaphore(uint64_t signalValue);
 
-            void runKernel(uint64_t frameCount);
+            // void runKernel();
 
         private:
             RendererContext &ctx;
@@ -47,13 +48,19 @@ namespace VRTR
 
             // RADIOSITY
             // To jest wskaznik dod danych patchy na GPU. To bedzie wspoldzielone z vulkanem
+            // std::vector<Patch> patchesData;
+            std::unique_ptr<Buffer> cudaPatchesBuffer;
             Patch* cudaPatchesData{};
             cudaExternalMemory_t cudaPatchesExternalMemory{nullptr};
+            // SelectedPatch selectedPatchData;
+            std::unique_ptr<Buffer> cudaSelectedPatchBuffer;
+            SelectedPatch* cudaSelectedPatchData{};
+            cudaExternalMemory_t cudaSelectedPatchExternalMemory{nullptr};
 
             uint64_t cudaToVkWaitValue{0};
             uint64_t vkToCudaSignalValue{1};
 
             vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
-            cudaExternalSemaphore_t  extCudaTimelineSemaphore;
+            cudaExternalSemaphore_t  extCudaTimelineSemaphore{nullptr};
     };
 }

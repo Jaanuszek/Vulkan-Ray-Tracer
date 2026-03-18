@@ -4,6 +4,7 @@
 #include "ConstantsAndStructs.hpp"
 #include "Texture.hpp"
 #include "VmaUsage.h"
+#include "CommonStructs.h"
 
 #define enableRadiosity 1
 
@@ -43,17 +44,6 @@ namespace VRTR
         uint64_t vertexBufferAddr;
         uint64_t indexBufferAddr;
     };
-
-    struct Patch
-    {
-        uint32_t id;
-        float area;
-        float emiission{0.0f}; // wartosc z przedmialu [0,1]
-        glm::vec3 center;
-        glm::vec3 normal;
-        glm::vec3 albedo;
-    };
-
 
     class Model
     {
