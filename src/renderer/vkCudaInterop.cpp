@@ -38,6 +38,9 @@ namespace VRTR
         CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
                                         cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
+        
+
+
         createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
 
         CUDA::importCudaExternalSemaphore(ctx.logicalDevice,

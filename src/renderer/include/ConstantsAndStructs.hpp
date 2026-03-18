@@ -33,15 +33,6 @@ namespace VRTR
         glm::vec2 texCoord;
     };
 
-    struct Patch
-    {
-        uint32_t id;
-        float area;
-        glm::vec3 center;
-        glm::vec3 normal;
-        glm::vec3 albedo;
-    };
-
     namespace CONSTANTS
     {
         inline std::filesystem::path getExecutableDir()

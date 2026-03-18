@@ -43,8 +43,6 @@ namespace VRTR
 
         void initImGUI(GLFWwindow* window);
 
-        void createScene();
-
         void recreateResources(GLFWwindow *window);
 
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createFloor();

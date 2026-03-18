@@ -149,27 +149,85 @@ namespace VRTR
         }
         if(ImGui::SliderFloat("Rotation Angle", &sceneSettings.transformations.rotationAngle, 0.0f, 360.0f))
         {
+            sceneSettings.transformations.updateRequest = UpdateRequest::Rotation;
             updated = true;
         }
         if(ImGui::SliderFloat3("Light Position", &sceneSettings.ubo.light_pos.x, -10.0f, 10.0f))
         {
+            sceneSettings.transformations.updateRequest = UpdateRequest::LightPos;
             updated = true;
         }
+
+        {
+            ImGui::SliderInt("Patch Size", &sceneSettings.transformations.patchTriangleSize, 1, 10);
+
+            if(ImGui::Button("Apply Patch Size"))
+            {
+                sceneSettings.transformations.updateRequest = UpdateRequest::PatchTriangleSize;
+                updated = true;
+            }
+        }
+
+        auto resetViewFlags = [&]()
+        {
+            sceneSettings.ubo.enableCUDA = false;
+            sceneSettings.ubo.shadowMode = false;
+            sceneSettings.ubo.debugPatches = false;
+            sceneSettings.ubo.debugNormals = false;
+            sceneSettings.ubo.debugCenters = false;
+        };
+
         if(ImGui::Button("Enable CUDA"))
         {
-            sceneSettings.ubo.enableCUDA = !sceneSettings.ubo.enableCUDA;
+            const bool wasEnabled = sceneSettings.ubo.enableCUDA;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.enableCUDA = true;
+            }
             updated = true;
         }
         if(ImGui::Button("Swap to shadows"))
         {
-            sceneSettings.ubo.shadowMode = !sceneSettings.ubo.shadowMode;
+            const bool wasEnabled = sceneSettings.ubo.shadowMode;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.shadowMode = true;
+            }
             updated = true;
         }
         if(ImGui::Button("Debug Patches"))
         {
-            sceneSettings.ubo.debugPatches = !sceneSettings.ubo.debugPatches;
+            const bool wasEnabled = sceneSettings.ubo.debugPatches;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.debugPatches = true;
+            }
             updated = true;
         }
+        if(ImGui::Button("Debug Patches Normal"))
+        {
+            const bool wasEnabled = sceneSettings.ubo.debugNormals;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.debugNormals = true;
+            }
+            updated = true;
+        }
+        if(ImGui::Button("Debug Patches Centers"))
+        {
+            const bool wasEnabled = sceneSettings.ubo.debugCenters;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.debugCenters = true;
+            }
+            updated = true;
+        }
+
         ImGui::Text("FPS %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
 

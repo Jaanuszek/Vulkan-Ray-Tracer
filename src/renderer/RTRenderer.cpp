@@ -46,7 +46,7 @@ namespace VRTR
 
         scene = std::make_unique<Scene>(ctx);
 
-        createScene();
+        scene->createScene(sceneSettings.ubo.light_pos);
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                             vk::BufferUsageFlagBits{},
@@ -122,50 +122,6 @@ namespace VRTR
         return dr;
     }
 
-    void RTRenderer::createScene()
-    {
-        VRTR_DEBUG("Creating scene");
-
-        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
-        std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
-
-        scene->importModel(viking_room_model_path, viking_room_texture_path);
-
-        std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
-        std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
-
-        auto [floorVertices, floorIndices] = CustomModels::createRectangle();
-        Material floorMat{
-            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
-
-        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-        scene->addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
-
-        auto [wallVertices, wallIndices] = CustomModels::createRectangle();
-        Material wallMat{
-            .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
-        glm::mat4 wallModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
-        wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        wallModel = glm::translate(wallModel, glm::vec3(0.0f, -10.0f, -2.0f));
-
-        scene->addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
-
-        glm::mat4 lightObjectModel = glm::translate(glm::mat4(1.0f), sceneSettings.ubo.light_pos);
-        lightObjectModel = glm::scale(lightObjectModel, glm::vec3(0.2f));
-        scene->addObject(LIGHT_MODEL_NAME, floorVertices, floorIndices, Material{
-            .albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-            .type = MaterialType::ALBEDO,
-        }, lightObjectModel);
-
-        // To musi byc na końcu
-        scene->buildTLAS();
-    }
-
     void RTRenderer::recreateResources(GLFWwindow *window)
     {
         swapChainManager->recreateSwapChain(window, width, height);
@@ -204,8 +160,28 @@ namespace VRTR
 
             if(gui->updateRequired())
             {
-                scene->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
-                gui->setUpdated(false);
+                switch (sceneSettings.transformations.updateRequest)
+                {
+                case UpdateRequest::Rotation:
+                {
+                    scene->updateTLAS(sceneSettings.transformations.rotationAngle);
+                    break;
+                }
+                case UpdateRequest::LightPos:
+                {   
+                    uint32_t lightInstanceIdx = scene->getLightTLASIdx();
+                    scene->updateInstanceTLAS(lightInstanceIdx, glm::translate(glm::mat4(1.0f), sceneSettings.ubo.light_pos));
+                    break;
+                }
+                case UpdateRequest::PatchTriangleSize:
+                {   scene->updatePatchData(static_cast<uint8_t>(sceneSettings.transformations.patchTriangleSize));
+                    break;
+                }
+                default:
+                    break;
+                }
+
+                gui->setUpdateNeed(false);
             }
             updateUniformBuffer(); // Camera UBO update
 

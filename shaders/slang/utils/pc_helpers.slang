@@ -33,7 +33,9 @@ enum class MaterialType
     NONE = 0,
     ALBEDO = 1,
     METALLIC = 2,
-    ROUGHNESS = 3
+    ROUGHNESS = 3,
+    PBR = 4,
+    LIGHT = 5
 };
 
 struct Material

@@ -22,6 +22,7 @@ namespace VRTR
         METALLIC = 2,
         ROUGHNESS = 3,
         PBR = 4,
+        LIGHT = 5
     };
 
     struct Material
@@ -42,6 +43,17 @@ namespace VRTR
         uint64_t vertexBufferAddr;
         uint64_t indexBufferAddr;
     };
+
+    struct Patch
+    {
+        uint32_t id;
+        float area;
+        float emiission{0.0f}; // wartosc z przedmialu [0,1]
+        glm::vec3 center;
+        glm::vec3 normal;
+        glm::vec3 albedo;
+    };
+
 
     class Model
     {
@@ -83,6 +95,8 @@ namespace VRTR
 
             Texture& getTexture() { return *texture; }
 
+            void rebuildPatches(uint8_t patchSize) { buildPatches(patchSize); }
+
         private:
             void loadModel(const std::string &path);
 
@@ -92,7 +106,7 @@ namespace VRTR
             void createIndexBuffer();
             void setGeometryInfo();
             void loadTexture(const std::string &path);
-            void buildPatches();
+            void buildPatches(uint8_t patchSize = 1);
 
         private:
             RendererContext &ctx;
@@ -106,15 +120,6 @@ namespace VRTR
 
             std::vector<Patch> patches;
 
-            /*
-                Jest to wazne w przypadku gdybym chcial na przyklad 
-                miec dwa trojkaty jako jeden patch
-                triangle 0 -> patch 0
-                triangle 1 -> patch 0
-                triangle 2 -> patch 1
-                triangle 3 -> patch 1
-            */
-
             std::vector<uint32_t> patchIdToTriangleId;
 
             std::unique_ptr<Texture> texture;
@@ -126,5 +131,6 @@ namespace VRTR
     namespace CustomModels
     {
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createRectangle();
+        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createCube();
     }
 }

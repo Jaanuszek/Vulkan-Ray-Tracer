@@ -22,25 +22,28 @@ namespace VRTR
             Scene(RendererContext& ctx);
             ~Scene();
 
-            void importModel(const std::string &modelPath, const std::string &texPath);
+            void createScene(const glm::vec3& lightPos);
 
-            // TODO na 100% da sie to lepiej rozwiazac niz nazywanie kazdego obiektu w jakis sposob
-            // ale moze to tez jest dobre?
-            void addObject(const std::string& objName, const std::vector<VertexRT>& vertices, 
-                            const std::vector<uint32_t>& indices, const Material& mat,
-                            const glm::mat4& transform);
+            void updateTLAS(const float& rotationAngle);
 
-            // Wrapper do zbudowania TLASu, zeby nie trzeba bylo expose'owac całego ASManagera
-            void buildTLAS();
-
-            // Wrapper do aktualizacji TLASu (transformacji obiektów)
-            void updateTLAS(float deltaTime, const float& rotationAngle);
+            void updateInstanceTLAS(uint32_t instanceIdx, const glm::mat4& newTransform);
 
             void appendDescriptorResources(DescriptorResources& resources);
 
+            uint32_t getLightTLASIdx() const { return lightSourceTLASIdx; }
             const GeometryInfo& getGeometryInfo(const std::string& modelName) const { return models.at(modelName)->getGeometryInfo(); }
 
+            void updatePatchData(uint8_t patchSize);
+
         private:
+            uint32_t importModel(const std::string &modelPath, const std::string &texPath);
+
+            uint32_t addObject(const std::string& objName, const std::vector<VertexRT>& vertices, 
+                    const std::vector<uint32_t>& indices, const Material& mat,
+                    const glm::mat4& transform);
+
+            void buildTLAS();
+
             void fillSSBOContainers();
 
         private:
@@ -56,6 +59,7 @@ namespace VRTR
                 do nastepnego modelu z tekstura jaki zostanie dodany do sceny
             */
             uint32_t textureIndexCounter = 0;
+            uint32_t lightSourceTLASIdx{0}; // póki co zakladam ze mamy tylko jedno źródło światła
 
             std::vector<uint32_t> triToPatchGlobal;
             std::vector<Patch> patchesGlobal;
@@ -66,5 +70,6 @@ namespace VRTR
             std::unique_ptr<StorageBuffer> geometrySBO;
             std::unique_ptr<StorageBuffer> materialSBO;
             std::unique_ptr<StorageBuffer> triToPatchBuffer;
+            std::unique_ptr<StorageBuffer> patchBuffer;
     };
 }

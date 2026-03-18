@@ -5,6 +5,7 @@
 #include "init_cuda.cuh"
 #include "DeviceManager.hpp"
 #include "DescriptorManager.hpp"
+#include "Model.hpp"
 
 namespace VRTR
 {
@@ -43,6 +44,11 @@ namespace VRTR
             std::unique_ptr<Buffer> cudaInteropBuffer;
             glm::vec4 *cudaData{};
             cudaExternalMemory_t cudaExternalMemory{nullptr};
+
+            // RADIOSITY
+            // To jest wskaznik dod danych patchy na GPU. To bedzie wspoldzielone z vulkanem
+            Patch* cudaPatchesData{};
+            cudaExternalMemory_t cudaPatchesExternalMemory{nullptr};
 
             uint64_t cudaToVkWaitValue{0};
             uint64_t vkToCudaSignalValue{1};

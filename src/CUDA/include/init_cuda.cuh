@@ -45,6 +45,8 @@ namespace VRTR
 
         __global__ void changePixelColor(glm::vec4 *colors, uint64_t frameIdx);
 
+        // __global__ void 
+
         void stepSim(glm::vec4 *colors, uint64_t frameIdx, cudaStream_t cudaStream);
     }
 }

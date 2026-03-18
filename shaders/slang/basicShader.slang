@@ -8,10 +8,23 @@ struct CameraData
     bool enableCUDA;
     bool shadowMode;
     bool debugPatches;
+    bool debugNormals;
+    bool debugCenters;
     float3 light_pos;
     column_major float4x4 viewInverse;
     column_major float4x4 projInverse;
 };
+
+struct Patch
+{
+    uint32_t id;
+    float area;
+    float emiission = 0.0f;
+    float3 center;
+    float3 normal;
+    float3 albedo;
+};
+
 
 [[vk::binding(0, 0)]]
 uniform RaytracingAccelerationStructure topLevelAS;
@@ -37,6 +50,9 @@ StructuredBuffer<float4> cudaColorBuffer;
 
 [[vk::binding(7, 0)]]
 StructuredBuffer<uint32_t> triToPatchBuffer;
+
+[[vk::binding(8, 0)]]
+StructuredBuffer<Patch, Std140DataLayout> patchBuffer;
 
 [[vk::push_constant]] internal pc_blas blasAddr;
 
@@ -186,6 +202,24 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
+    if(cameraData.debugNormals)
+    {
+        payload.hitValue = tri.normal * 0.5 + 0.5; // mapowanie z [-1,1] na [0,1]
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
+    }
+
+    if(cameraData.debugCenters)
+    {
+        payload.hitValue = patchBuffer[patchId].center; // Color based on patch center
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
+    }
+
     if (cameraData.debugPatches)
     {
         float3 c = patchColor(patchId);
@@ -234,6 +268,15 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     if (isMetallic)
     {
         color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
+    }
+    bool isLight = materialBuffer[instanceIndex].type == MaterialType::LIGHT;
+    if (isLight){
+        color = float4(1.0f, 1.0f, 1.0f, 1.0f);
+        payload.hitValue = color.rgb;
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
     }
 
     // ========================== REFLECTIONS

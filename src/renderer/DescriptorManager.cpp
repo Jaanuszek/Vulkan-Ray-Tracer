@@ -80,17 +80,24 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
-        std::array<vk::DescriptorSetLayoutBinding, 8> bindings =
-            {
-                ASLayout,
-                storageImageLayout,
-                uniformBufferLayout,
-                textureBinding,
-                geometryInfoBufferLayout,
-                materialBufferLayout,
-                cudaColorBufferLayout,
-                triToPatchBufferLayout
-            };
+        vk::DescriptorSetLayoutBinding patchBufferLayout{
+            .binding = 8,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+            ASLayout,
+            storageImageLayout,
+            uniformBufferLayout,
+            textureBinding,
+            geometryInfoBufferLayout,
+            materialBufferLayout,
+            cudaColorBufferLayout,
+            triToPatchBufferLayout,
+            patchBufferLayout
+        };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
             .flags = {},
@@ -114,6 +121,7 @@ namespace VRTR
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla CUDA color buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla triToPatch buffera    
+                {vk::DescriptorType::eStorageBuffer, maxSets}             // wsparcie dla patch buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -270,7 +278,21 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &triToPatchBufferInfo};
 
-        std::array<vk::WriteDescriptorSet, 8> WriteDescriptorSets = {
+        vk::DescriptorBufferInfo patchBufferInfo{
+            .buffer = descriptorResources.patchBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet patchBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 8,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &patchBufferInfo};
+
+        std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
             uniformBufferWrite,
@@ -278,7 +300,8 @@ namespace VRTR
             geometryInfoBufferWrite,
             materialBufferWrite,
             cudaColorBufferWrite,
-            triToPatchBufferWrite
+            triToPatchBufferWrite,
+            patchBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
@@ -399,13 +422,28 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &triToPatchBufferInfo};
 
-        std::array<vk::WriteDescriptorSet, 6> WriteDescriptorSets = {
+        vk::DescriptorBufferInfo patchBufferInfo{
+            .buffer = descriptorResources.patchBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet patchBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 8,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &patchBufferInfo};
+
+        std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             resultImageWrite,
             textureWrite,
             geometryInfoBufferWrite,
             materialBufferWrite,
             cudaColorBufferWrite,
-            triToPatchBufferWrite
+            triToPatchBufferWrite,
+            patchBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

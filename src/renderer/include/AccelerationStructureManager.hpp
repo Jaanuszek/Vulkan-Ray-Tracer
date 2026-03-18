@@ -41,9 +41,11 @@ namespace VRTR
 
             void buildTLAS();
 
-            void addInstance(uint32_t blasIdx, const glm::mat4 &transform);
+            uint32_t addInstance(uint32_t blasIdx, const glm::mat4 &transform);
 
-            void updateTLAS(float deltaTime, const float& rotationAngle);
+            void updateInstanceTransform(uint32_t instanceIdx, const glm::mat4 &newTransform);
+
+            void updateTLAS(const float& rotationAngle);
 
             const vk::raii::AccelerationStructureKHR& getTLAS() const { return tlas.as.handle; }
 

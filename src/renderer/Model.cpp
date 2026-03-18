@@ -44,6 +44,10 @@ namespace VRTR
         createVertexBuffer();
         createIndexBuffer();
         setGeometryInfo();
+
+        #ifdef enableRadiosity
+            buildPatches(1);
+        #endif
     }
 
     Model::~Model()
@@ -113,7 +117,7 @@ namespace VRTR
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
 
         #ifdef enableRadiosity
-            buildPatches();
+            buildPatches(0);
         #endif
     }
 
@@ -170,41 +174,58 @@ namespace VRTR
         texture = std::make_unique<Texture>(ctx, path);
     }
 
-    void Model::buildPatches()
+    void Model::buildPatches(uint8_t patchSize)
     {
+        const uint32_t trianglesPerPatch = std::max<uint32_t>(1, patchSize);
         triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
+
         patchIdToTriangleId.resize(triCount);
         patches.clear();
-        patches.reserve(triCount);
+        patches.reserve((triCount + trianglesPerPatch - 1) / trianglesPerPatch);
 
-        for (uint32_t i = 0; i < triCount; i++)
+        for (uint32_t i = 0; i < triCount; i += trianglesPerPatch)
         {
-            uint32_t i0 = modelMesh->indices[3 * i + 0];
-            uint32_t i1 = modelMesh->indices[3 * i + 1];
-            uint32_t i2 = modelMesh->indices[3 * i + 2];
+            const uint32_t patchIdx = static_cast<uint32_t>(patches.size());
+            const uint32_t trianglesInPatch = std::min<uint32_t>(trianglesPerPatch, triCount - i);
+            float area{};
+            glm::vec3 center{};
+            glm::vec3 normal{};
 
-            const auto& v0 = modelMesh->vertices[i0];
-            const auto& v1 = modelMesh->vertices[i1];
-            const auto& v2 = modelMesh->vertices[i2];
+            for (uint32_t j = 0; j < trianglesInPatch; ++j)
+            {
+                const uint32_t tri = i + j;
+                uint32_t i0 = modelMesh->indices[3 * tri + 0];
+                uint32_t i1 = modelMesh->indices[3 * tri + 1];
+                uint32_t i2 = modelMesh->indices[3 * tri + 2];
 
-            glm::vec3 e1 = v1.pos - v0.pos; 
-            glm::vec3 e2 = v2.pos - v0.pos;
-            glm::vec3 n = glm::normalize(glm::cross(e1, e2));
+                const auto& v0 = modelMesh->vertices[i0];
+                const auto& v1 = modelMesh->vertices[i1];
+                const auto& v2 = modelMesh->vertices[i2];
 
-            // glm::length(glm::cross(e1,e2)) to pole równoległoboku rozpiętego na wektorach e1 i e2
-            // Zeby uzyskac pole trójkąta trzeba podzielić to przez 2
-            float area = 0.5f * glm::length(glm::cross(e1, e2));
-            glm::vec3 center = (v0.pos + v1.pos + v2.pos) / 3.0f;
+                glm::vec3 e1 = v1.pos - v0.pos; 
+                glm::vec3 e2 = v2.pos - v0.pos;
+                glm::vec3 triNormal = glm::cross(e1, e2);
+                float triArea = 0.5f * glm::length(triNormal);
+                glm::vec3 triCenter = (v0.pos + v1.pos + v2.pos) / 3.0f;
+
+                area += triArea;
+                center += triCenter * triArea; // nie wiem po co tak, weighted center. Duze trójkąty maja większy wpływ na pozycje patcha, wiec to jest pewnie po to
+                normal += triNormal;
+                patchIdToTriangleId[tri] = patchIdx;
+            }
 
             Patch p{};
-            p.id = i;
+            p.id = patchIdx;
             p.area = area;
-            p.center = center;
-            p.normal = n;
+            p.center = (area > 0.0f) ? (center / area) : glm::vec3(0.0f);
+            p.normal = (glm::length(normal) > 0.0f) ? glm::normalize(normal) : glm::vec3(0.0f);
             p.albedo = material.albedo;
+            if(material.type == MaterialType::LIGHT)
+            {
+                p.emiission = 1.0f;
+            }
 
             patches.push_back(p);
-            patchIdToTriangleId[i] = i;
         }
     }
 
@@ -215,6 +236,23 @@ namespace VRTR
             {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
             {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
             {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+        };
+
+        std::vector<uint32_t> indices = {
+            0, 1, 2,
+            2, 3, 0
+        };
+
+        return {vertices, indices};
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createCube()
+    {
+        std::vector<VertexRT> vertices = {
+            {{-1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{1.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+            {{-1.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices = {
