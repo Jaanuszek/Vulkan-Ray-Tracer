@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.28)
 
 project(VulkanRayTracer LANGUAGES CXX CUDA)
 
+include(CTest)
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -21,6 +24,7 @@ add_subdirectory(src/common)
 add_subdirectory(src/core)
 add_subdirectory(src/engine)
 add_subdirectory(src/renderer)
+add_subdirectory(third-party/googletest)
 add_subdirectory(src/CUDA)
 
 SET(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
@@ -43,6 +47,7 @@ target_link_libraries(${PROJECT_NAME}
     common
     renderer
     cuda_lib
+    gtest_main
 )
 # Exe needs to have different precompiled headers because of usage of different compiler flags
 target_precompile_headers(${PROJECT_NAME} PRIVATE "${PROJECT_SOURCE_DIR}/src/common/pch.h")

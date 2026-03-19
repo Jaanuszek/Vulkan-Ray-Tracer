@@ -8,42 +8,29 @@ namespace VRTR::CUDA
     {
         uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        // 1024 bo moze byc max 1024 threadów per block
-        __shared__ float maxEnergy[1024];
-        __shared__ uint32_t maxPatchId[1024];
+        __shared__ float maxEnergy[TPB];
+        __shared__ uint32_t maxPatchId[TPB];
 
         float localMaxEnergy = 0.0f;
         uint32_t localMaxPatchId = 0;
-        /*
-            Pętla iterująca po patchach w taki sposób,
-            że każdy thread przetwarza kilka patchy (tzw. striding).
-             - idx to globalny indeks threada
-             - gridDim.x * blockDim.x to całkowita liczba threadów w siatce
-             - i += gridDim.x * blockDim.x powoduje, że każdy thread przeskakuje o tyle patchy, ile jest threadów, 
-               co pozwala równomiernie rozłożyć pracę nawet jeśli liczba patchy nie jest idealnie podzielna przez liczbę threadów.
-        */
+
         for (uint32_t i = idx; i < numPatches; i += gridDim.x * blockDim.x)
         {
             if (patches[i].unshotEnergy > localMaxEnergy)
             {
                 localMaxEnergy = patches[i].unshotEnergy;
-                // Uzywamy globalnego ID patcha, a nie indeksu w buforze.
                 localMaxPatchId = patches[i].id;
             }
         }
-
-        // Zapisz dane do shared memory
 
         maxEnergy[threadIdx.x] = localMaxEnergy;
         maxPatchId[threadIdx.x] = localMaxPatchId;
         __syncthreads(); // obowiązkowo synchronizacja zeby wszystkie wątki zdążyły zapisać
 
-        // Redukcja w ramach bloku (tree reduction)
         for (uint32_t s = blockDim.x / 2; s > 0; s >>= 1)
         {
             if(threadIdx.x < s)
             {
-                // porównanie pierwszego elementu z elementem oddalonym o s, czyli o połowe block dim w pierwszej iteracji
                 if (maxEnergy[threadIdx.x + s] > maxEnergy[threadIdx.x])
                 {
                     maxEnergy[threadIdx.x] = maxEnergy[threadIdx.x + s];
@@ -53,19 +40,61 @@ namespace VRTR::CUDA
             __syncthreads(); 
         }
 
-        // Po tym maxEnergy[0] to jest maksymalna niewystrzelona energia z patcha
+        if (threadIdx.x == 0)
+        {
+            // Jeden wynik na blok: zapis do indeksu blockIdx.x.
+            selectedPatch[blockIdx.x].patchId = maxPatchId[0];
+            selectedPatch[blockIdx.x].unshotEnergy = maxEnergy[0];
+        }
+    }
+
+    __global__ void filterSelectedPatches(const SelectedPatch* inSelected,
+                                          SelectedPatch* outSelected,
+                                          uint32_t numSelected)
+    {
+        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+        // extern __shared__ unsigned char sharedRaw[];
+        // float* maxEnergy = reinterpret_cast<float*>(sharedRaw);
+        // uint32_t* maxPatchId = reinterpret_cast<uint32_t*>(maxEnergy + blockDim.x);
+        __shared__ float maxEnergy[TPB];
+        __shared__ uint32_t maxPatchId[TPB];
+
+        float localMaxEnergy = -FLT_MAX;
+        uint32_t localMaxPatchId = 0;
+
+        for (uint32_t i = idx; i < numSelected; i += blockDim.x * gridDim.x)
+        {
+            float e = inSelected[i].unshotEnergy;
+            if (e > localMaxEnergy)
+            {
+                localMaxEnergy = e;
+                localMaxPatchId = inSelected[i].patchId;
+            }
+        }
+
+        maxEnergy[threadIdx.x] = localMaxEnergy;
+        maxPatchId[threadIdx.x] = localMaxPatchId;
+
+        __syncthreads();
+
+        for (uint32_t s = blockDim.x / 2; s > 0; s >>= 1)
+        {
+            if(threadIdx.x < s)
+            {
+                if (maxEnergy[threadIdx.x + s] > maxEnergy[threadIdx.x])
+                {
+                    maxEnergy[threadIdx.x] = maxEnergy[threadIdx.x + s];
+                    maxPatchId[threadIdx.x] = maxPatchId[threadIdx.x + s];
+                }
+            }
+            __syncthreads(); 
+        }
 
         if (threadIdx.x == 0)
         {
-            unsigned int* globalEnergyBits = reinterpret_cast<unsigned int*>(&selectedPatch->unshotEnergy);
-            unsigned int candidateEnergyBits = __float_as_uint(maxEnergy[0]);
-            unsigned int previousEnergyBits = atomicMax(globalEnergyBits, candidateEnergyBits);
-
-            // patchId zapisuje tylko blok, ktory rzeczywiscie podniosl globalne maksimum.
-            if (candidateEnergyBits > previousEnergyBits)
-            {
-                selectedPatch->patchId = maxPatchId[0];
-            }
+            outSelected[blockIdx.x].patchId = maxPatchId[0];
+            outSelected[blockIdx.x].unshotEnergy = maxEnergy[0];
         }
     }
 
@@ -128,18 +157,114 @@ namespace VRTR::CUDA
     __host__ void runFilterPatchesKernel(Patch *patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
     {
         if (numPatches == 0)
-        {
             return;
-        }
 
-        int threadsPerBlock = 256;
-        int blocks = (numPatches + threadsPerBlock - 1) / threadsPerBlock;
+        int blocks = (numPatches + TPB - 1) / TPB;
+        blocks = min(blocks, 1024);
 
-        filterPatches<<<blocks, threadsPerBlock, 0, stream>>>(patches, numPatches, selectedPatch);
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess)
+        // 🔹 buffer na wyniki bloków
+        SelectedPatch* d_blockResults = nullptr;
+        CUDA_CHECK_STD_ERROR(cudaMalloc(&d_blockResults, blocks * sizeof(SelectedPatch)));
+
+        // 🔹 kernel
+        filterPatches<<<blocks, TPB, 0, stream>>>(
+            patches,
+            numPatches,
+            d_blockResults
+        );
+
+        CUDA_CHECK_STD_ERROR(cudaGetLastError());
+
+        // 🔹 kopiujemy małą tablicę do CPU
+        std::vector<SelectedPatch> h_blockResults(blocks);
+
+        CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(
+            h_blockResults.data(),
+            d_blockResults,
+            blocks * sizeof(SelectedPatch),
+            cudaMemcpyDeviceToHost,
+            stream
+        ));
+
+        CUDA_CHECK_STD_ERROR(cudaStreamSynchronize(stream));
+
+        SelectedPatch best;
+        best.unshotEnergy = -FLT_MAX;
+        best.patchId = 0;
+
+        for (int i = 0; i < blocks; i++)
         {
-            std::cerr << "CUDA kernel launch error: " << cudaGetErrorString(err) << std::endl;
+            if (h_blockResults[i].unshotEnergy > best.unshotEnergy)
+            {
+                best = h_blockResults[i];
+            }
         }
+
+        CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(
+            selectedPatch,
+            &best,
+            sizeof(SelectedPatch),
+            cudaMemcpyHostToDevice,
+            stream
+        ));
+
+        cudaFree(d_blockResults);
+        // if (numPatches == 0)
+        // {
+        //     return;
+        // }
+
+        // int blocks = (numPatches + TPB - 1) / TPB;
+
+        // filterPatches<<<blocks, TPB, 0, stream>>>(patches, numPatches, selectedPatch);
+        // cudaError_t err = cudaGetLastError();
+        // if (err != cudaSuccess)
+        // {
+        //     std::cerr << "CUDA kernel launch error: " << cudaGetErrorString(err) << std::endl;
+        //     return;
+        // }
+
+        // //TODO tutaj mi czat jakies cos wygenerowal i mi sie to nie podoba bo jest kilka
+        // // alokacji w petli
+
+        // // Iteracyjna redukcja wyników bloków do pojedynczego SelectedPatch.
+        // uint32_t currentCount = static_cast<uint32_t>(blocks);
+        // SelectedPatch* currentIn = selectedPatch;
+
+        // while (currentCount > 1)
+        // {
+        //     uint32_t reduceBlocks = (currentCount + TPB - 1) / TPB;
+
+        //     SelectedPatch* nextOut = nullptr;
+        //     CUDA_CHECK_STD_ERROR(cudaMalloc(&nextOut, reduceBlocks * sizeof(SelectedPatch)));
+
+        //     filterSelectedPatches<<<reduceBlocks, TPB, 0, stream>>>(currentIn, nextOut, currentCount);
+
+        //     err = cudaGetLastError();
+        //     if (err != cudaSuccess)
+        //     {
+        //         std::cerr << "CUDA kernel launch error: " << cudaGetErrorString(err) << std::endl;
+        //         cudaFree(nextOut);
+        //         if (currentIn != selectedPatch)
+        //         {
+        //             cudaFree(currentIn);
+        //         }
+        //         return;
+        //     }
+
+        //     if (currentIn != selectedPatch)
+        //     {
+        //         cudaFree(currentIn);
+        //     }
+
+        //     currentIn = nextOut;
+        //     currentCount = reduceBlocks;
+        // }
+
+        // if (currentIn != selectedPatch)
+        // {
+        //     CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(selectedPatch, currentIn, sizeof(SelectedPatch), cudaMemcpyDeviceToDevice, stream));
+        //     cudaFree(currentIn);
+        // }
     }
 }
