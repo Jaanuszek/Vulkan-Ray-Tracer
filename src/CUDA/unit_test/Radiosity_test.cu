@@ -67,6 +67,7 @@ namespace VRTR::CUDA
     {
     protected:
         static constexpr uint32_t NUM_PATCHES = 2048; // wiecej niz 1024 zeby przetestowac wiele blokow
+        static constexpr uint32_t LARGE_NUM = 10000;
         uint32_t BlockCount = (NUM_PATCHES + TPB - 1) / TPB;
 
         std::random_device rd;
@@ -210,8 +211,6 @@ namespace VRTR::CUDA
     
     TEST_F(RadiosityKernelTest, FilterPatchesWithLargeDataset)
     {
-        // Arrange - Large number of patches
-        constexpr uint32_t LARGE_NUM = 10000;
         uint32_t BlockCount = (LARGE_NUM + TPB - 1) / TPB;
         std::vector<Patch> largePatches(LARGE_NUM);
         for (uint32_t i = 0; i < LARGE_NUM; ++i)
@@ -243,18 +242,40 @@ namespace VRTR::CUDA
         cudaFree(d_largePatches);
         cudaFree(d_large_selected);
     }
-    
-    // ========================================================================
-    // Additional Test Cases - Specific Radiosity Scenarios
-    // ========================================================================
-    
-    TEST_F(RadiosityKernelTest, VerifyKernelExecution)
+
+    TEST_F(RadiosityKernelTest, FilterPatchesWithLargeDatasetRandom)
     {
-        // Simple test to verify kernel compiles and runs without errors
-        ASSERT_EQ(cudaMemset(d_selectedPatch, 0, sizeof(SelectedPatch) * BlockCount), cudaSuccess);
-        runFilterPatchesKernel(d_patches, NUM_PATCHES, d_selectedPatch, 0);
-        EXPECT_EQ(cudaGetLastError(), cudaSuccess);
-        EXPECT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+        uint32_t BlockCount = (LARGE_NUM + TPB - 1) / TPB;
+        
+        std::uniform_real_distribution<float> unshootEnergyDist(0.0f, 1.0f);
+        std::vector<Patch> largePatches(LARGE_NUM);
+        for (uint32_t i = 0; i < LARGE_NUM; ++i)
+        {
+            largePatches[i].id = i;
+            largePatches[i].unshotEnergy = unshootEnergyDist(gen);
+            largePatches[i].center = glm::vec3(i, i, i);
+            largePatches[i].normal = glm::vec3(0, 1, 0);
+        }
+
+        Patch* d_largePatches = allocateAndCopyToGPU(largePatches.data(), LARGE_NUM);
+        SelectedPatch initialSelected = {0, 0.0f};
+        SelectedPatch* d_large_selected = allocateAndCopyToGPU(&initialSelected, static_cast<size_t>(BlockCount));
+
+        Patch CPUMaxEnergy = *std::max_element(largePatches.begin(), largePatches.end(), [](const Patch& a, const Patch& b) {
+            return a.unshotEnergy < b.unshotEnergy;
+        });
+
+        runFilterPatchesKernel(d_largePatches, LARGE_NUM, d_large_selected, 0);
+        ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+        ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+        std::vector<SelectedPatch> result(BlockCount);
+        ASSERT_EQ(cudaMemcpy(result.data(), d_large_selected, sizeof(SelectedPatch) * BlockCount, cudaMemcpyDeviceToHost), cudaSuccess);
+        
+        EXPECT_EQ(result[0].patchId, CPUMaxEnergy.id);
+        EXPECT_FLOAT_EQ(result[0].unshotEnergy, CPUMaxEnergy.unshotEnergy);
+
+        cudaFree(d_largePatches);
+        cudaFree(d_large_selected);
     }
-    
+
 } // namespace VRTR::CUDA

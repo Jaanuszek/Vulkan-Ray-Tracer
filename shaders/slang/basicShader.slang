@@ -63,7 +63,7 @@ StructuredBuffer<uint32_t> triToPatchBuffer;
 StructuredBuffer<Patch, Std140DataLayout> patchBuffer;
 
 [[vk::binding(9, 0)]]
-StructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
+RWStructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
 
 [[vk::push_constant]] internal pc_blas blasAddr;
 

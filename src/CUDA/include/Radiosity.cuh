@@ -32,9 +32,7 @@ namespace VRTR
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       SelectedPatch* selectedPatch);
 
-        __global__ void filterSelectedPatches(const SelectedPatch* inSelected,
-                              SelectedPatch* outSelected,
-                              uint32_t numSelected);
+        __global__ void reduceSelectedPatches(SelectedPatch *input, uint32_t n, SelectedPatch *output);
 
         /**
          * @brief Kernel do obliczenia radiosity na bazie visibility
