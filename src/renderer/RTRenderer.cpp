@@ -69,6 +69,9 @@ namespace VRTR
                                 width,
                                 height
                                 );
+
+        visibilityPipeline = std::make_unique<VisibilityPipeline>(ctx);
+        visibilityPipeline->init(dr, commandBufferManager);
     }
 
     void RTRenderer::setupVMA()
@@ -185,7 +188,7 @@ namespace VRTR
             updateUniformBuffer(); // Camera UBO update
 
             frameManager->submitQueue(submitCommandBuffers);
-            frameManager->runCudaFrame(scene->getPatchCount());
+            frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
         }

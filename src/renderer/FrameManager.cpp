@@ -126,6 +126,16 @@ namespace VRTR
         vkCudaInteropManager->runCudaFrame(patchesCount);
     }
 
+    // void FrameManager::runCudaSelectPass(uint32_t patchesCount)
+    // {
+    //     vkCudaInteropManager->runCudaSelectPass(patchesCount);
+    // }
+
+    // void FrameManager::runCudaPostVisibilityPass(uint32_t patchesCount)
+    // {
+    //     vkCudaInteropManager->runCudaPostVisibilityPass(patchesCount);
+    // }
+
     void FrameManager::waitForFence()
     {
         while (vk::Result::eTimeout == ctx.logicalDevice.waitForFences(frameSyncManager->getDrawFence(), VK_TRUE, TIMEOUT))

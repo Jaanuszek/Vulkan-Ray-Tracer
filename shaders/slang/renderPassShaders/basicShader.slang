@@ -1,7 +1,7 @@
 module basicShader;
-__include "utils/pc_helpers";
-__include "utils/helpers";
-__include "utils/constants";
+__include "../utils/pc_helpers";
+__include "../utils/helpers";
+__include "../utils/constants";
 
 struct CameraData
 {

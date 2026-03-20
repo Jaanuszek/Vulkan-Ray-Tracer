@@ -19,6 +19,8 @@ namespace VRTR
             void init(const std::vector<Patch>& patches);
 
             void runCudaFrame(uint32_t patchesCount);
+            // void runCudaSelectPass(uint32_t patchesCount);
+            // void runCudaPostVisibilityPass(uint32_t patchesCount);
 
             void appendDescriptorResources(DescriptorResources& resources);
 

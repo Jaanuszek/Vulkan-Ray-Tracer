@@ -45,7 +45,10 @@ namespace VRTR
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
                                           uint32_t srcPatchId);
+
+        __global__ void postVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch);
         
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+        __host__ void runPostVisibilityKernelStub(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
     }
 }

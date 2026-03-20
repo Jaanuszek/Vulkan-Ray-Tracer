@@ -3,6 +3,17 @@
 
 namespace VRTR::CUDA
 {
+    __global__ void postVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch)
+    {
+        if (numPatches == 0 || selectedPatch == nullptr || patches == nullptr)
+        {
+            return;
+        }
+
+        // Placeholder stage for radiosity accumulation after visibility pass.
+        // It currently performs no writes to keep behavior deterministic while integrating pipeline flow.
+    }
+
     __global__ void filterPatches(Patch* patches, uint32_t numPatches,
                                   SelectedPatch* selectedPatch)
     {
@@ -169,7 +180,6 @@ namespace VRTR::CUDA
         SelectedPatch* d_reduceBuffer = nullptr;
         if (currSize > 1)
         {
-            // Allocate once and ping-pong between stable owners to avoid aliasing/free issues.
             CUDA_CHECK_STD_ERROR(cudaMalloc(&d_reduceBuffer, blocks * sizeof(SelectedPatch)));
         }
 
@@ -205,5 +215,11 @@ namespace VRTR::CUDA
         {
             cudaFree(d_reduceBuffer);
         }
+    }
+
+    __host__ void runPostVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
+    {
+        postVisibilityKernelStub<<<1, 1, 0, stream>>>(patches, numPatches, selectedPatch);
+        CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 }

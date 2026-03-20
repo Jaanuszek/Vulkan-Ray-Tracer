@@ -17,6 +17,7 @@
 #include "AccelerationStructureManager.hpp"
 #include "DescriptorManager.hpp"
 #include "RayTracingPipeline.hpp"
+#include "VisibilityPipeline.hpp"
 #include "Model.hpp"
 #include "Texture.hpp"
 #include "StorageBuffer.hpp"
@@ -62,6 +63,7 @@ namespace VRTR
         std::shared_ptr<CommandBufferManager> commandBufferManager;
         std::unique_ptr<Scene> scene;
         std::unique_ptr<RayTracingPipeline> rayTracingPipeline;
+        std::unique_ptr<VisibilityPipeline> visibilityPipeline;
         std::unique_ptr<FrameManager> frameManager;
 
         std::shared_ptr<Camera> camera;
@@ -69,6 +71,7 @@ namespace VRTR
         // ================== RAY TRACING ==================
         std::unique_ptr<Buffer> uniform_buffer;
         SceneSettings &sceneSettings;
+        bool radiosityBootstrapDone{false};
     };
 
     inline static void framebufferResizeCallback(GLFWwindow *window, int width, int height)

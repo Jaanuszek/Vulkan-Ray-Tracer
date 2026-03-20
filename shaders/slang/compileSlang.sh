@@ -5,6 +5,9 @@ set -e
 ROOT_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
 SLANG_SHADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+RENDER_PASS_SHADER_DIR="${SLANG_SHADER_DIR}/renderPassShaders"
+VISIBILITY_SHADER_DIR="${SLANG_SHADER_DIR}/visibilityPassShaders"
+
 if command -v slangc >/dev/null 2>&1; then
     COMPILER="slangc"
     echo "Using slangc compiler"
@@ -17,6 +20,11 @@ compile_shader() {
     local input_file=$1
     local output_file=$2
     local stage=$3
+
+    if [[ ! -f "$input_file" ]]; then
+        echo "Error: Input file '$input_file' does not exist."
+        exit 1
+    fi
 
     echo "Compiling $input_file -> $output_file"
 
@@ -34,4 +42,7 @@ compile_shader() {
 # compile_shader "${SLANG_SHADER_DIR}/basicShader.slang" "${ROOT_SHADER_DIR}/miss.spv" "missShader"
 # compile_shader "${SLANG_SHADER_DIR}/basicShader.slang" "${ROOT_SHADER_DIR}/closesthit.spv" "closestHitShader"
 
-compile_shader "${SLANG_SHADER_DIR}/basicShader.slang" "${ROOT_SHADER_DIR}/slangTest.spv" "closestHitShader"
+compile_shader "${RENDER_PASS_SHADER_DIR}/basicShader.slang" "${ROOT_SHADER_DIR}/renderPass.spv" "closestHitShader"
+
+compile_shader "${VISIBILITY_SHADER_DIR}/visibilityShader.slang" "${ROOT_SHADER_DIR}/visibilityPass.spv" "closestHitShader"
+
