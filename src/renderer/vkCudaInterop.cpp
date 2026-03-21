@@ -3,7 +3,7 @@
 
 namespace VRTR
 {
-    vkCudaInterop::vkCudaInterop(RendererContext& ctx) : ctx(ctx) {}
+    vkCudaInterop::vkCudaInterop(RendererContext& ctx, uint32_t passCount) : ctx(ctx), passCount(passCount) {}
 
     vkCudaInterop::~vkCudaInterop()
     {
@@ -124,6 +124,40 @@ namespace VRTR
 
         cudaToVkWaitValue = cudaSemSignal;
         vkToCudaSignalValue += 2;
+    }
+
+    void vkCudaInterop::runCudaSelectPass(uint32_t patchesCount)
+    {
+        // czekam na semafory o indeksach 0, 4, 8 ...
+        // Bo (0)FilterPatches (1) -> (1)visibilityPass (2) -> (2) radiosityCalculation (3) -> (3) renderPass (4) -> (4) filterPatches...
+        waitForSemapore(filterPatchesWaitValue);
+
+        SelectedPatch selectedInit{};
+        CUDA_CHECK_ERROR(cudaMemcpyAsync(cudaSelectedPatchData, &selectedInit, sizeof(SelectedPatch),
+                                         cudaMemcpyHostToDevice, cudaStream));
+
+        CUDA::runFilterPatchesKernel(cudaPatchesData, patchesCount, cudaSelectedPatchData, cudaStream);
+
+        CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
+
+        signalSemaphore(filterPatchesSignalValue);
+        lastFilterPatchesSignalValue = filterPatchesSignalValue;
+
+        filterPatchesWaitValue += passCount;
+        filterPatchesSignalValue += passCount;
+    }
+
+    void vkCudaInterop::runCudaPostVisibilityPass()
+    {
+        waitForSemapore(radiosityWaitValue);
+
+        CUDA::runPostVisibilityKernel(cudaStream);
+
+        signalSemaphore(radiositySignalValue);
+        lastRadiositySignalValue = radiositySignalValue;
+
+        radiosityWaitValue += passCount;
+        radiositySignalValue += passCount;
     }
 
     void vkCudaInterop::waitForSemapore(uint64_t waitValue)

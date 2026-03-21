@@ -143,6 +143,12 @@ namespace VRTR
         {
             uint32_t imageIndex = frameManager->acquireNextImage();
 
+            frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
+
+            frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
+
+            frameManager->runCudaPostVisibilityPass();
+
             // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne
             std::vector<vk::CommandBuffer> submitCommandBuffers = {*commandBufferManager->getCommandBuffer(imageIndex)};
             if (renderGUI){
@@ -187,8 +193,8 @@ namespace VRTR
             }
             updateUniformBuffer(); // Camera UBO update
 
-            frameManager->submitQueue(submitCommandBuffers);
-            frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
+            frameManager->submitRenderQueue(submitCommandBuffers);
+            // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
         }

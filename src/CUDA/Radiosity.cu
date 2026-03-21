@@ -101,6 +101,12 @@ namespace VRTR::CUDA
         }
     }
 
+    __global__ void calculateRadiosity()
+    {
+        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        // Placeholder for radiosity calculation kernel.
+    }
+
     // /**
     //  * KERNEL 2: calculateRadiosity - obliczenie transferu radiosity między patchami
     //  * 
@@ -217,9 +223,15 @@ namespace VRTR::CUDA
         }
     }
 
-    __host__ void runPostVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
+    // __host__ void runPostVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
+    // {
+    //     postVisibilityKernelStub<<<1, 1, 0, stream>>>(patches, numPatches, selectedPatch);
+    //     CUDA_CHECK_STD_ERROR(cudaGetLastError());
+    // }
+
+    __host__ void runPostVisibilityKernel(cudaStream_t stream)
     {
-        postVisibilityKernelStub<<<1, 1, 0, stream>>>(patches, numPatches, selectedPatch);
+        calculateRadiosity<<<1, 1, 0, stream>>>();
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 }

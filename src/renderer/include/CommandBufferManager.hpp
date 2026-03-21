@@ -19,9 +19,15 @@ namespace VRTR
 
         vk::raii::CommandBuffer &getCommandBuffer(uint32_t index);
 
-        // vk::raii::CommandBuffer &getVisibilityCommandBuffer(uint32_t index);
+        vk::raii::CommandBuffer &getVisibilityCommandBuffer(uint32_t index)
+        {
+            return VisibilityCommandBuffers.at(index);
+        }
 
-        std::vector<vk::raii::CommandBuffer> &getVisibilityCommandBuffers() { return VisibilityCommandBuffers; }
+        std::vector<vk::raii::CommandBuffer> &getVisibilityCommandBuffers() 
+        { 
+            return VisibilityCommandBuffers; 
+        }
         
         inline std::vector<vk::raii::CommandBuffer> &getCommandBuffers()
         {

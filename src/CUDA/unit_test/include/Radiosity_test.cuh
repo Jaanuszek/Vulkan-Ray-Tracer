@@ -9,4 +9,3 @@
 
 #include <gtest/gtest.h>
 
-constexpr uint32_t TPB = 1024;
