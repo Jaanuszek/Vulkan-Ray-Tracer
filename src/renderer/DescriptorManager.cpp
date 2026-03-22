@@ -94,6 +94,13 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
+        vk::DescriptorSetLayoutBinding radiosityLightmapLayout{
+            .binding = 10,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr};
+
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             ASLayout,
             storageImageLayout,
@@ -104,7 +111,8 @@ namespace VRTR
             cudaColorBufferLayout,
             triToPatchBufferLayout,
             patchBufferLayout,
-            selectedPatchLayout
+            selectedPatchLayout,
+            radiosityLightmapLayout
         };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -131,6 +139,7 @@ namespace VRTR
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla triToPatch buffera    
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla selected patch buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla radiosity lightmap buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -315,6 +324,20 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &selectedPatchBufferInfo};
 
+        vk::DescriptorBufferInfo radiosityLightmapBufferInfo{
+            .buffer = descriptorResources.radiosityLightmapBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet radiosityLightmapBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 10,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &radiosityLightmapBufferInfo};
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
@@ -325,7 +348,8 @@ namespace VRTR
             cudaColorBufferWrite,
             triToPatchBufferWrite,
             patchBufferWrite,
-            selectedPatchBufferWrite
+            selectedPatchBufferWrite,
+            radiosityLightmapBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
@@ -474,6 +498,20 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &selectedPatchBufferInfo};
 
+        vk::DescriptorBufferInfo radiosityLightmapBufferInfo{
+            .buffer = descriptorResources.radiosityLightmapBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+
+        vk::WriteDescriptorSet radiosityLightmapBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 10,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &radiosityLightmapBufferInfo};
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             resultImageWrite,
             textureWrite,
@@ -482,7 +520,8 @@ namespace VRTR
             cudaColorBufferWrite,
             triToPatchBufferWrite,
             patchBufferWrite,
-            selectedPatchBufferWrite
+            selectedPatchBufferWrite,
+            radiosityLightmapBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

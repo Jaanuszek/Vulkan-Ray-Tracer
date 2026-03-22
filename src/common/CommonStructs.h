@@ -13,7 +13,7 @@ namespace VRTR
         
         // RADIOSITY - energia wysłana i otrzymana
         float unshotEnergy{0.0f};      // energia, ktora jeszcze nie byla radiosity
-        float radiosity{0.0f};         // skumulowana radiosity dla tego patcha
+        glm::vec3 radiosity{0.0f, 0.0f, 0.0f};
     };
 
     // Struktura ktora bedzie uzupelniona w visability passie

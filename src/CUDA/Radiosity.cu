@@ -3,6 +3,26 @@
 
 namespace VRTR::CUDA
 {
+    namespace
+    {
+        constexpr float CONVERGENCE_UNSHOT_EPSILON = 1e-5f;
+    }
+
+    __device__ inline float3 makeDiff(const glm::vec3& a, const glm::vec3& b)
+    {
+        return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+    }
+
+    __device__ inline float dot3(const float3& a, const float3& b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    __device__ inline float length3(const float3& v)
+    {
+        return sqrtf(dot3(v, v));
+    }
+
     __global__ void postVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch)
     {
         if (numPatches == 0 || selectedPatch == nullptr || patches == nullptr)
@@ -100,69 +120,93 @@ namespace VRTR::CUDA
             output[blockIdx.x].unshotEnergy = maxEnergy[0];
         }
     }
-
-    __global__ void calculateRadiosity()
-    {
-        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        // Placeholder for radiosity calculation kernel.
-    }
-
     // /**
     //  * KERNEL 2: calculateRadiosity - obliczenie transferu radiosity między patchami
     //  * 
     //  * Na bazie visibility z Vulkan ray tracingu, obliczamy ile energii
     //  * transfer się z srcPatch do pozostałych patchy
     //  */
-    // __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
-    //                                    PatchVisibility *visibilities, uint32_t numVisibilities,
-    //                                    uint32_t srcPatchId)
-    // {
-    //     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
+                                       PatchVisibility *visibilities, uint32_t numVisibilities,
+                                       SelectedPatch* selectedPatch, float4* d_lightMap)
+    {
+        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
         
-    //     if (idx >= numVisibilities)
-    //         return;
+        if (idx >= numVisibilities)
+            return;
         
-    //     PatchVisibility &vis = visibilities[idx];
+        PatchVisibility &vis = visibilities[idx];
         
-    //     // Jeśli to nie jest nasze source patch, skip
-    //     if (vis.srcPatchId != srcPatchId)
-    //         return;
+        // Jeśli to nie jest nasze source patch, skip
+        if (vis.srcPatchId != selectedPatch->patchId)
+            return;
         
-    //     Patch &srcPatch = patches[srcPatchId];
-    //     Patch &dstPatch = patches[vis.dstPatchId];
+        Patch &srcPatch = patches[selectedPatch->patchId];
+        Patch &dstPatch = patches[vis.dstPatchId];
         
-    //     // Jeśli destination patch nie jest widoczny, skip
-    //     if (vis.visibility < 0.001f)
-    //         return;
+        // Jeśli destination patch nie jest widoczny, skip
+        if (vis.visibility < 0.001f || dstPatch.id == 0xFFFFFFFF)
+            return;
+
+    
+        // numVisibilities to liczba promieni wystrzelanych z patchy
+        // narazie robie to w jednym wymiarze
+        // ale trzeba bedzie to zmienic na 3d
+        float energyPerRay = srcPatch.unshotEnergy / numVisibilities;
+
+        // Obliczamy form factor F (solid angle approximation)
+        glm::vec3 diff = dstPatch.center - srcPatch.center;
+        float distance = glm::length(diff);
         
-    //     // Obliczamy form factor F (solid angle approximation)
-    //     glm::vec3 diff = dstPatch.center - srcPatch.center;
-    //     float distance = glm::length(diff);
+        if (distance < 0.001f)
+            return; // Zbyt blisko, ignoruj
         
-    //     if (distance < 0.001f)
-    //         return; // Zbyt blisko, ignoruj
+        glm::vec3 dir = diff / distance;
         
-    //     glm::vec3 dir = diff / distance;
+        // Cosine term z obu stron
+        float cosSrc = glm::max(0.0f, glm::dot(srcPatch.normal, dir));
+        float cosDst = glm::max(0.0f, glm::dot(dstPatch.normal, -dir));
         
-    //     // Cosine term z obu stron
-    //     float cosSrc = glm::max(0.0f, glm::dot(srcPatch.normal, dir));
-    //     float cosDst = glm::max(0.0f, glm::dot(dstPatch.normal, -dir));
-        
-    //     // Form factor (uproszczona wersja)
-    //     float distSq = distance * distance;
-    //     float formFactor = (cosSrc * cosDst) / (M_PI * distSq);
-    //     formFactor *= dstPatch.area;
-        
-    //     // Radiosity transfer z visibility
-    //     float transferEnergy = srcPatch.unshotEnergy * formFactor * vis.visibility;
-        
-    //     // Albedo modulates transfer
-    //     transferEnergy *= glm::length(dstPatch.albedo) / 3.0f;  // średnia albedo
-        
-    //     // Aktualizuj radiosity destination patcha
-    //     // Note: w idealnym case miałbyś reduction/atomic, ale dla prostoty używamy atomic
-    //     atomicAdd(&dstPatch.radiosity, transferEnergy);
-    // }
+        // Form factor (uproszczona wersja)
+        float distSq = distance * distance;
+        float formFactor = (cosSrc * cosDst) / (M_PI * distSq);
+        formFactor *= dstPatch.area;
+        formFactor = min(1.0f, formFactor);
+
+        // Radiosity transfer z visibility
+        // float transferEnergy = srcPatch.unshotEnergy * formFactor * vis.visibility;
+        // glm::vec3 transferEnergy = srcPatch.unshotEnergy * formFactor * vis.visibility * dstPatch.albedo;
+        glm::vec3 transferEnergy = energyPerRay * dstPatch.albedo;
+        // Aktualizuj radiosity destination patcha
+        // Note: w idealnym case miałbyś reduction/atomic, ale dla prostoty używamy atomic
+        atomicAdd(&dstPatch.radiosity.r, transferEnergy.r);
+        atomicAdd(&dstPatch.radiosity.g, transferEnergy.g);
+        atomicAdd(&dstPatch.radiosity.b, transferEnergy.b);
+        dstPatch.unshotEnergy += energyPerRay;
+        // atomicAdd(&dstPatch.unshotEnergy, 0.2f);
+        // dstPatch.unshotEnergy += transferEnergy.r + transferEnergy.g + transferEnergy.b;
+
+        d_lightMap[dstPatch.id] = make_float4(transferEnergy.r, transferEnergy.g, transferEnergy.b, 1.0f);
+    }
+
+    __global__ void resetSelectedPatchUnshotEnergy(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch)
+    {
+        if (patches == nullptr || selectedPatch == nullptr)
+        {
+            return;
+        }
+
+        if (blockIdx.x == 0 && threadIdx.x == 0)
+        {
+            const uint32_t selectedPatchId = selectedPatch->patchId;
+            if (selectedPatchId < numPatches)
+            {
+                patches[selectedPatchId].unshotEnergy = 0.0f;
+                selectedPatch->unshotEnergy = 0.0f;
+            }
+        }
+    }
+
     __host__ void runFilterPatchesKernel(Patch *patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
     {
         if (numPatches == 0)
@@ -223,15 +267,23 @@ namespace VRTR::CUDA
         }
     }
 
-    // __host__ void runPostVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
-    // {
-    //     postVisibilityKernelStub<<<1, 1, 0, stream>>>(patches, numPatches, selectedPatch);
-    //     CUDA_CHECK_STD_ERROR(cudaGetLastError());
-    // }
-
-    __host__ void runPostVisibilityKernel(cudaStream_t stream)
+    __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
+                                        SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
+                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream)
     {
-        calculateRadiosity<<<1, 1, 0, stream>>>();
+        if (numPatches == 0)
+        {
+            return;
+        }
+
+        int blocks = (numPatches + TPB - 1) / TPB;
+        blocks = min(blocks, 1024);
+
+        calculateRadiosity<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_visibilities, numVisibilities, d_selectedPatch, d_lightMap);
+        CUDA_CHECK_STD_ERROR(cudaGetLastError());
+
+        // Reset source patch energy after radiosity accumulation so the next selection pass sees the update.
+        resetSelectedPatchUnshotEnergy<<<1, 1, 0, stream>>>(d_patches, numPatches, d_selectedPatch);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 }

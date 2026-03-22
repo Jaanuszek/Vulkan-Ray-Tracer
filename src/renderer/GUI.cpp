@@ -175,7 +175,25 @@ namespace VRTR
             sceneSettings.ubo.debugPatches = false;
             sceneSettings.ubo.debugNormals = false;
             sceneSettings.ubo.debugCenters = false;
+            sceneSettings.ubo.enableRadiosityPass = false;
         };
+
+        if (ImGui::Checkbox("Use Radiosity Lightmap", &sceneSettings.ubo.useRadiosityLightmap))
+        {
+            updated = true;
+        }
+
+        if(ImGui::Button("Enable Radiosity Cuda Pass"))
+        {
+            const bool wasEnabled = sceneSettings.ubo.enableRadiosityPass;
+            resetViewFlags();
+            if(!wasEnabled)
+            {
+                sceneSettings.ubo.enableRadiosityPass = true;
+                sceneSettings.transformations.updateRequest = UpdateRequest::EnableRadiosityPass;
+            }
+            updated = true;
+        }
 
         if(ImGui::Button("Enable CUDA"))
         {

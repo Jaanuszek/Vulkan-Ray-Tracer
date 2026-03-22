@@ -20,7 +20,7 @@ namespace VRTR
 
             void runCudaFrame(uint32_t patchesCount);
             void runCudaSelectPass(uint32_t patchesCount);
-            void runCudaPostVisibilityPass();
+            void runCudaPostVisibilityPass(uint32_t patchesCount);
 
             void appendDescriptorResources(DescriptorResources& resources);
 
@@ -64,6 +64,15 @@ namespace VRTR
             std::unique_ptr<Buffer> cudaSelectedPatchBuffer;
             SelectedPatch* cudaSelectedPatchData{};
             cudaExternalMemory_t cudaSelectedPatchExternalMemory{nullptr};
+
+            std::unique_ptr<Buffer> cudaPatchVisibilityBuffer;
+            PatchVisibility* cudaPatchVisibilityData{};
+            cudaExternalMemory_t cudaPatchVisibilityExternalMemory{nullptr};
+            uint32_t patchVisibilityCount{0};
+
+            std::unique_ptr<Buffer> cudaRadiosityLightmapBuffer;
+            float4* cudaRadiosityLightmapData{};
+            cudaExternalMemory_t cudaRadiosityLightmapExternalMemory{nullptr};
 
             uint32_t passCount;
 

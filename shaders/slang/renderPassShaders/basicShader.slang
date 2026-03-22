@@ -1,38 +1,10 @@
 module basicShader;
-__include "../utils/pc_helpers";
-__include "../utils/helpers";
-__include "../utils/constants";
 
-struct CameraData
-{
-    bool enableCUDA;
-    bool shadowMode;
-    bool debugPatches;
-    bool debugNormals;
-    bool debugCenters;
-    float3 light_pos;
-    column_major float4x4 viewInverse;
-    column_major float4x4 projInverse;
-};
+__include "pc_helpers";
 
-struct Patch
-{
-    uint32_t id;
-    float area;
-    float emiission = 0.0f;
-    float unshotEnergy = 0.0f;
-    float radiosity = 0.0f; 
-    float3 center;
-    float3 normal;
-    float3 albedo;
-};
-
-struct SelectedPatch
-{
-    uint32_t id;
-    float unshotEnergy;
-};
-
+#include "../utils/helpers.slang"
+#include "../utils/constants.slang"
+#include "../utils/common_structs.slang"
 
 [[vk::binding(0, 0)]]
 uniform RaytracingAccelerationStructure topLevelAS;
@@ -60,27 +32,15 @@ StructuredBuffer<float4> cudaColorBuffer;
 StructuredBuffer<uint32_t> triToPatchBuffer;
 
 [[vk::binding(8, 0)]]
-StructuredBuffer<Patch, Std140DataLayout> patchBuffer;
+RWStructuredBuffer<Patch, Std140DataLayout> patchBuffer;
 
 [[vk::binding(9, 0)]]
 RWStructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
 
+[[vk::binding(10, 0)]]
+StructuredBuffer<float4> radiosityLightmapBuffer;
+
 [[vk::push_constant]] internal pc_blas blasAddr;
-
-public struct RayPayload
-{
-    float3 hitValue;
-    float distance;
-    float3 normal;
-    float reflector;
-    // ========================== SHADOWS
-    bool shadowed;
-};
-
-public struct HitAttribute
-{
-    float2 bary;
-};
 
 [shader("raygeneration")]
 void rayGenShader()
@@ -198,7 +158,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
     uint patchId = triToPatchBuffer[triGlobalIndex];
 
-    uint selectedPatchId = selectedPatchesBuffer[0].id;
+    uint selectedPatchId = selectedPatchesBuffer[0].patchId;
     float unshotEnergy = selectedPatchesBuffer[0].unshotEnergy;
 
     Material mat = materialBuffer[instanceIndex];
@@ -316,7 +276,19 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float dot_product = max(dot(lightVector, normal), 0.0f);
     float3 directLighting = (color * dot_product).rgb;
 
-    payload.hitValue.rgb = isMetallic ? directLighting * 0.3f : directLighting;
+    float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
+    if (cameraData.useRadiosityLightmap)
+    {
+        // const float indirectStrength = 0.01f;
+        // directLighting += radiosityLightmapBuffer[patchId].bgr * indirectStrength;
+        if(radiosityLightmapBuffer[patchId].x > 0.01f || radiosityLightmapBuffer[patchId].y > 0.01f || radiosityLightmapBuffer[patchId].z > 0.01f)
+        {
+            float3 c = patchColor(patchId);
+            FinalColor += radiosityLightmapBuffer[patchId].bgr + c;
+        }
+    }
+
+    payload.hitValue.rgb = FinalColor;
     payload.distance = RayTCurrent();
     payload.normal = normal;
     payload.reflector = isMetallic ? 0.75f : 0.0f;

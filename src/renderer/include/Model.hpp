@@ -51,11 +51,11 @@ namespace VRTR
             // temporary constructor, W przyszlosci pewnie informacje o materiale beda odczytywane z pliku modelu
             Model(RendererContext& ctx,
                     const std::string& modelPath, const std::string& texturePath,
-                    const Material& mat = Material{});
+                    const Material& mat = Material{}, const glm::mat4& transform = glm::mat4(1.0f));
 
             Model(RendererContext& ctx,
                     const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
-                    const Material& mat = Material{});
+                    const Material& mat = Material{}, const glm::mat4& transform = glm::mat4(1.0f));
 
             ~Model();
 
@@ -104,6 +104,7 @@ namespace VRTR
             uint32_t triCount{};
             std::string modelName;
             std::unique_ptr<mesh> modelMesh;
+            glm::mat4 modelTransform{1.0f};
 
             std::unique_ptr<Buffer> vertexBuffer;
             std::unique_ptr<Buffer> indexBuffer;

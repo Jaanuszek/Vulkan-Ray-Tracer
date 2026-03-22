@@ -1,19 +1,163 @@
 module visibilityShader;
 
+#include "../utils/helpers.slang"
+#include "../utils/constants.slang"
+#include "../utils/common_structs.slang"
+
+[[vk::binding(0, 0)]]
+uniform RaytracingAccelerationStructure topLevelAS;
+
+[[vk::binding(2, 0)]]
+ConstantBuffer<CameraData> cameraData;
+
+[[vk::binding(4, 0)]]
+StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
+
+[[vk::binding(5, 0)]]
+StructuredBuffer<Material, Std140DataLayout> materialBuffer;
+
+[[vk::binding(6, 0)]]
+StructuredBuffer<float4> cudaColorBuffer;
+
+[[vk::binding(7, 0)]]
+StructuredBuffer<uint32_t> triToPatchBuffer;
+
+[[vk::binding(8, 0)]]
+RWStructuredBuffer<Patch, Std140DataLayout> patchBuffer;
+
+[[vk::binding(9, 0)]]
+RWStructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
+
+[[vk::binding(10, 0)]]
+RWStructuredBuffer<PatchVisibility, Std140DataLayout> patchVisibilityBuffer;
+
+static const float PI = float.getPi();
+
+float3 safeNormalize(float3 v, float3 fallback)
+{
+    float len2 = dot(v, v);
+    if (len2 < 1e-10f)
+    {
+        return fallback;
+    }
+    return v * rsqrt(len2);
+}
+
+float3 sampleHemisphere(float2 seed, float3 normal)
+{
+    float3 d = rand_unit_vec(seed);
+    if (dot(d, normal) < 0.0f)
+    {
+        d = -d;
+    }
+    return safeNormalize(d, normal);
+}
+
+float3 sampleCosineHemisphere(float2 u)
+{
+    float r = sqrt(u.x);
+    float theta = 2.0f * PI * u.y;
+
+    float x = r * cos(theta);
+    float y = r * sin(theta);
+    float z = sqrt(1.0f - u.x);
+    return float3(x, y, z);
+}
+
+void buildOrthonormalBasis(float3 n, out float3 t, out float3 b)
+{
+    if (abs(n.z) < 0.999f)
+    {
+        t = normalize(cross(n, float3(0, 0, 1)));
+    }
+    else
+    {
+        t = normalize(cross(n, float3(0, 1, 0)));
+    }
+
+    b = cross(n, t);
+}
+
+float3 sampleCosineHemisphereWorld(float2 u, float3 normal)
+{
+    float3 localDir = sampleCosineHemisphere(u);
+
+    float3 t, b;
+    buildOrthonormalBasis(normal, t, b);
+
+    return normalize(
+        localDir.x * t +
+        localDir.y * b +
+        localDir.z * normal
+    );
+}
+
 [shader("raygeneration")]
 void rayGenShader()
 {
-    // Ray generation shader code
+    const uint3 dispatchIndex = DispatchRaysIndex();
+
+    uint32_t selectedPatchID = selectedPatchesBuffer[0].patchId;
+    if (selectedPatchID == 0xFFFFFFFF)
+    {
+        return;
+    }
+
+    Patch patch = patchBuffer[selectedPatchID];
+
+    float3 normal = patch.normal;
+    float3 origin = patch.center + normal * 0.02f;
+
+    uint32_t hitCount = 0;
+
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.TMin = 0.001f;
+    ray.TMax = 1000.0f;
+
+    visibilityRayPayload payload;
+    payload.distance = -1.0f;
+    payload.dstPatchId = 0xFFFFFFFF;
+
+    float2 seed = float2(
+        fract(sin(dispatchIndex.x * 12.9898f) * 43758.5453f),
+        fract(sin(dispatchIndex.x * 78.233f) * 12345.6789f)
+    );
+    ray.Direction = sampleCosineHemisphereWorld(seed, normal);
+
+    TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
+
+    const uint32_t visibilityBufferIndex = dispatchIndex.x;
+    patchVisibilityBuffer[visibilityBufferIndex].srcPatchId = selectedPatchID;
+
+    if (payload.distance > 0.0f)
+    {
+        patchVisibilityBuffer[visibilityBufferIndex].dstPatchId = payload.dstPatchId;
+        patchVisibilityBuffer[visibilityBufferIndex].visibility = 1.0f;
+        hitCount += 1; // <--- nie wiem czy mi sie to przyda
+    }
+    else
+    {
+        patchVisibilityBuffer[visibilityBufferIndex].dstPatchId = 0xFFFFFFFF;
+        patchVisibilityBuffer[visibilityBufferIndex].visibility = 0.0f;
+    }
 }
 
 [shader("closesthit")]
-void closestHitShader()
+void closestHitShader(inout visibilityRayPayload payload, in HitAttribute attribs)
 {
-    // Closest hit shader code
+    uint instanceIndex = InstanceIndex();
+    uint triangleIndex = PrimitiveIndex();
+    uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
+    uint patchId = triToPatchBuffer[triGlobalIndex];
+
+    payload.distance = RayTCurrent();
+    payload.dstPatchId = patchId;
 }
 
 [shader("miss")]
-void missShader()
+void missShader(inout visibilityRayPayload payload)
 {
-    // Miss shader code
+    payload.distance = -1.0f;
+    payload.dstPatchId = 0xFFFFFFFF;
 }

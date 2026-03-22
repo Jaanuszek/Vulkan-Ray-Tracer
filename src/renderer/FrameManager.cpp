@@ -214,9 +214,9 @@ namespace VRTR
         vkCudaInteropManager->runCudaSelectPass(patchesCount);
     }
 
-    void FrameManager::runCudaPostVisibilityPass()
+    void FrameManager::runCudaPostVisibilityPass(uint32_t patchesCount)
     {
-        vkCudaInteropManager->runCudaPostVisibilityPass();
+        vkCudaInteropManager->runCudaPostVisibilityPass(patchesCount);
     }
 
     void FrameManager::waitForFence()

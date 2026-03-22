@@ -1,5 +1,3 @@
-implementing basicShader;
-
 // func rand_unit_vec()->float3 {
 //     return normalize(tan(hash3(seed)))
 // }

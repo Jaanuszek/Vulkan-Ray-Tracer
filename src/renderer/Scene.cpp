@@ -23,7 +23,8 @@ namespace VRTR
         std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
         std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
 
-        importModel(viking_room_model_path, viking_room_texture_path);
+        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        importModel(viking_room_model_path, viking_room_texture_path, rotatedModel);
 
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
@@ -50,11 +51,6 @@ namespace VRTR
 
         auto [cubeVertices, cubeIndices] = CustomModels::createCube();
 
-        // for(auto& vert : cubeVertices)
-        // {
-        //     vert.normal = -vert.normal;
-        // }
-
         glm::mat4 lightObjectModel = glm::translate(glm::mat4(1.0f), lightPos);
         lightObjectModel = glm::scale(lightObjectModel, glm::vec3(0.2f));
         lightSourceTLASIdx = addObject(LIGHT_MODEL_NAME, cubeVertices, cubeIndices, Material{
@@ -65,7 +61,7 @@ namespace VRTR
         buildTLAS();
     }
 
-    uint32_t Scene::importModel(const std::string &modelPath, const std::string &texPath)
+    uint32_t Scene::importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform)
     {
         // Moze byc model bez tekstury, ale nie moze byc modelu bez modelu XD
         assert(!modelPath.empty() && "Model path cannot be empty!");
@@ -93,7 +89,8 @@ namespace VRTR
             ctx,
             modelPath,
             texPath,
-            mat));
+            mat,
+            transform));
 
         if(it->second->hasTexture())
         {
@@ -106,8 +103,7 @@ namespace VRTR
 
         uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
 
-        glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        uint32_t instanceIndex = asManager->addInstance(blasIndex, rotatedModel);
+        uint32_t instanceIndex = asManager->addInstance(blasIndex, transform);
         modelInstanceOrder.push_back(model_name);
         return instanceIndex;
     }
@@ -128,7 +124,7 @@ namespace VRTR
         }
 
         // models[objName] = std::make_unique<Model>(ctx, vertices, indices, mat);
-        models.try_emplace(objName, std::make_unique<Model>(ctx, vertices, indices, mat));
+        models.try_emplace(objName, std::make_unique<Model>(ctx, vertices, indices, mat, transform));
         models.at(objName)->setTextureIndex(CONSTANTS::MAX_TEXTURES);
         uint32_t blasIndex = asManager->createBLAS(models.at(objName));
         uint32_t instanceIndex = asManager->addInstance(blasIndex, transform);

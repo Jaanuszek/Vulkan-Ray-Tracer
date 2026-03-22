@@ -39,7 +39,7 @@ namespace VRTR
             void updatePatchData(uint8_t patchSize);
 
         private:
-            uint32_t importModel(const std::string &modelPath, const std::string &texPath);
+            uint32_t importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform);
 
             uint32_t addObject(const std::string& objName, const std::vector<VertexRT>& vertices, 
                     const std::vector<uint32_t>& indices, const Material& mat,

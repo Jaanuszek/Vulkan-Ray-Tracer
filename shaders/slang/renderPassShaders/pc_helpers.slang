@@ -1,52 +1,5 @@
 implementing basicShader;
 
-public struct Vertex
-{
-    float3 pos;
-    float3 normal;
-    float2 uv;
-};
-
-public struct Triangle
-{
-    Vertex[3] vertices;
-    float3 normal;
-    float2 uv;
-}
-
-public struct pc_blas
-{
-    uint64_t verticesAddress;
-    uint64_t indicesAddress;
-};
-
-struct GeometryInfo
-{
-    uint32_t triToPatchOffset;
-    uint32_t triangleCount;
-    uint64_t verticesAddress;
-    uint64_t indicesAddress;
-};
-
-enum class MaterialType
-{
-    NONE = 0,
-    ALBEDO = 1,
-    METALLIC = 2,
-    ROUGHNESS = 3,
-    PBR = 4,
-    LIGHT = 5
-};
-
-struct Material
-{
-    float4 albedo;
-    float metallic; // 4B
-    float roughness; // 4B
-    MaterialType type; // 4B
-    uint32_t textureIndex;
-};
-
 public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Triangle
 {
     Triangle tri;

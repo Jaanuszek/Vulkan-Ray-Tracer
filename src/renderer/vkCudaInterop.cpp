@@ -3,6 +3,12 @@
 
 namespace VRTR
 {
+    namespace
+    {
+        // Keep this in sync with visibility raygen dispatch/sampling setup.
+        constexpr uint32_t VISIBILITY_DISPATCH_RAYS = 16;
+    }
+
     vkCudaInterop::vkCudaInterop(RendererContext& ctx, uint32_t passCount) : ctx(ctx), passCount(passCount) {}
 
     vkCudaInterop::~vkCudaInterop()
@@ -38,23 +44,17 @@ namespace VRTR
                   << " emittingPatches=" << emittingPatchCount
                   << " totalInitialUnshot=" << totalInitialUnshot << std::endl;
 
-        // TEMPORARY - Dodam jakiś prosty external buffor, zeby sprawdzic czy CUDA <-> Vulkan interop działa
         vk::DeviceSize cudaBuffSize = sizeof(glm::vec4);
-        std::cout << "Cuda interop buffer size: " << cudaBuffSize << " bytes" << std::endl;
         cudaInteropBuffer = std::make_unique<Buffer>(ctx, cudaBuffSize,
                                                      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
                                                      vk::MemoryPropertyFlagBits::eDeviceLocal,
                                                      vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
-        // to jest workaround, bo importCudaExtenralMemory potrzebuje lvalue
-        // Ale nie powinien to byc problem, bo deviceMemory w vulkanie to ejst tylko uchwyt do pamięci,
-        // wiec nie ma potrzeby przekazywania go jako referencje
         auto cudaBuffDevMem = cudaInteropBuffer->getBufferMemory();
         CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
                                         cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
         vk::DeviceSize cudaPatchesDataSize = patches.size() * sizeof(Patch);
-        std::cout << "Patches data size: " << cudaPatchesDataSize << " bytes" << std::endl;
         cudaPatchesBuffer = std::make_unique<Buffer>(ctx, cudaPatchesDataSize,
                                                      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
                                                      vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -65,7 +65,6 @@ namespace VRTR
                         cudaPatchesDevMem, cudaPatchesDataSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
         vk::DeviceSize cudaSelectedPatchSize = sizeof(SelectedPatch);
-        std::cout << "Selected patch data size: " << cudaSelectedPatchSize << " bytes" << std::endl;
         cudaSelectedPatchBuffer = std::make_unique<Buffer>(ctx, cudaSelectedPatchSize,
                                                      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
                                                      vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -75,10 +74,31 @@ namespace VRTR
         CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaSelectedPatchData, cudaSelectedPatchExternalMemory,
                                         cudaSelectedPatchDevMem, sizeof(SelectedPatch), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
 
-        // cudaMemcpyAsync(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice, cudaStream);
-        CUDA_CHECK_ERROR(cudaMemcpy(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice));
 
-        // Kernel filterPatches uzywa atomicMax na unshotEnergy, wiec wynik musi byc zerowany przed pierwszym uruchomieniem.
+        patchVisibilityCount = VISIBILITY_DISPATCH_RAYS;
+        vk::DeviceSize cudaPatchVisibilitySize = sizeof(PatchVisibility) * patchVisibilityCount;
+        cudaPatchVisibilityBuffer = std::make_unique<Buffer>(ctx, cudaPatchVisibilitySize,
+                                                             vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                                                             vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                             vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        auto cudaPatchVisibilityDevMem = cudaPatchVisibilityBuffer->getBufferMemory();
+        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaPatchVisibilityData, cudaPatchVisibilityExternalMemory,
+                                        cudaPatchVisibilityDevMem, cudaPatchVisibilitySize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        vk::DeviceSize cudaRadiosityLightmapSize = sizeof(float4) * patches.size();
+        cudaRadiosityLightmapBuffer = std::make_unique<Buffer>(ctx, cudaRadiosityLightmapSize,
+                                       vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                       vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        auto cudaRadiosityLightmapDevMem = cudaRadiosityLightmapBuffer->getBufferMemory();
+        CUDA::importCudaExternalMemory(ctx.logicalDevice, (void**)&cudaRadiosityLightmapData, cudaRadiosityLightmapExternalMemory,
+                           cudaRadiosityLightmapDevMem, cudaRadiosityLightmapSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+
+        CUDA_CHECK_ERROR(cudaMemcpy(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice));
+        CUDA_CHECK_ERROR(cudaMemset(cudaRadiosityLightmapData, 0, cudaRadiosityLightmapSize));
+
         SelectedPatch selectedInit{};
         CUDA_CHECK_ERROR(cudaMemcpy(cudaSelectedPatchData, &selectedInit, sizeof(SelectedPatch), cudaMemcpyHostToDevice));
 
@@ -139,6 +159,18 @@ namespace VRTR
         CUDA::runFilterPatchesKernel(cudaPatchesData, patchesCount, cudaSelectedPatchData, cudaStream);
 
         CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
+        SelectedPatch hostSelected{};
+        CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
+
+        static uint64_t debugFrameIdx = 0;
+        if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
+        {
+            std::cout << "[After filter CUDA] frame=" << debugFrameIdx
+                      << " selectedPatchId=" << hostSelected.patchId
+                      << " unshotEnergy=" << hostSelected.unshotEnergy
+                      << " patchesCount=" << patchesCount << std::endl;
+        }
+        ++debugFrameIdx;
 
         signalSemaphore(filterPatchesSignalValue);
         lastFilterPatchesSignalValue = filterPatchesSignalValue;
@@ -147,11 +179,44 @@ namespace VRTR
         filterPatchesSignalValue += passCount;
     }
 
-    void vkCudaInterop::runCudaPostVisibilityPass()
+    void vkCudaInterop::runCudaPostVisibilityPass(uint32_t patchesCount)
     {
         waitForSemapore(radiosityWaitValue);
 
-        CUDA::runPostVisibilityKernel(cudaStream);
+        CUDA::runPostVisibilityKernel(
+            cudaPatchesData,
+            patchesCount,
+            cudaSelectedPatchData,
+            cudaPatchVisibilityData,
+            patchVisibilityCount,
+            cudaRadiosityLightmapData,
+            cudaStream);
+
+        static uint64_t debugLightmapFrame = 0;
+        if (patchesCount > 0 && (debugLightmapFrame < 120 || (debugLightmapFrame % 120 == 0)))
+        {
+            CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
+
+            SelectedPatch hostSelected{};
+            CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
+
+            if (hostSelected.patchId != 0xFFFFFFFF && hostSelected.patchId < patchesCount)
+            {
+
+                PatchVisibility hostVisibilities[VISIBILITY_DISPATCH_RAYS];
+                CUDA_CHECK_ERROR(cudaMemcpy(hostVisibilities, cudaPatchVisibilityData, sizeof(PatchVisibility) * patchVisibilityCount, cudaMemcpyDeviceToHost));
+
+                for(uint32_t i = 0; i < patchVisibilityCount; ++i)
+                {
+                    const auto& vis = hostVisibilities[i];
+                    std::cout << "    visibility srcPatchId=" << vis.srcPatchId
+                              << " dstPatchId=" << vis.dstPatchId
+                              << " visibility=" << vis.visibility
+                              << std::endl;
+                }
+            }
+        }
+        ++debugLightmapFrame;
 
         signalSemaphore(radiositySignalValue);
         lastRadiositySignalValue = radiositySignalValue;
@@ -190,6 +255,8 @@ namespace VRTR
         resources.cudaColorBuffer = cudaInteropBuffer->getBufferHandle();
         resources.patchBuffer = cudaPatchesBuffer->getBufferHandle();
         resources.selectedPatchBuffer = cudaSelectedPatchBuffer->getBufferHandle();
+        resources.patchVisibilityBuffer = cudaPatchVisibilityBuffer->getBufferHandle();
+        resources.radiosityLightmapBuffer = cudaRadiosityLightmapBuffer->getBufferHandle();
     }
 
     void vkCudaInterop::setupCuda()

@@ -8,8 +8,8 @@ namespace VRTR
 {
     Model::Model(RendererContext& ctx,
                 const std::string& modelPath, const std::string& texturePath,
-                const Material& mat)
-        : ctx(ctx), material(mat)
+                const Material& mat, const glm::mat4& transform)
+        : ctx(ctx), material(mat), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from path: {}", modelPath);
 
@@ -31,8 +31,8 @@ namespace VRTR
 
     Model::Model(RendererContext& ctx,
         const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
-        const Material& mat)
-        : ctx(ctx), material(mat)
+        const Material& mat, const glm::mat4& transform)
+        : ctx(ctx), material(mat), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
@@ -214,20 +214,30 @@ namespace VRTR
                 patchIdToTriangleId[tri] = patchIdx;
             }
 
+            glm::vec3 worldCenter = glm::vec3(modelTransform * glm::vec4(center / area, 1.0f));
+            glm::vec3 worldNormal = glm::normalize(glm::mat3(modelTransform) * normal);
+
             Patch p{};
             p.id = patchIdx;
             p.area = area;
-            p.center = (area > 0.0f) ? (center / area) : glm::vec3(0.0f);
-            p.normal = (glm::length(normal) > 0.0f) ? glm::normalize(normal) : glm::vec3(0.0f);
+            p.center = (area > 0.0f) ? worldCenter : glm::vec3(0.0f);
+            p.normal = (glm::length(normal) > 0.0f) ? worldNormal : glm::vec3(0.0f);
             p.albedo = material.albedo;
             if(material.type == MaterialType::LIGHT)
             {
                 p.emission = 1.0f;
             }
+            else if(material.type == MaterialType::ALBEDO)
+            {
+                p.emission = material.albedo.r; 
+            }
+            else if (material.type == MaterialType::METALLIC)
+            {
+                p.emission = material.metallic;
+            }
 
-            // Initial radiosity state: emitters start with energy available to shoot.
             p.unshotEnergy = p.emission;
-            p.radiosity = p.emission;
+            p.radiosity = glm::vec3(0.0f);
 
             patches.push_back(p);
         }

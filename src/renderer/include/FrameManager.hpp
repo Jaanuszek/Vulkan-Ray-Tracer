@@ -32,12 +32,15 @@ namespace VRTR
 
             void runCudaSelectPass(uint32_t patchesCount);
 
-            void runCudaPostVisibilityPass();
+            void runCudaPostVisibilityPass(uint32_t patchesCount);
 
             void appendDescriptorResources(DescriptorResources& resources)
             {
                 vkCudaInteropManager->appendDescriptorResources(resources);
             }
+
+            bool isComputeRadiosity() const { return computeRadiosity; }
+            void setComputeRadiosity(bool value) { computeRadiosity = value; }
 
         private:
             void waitForFence();

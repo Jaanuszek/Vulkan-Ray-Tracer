@@ -97,7 +97,7 @@ namespace VRTR::CUDA
                 hostPatches[i].normal = glm::vec3(0, 1, 0);
                 hostPatches[i].albedo = glm::vec3(0.8f, 0.8f, 0.8f);
                 hostPatches[i].unshotEnergy = unshootEnergyDist(gen);
-                hostPatches[i].radiosity = 0.0f;
+                hostPatches[i].radiosity = glm::vec3(0.0f);
             }
             
             // Allocate GPU memory and copy data

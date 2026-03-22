@@ -23,12 +23,6 @@ namespace VRTR
     namespace CUDA
     {
         constexpr uint32_t TPB = 1024;
-        /**
-         * @brief Kernel do znalezienia patcha z największą niewystrzeloną energią
-         * @param patches Array patchy
-         * @param numPatches Ilość patchy
-         * @param selectedPatch Output: wybrany patch (jeden thread zapisze wynik)
-         */
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       SelectedPatch* selectedPatch);
 
@@ -42,15 +36,14 @@ namespace VRTR
          * @param numVisibilities Ilość vidibilities
          * @param srcPatchId Patch, z ktorego wysylamy radiosity
          */
-        // __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
-        //                                   PatchVisibility *visibilities, uint32_t numVisibilities,
-        //                                   uint32_t srcPatchId);
-        __global__ void calculateRadiosity();
+        __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
+                                          PatchVisibility *visibilities, uint32_t numVisibilities,
+                                          SelectedPatch* selectedPatch, float* d_lightMap);
 
-        __global__ void postVisibilityKernelStub(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch);
-        
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
-        __host__ void runPostVisibilityKernel(cudaStream_t stream);
+        __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
+                                                SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
+                                                uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
         // __host__ void runPostVisibilityKernelStub(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
     }
 }

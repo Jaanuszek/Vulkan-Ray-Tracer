@@ -143,11 +143,14 @@ namespace VRTR
         {
             uint32_t imageIndex = frameManager->acquireNextImage();
 
-            frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
+            if(frameManager->isComputeRadiosity())
+            {
+                frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
 
-            frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
+                frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
 
-            frameManager->runCudaPostVisibilityPass();
+                frameManager->runCudaPostVisibilityPass(scene->getPatches().size());
+            }
 
             // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne
             std::vector<vk::CommandBuffer> submitCommandBuffers = {*commandBufferManager->getCommandBuffer(imageIndex)};
@@ -185,6 +188,11 @@ namespace VRTR
                 {   scene->updatePatchData(static_cast<uint8_t>(sceneSettings.transformations.patchTriangleSize));
                     break;
                 }
+                case UpdateRequest::EnableRadiosityPass:
+                {
+                    frameManager->setComputeRadiosity(sceneSettings.ubo.enableRadiosityPass);
+                    break;
+                }
                 default:
                     break;
                 }
@@ -197,6 +205,11 @@ namespace VRTR
             // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
+
+            // if(frameCount == 2)
+            // {
+                // frameManager->setComputeRadiosity(false);
+            // }
         }
         catch (const vk::OutOfDateKHRError &e)
         {
