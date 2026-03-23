@@ -4,6 +4,14 @@
 
 namespace VRTR::CUDA
 {
+    namespace
+    {
+        float energyMetric(const glm::vec3& e)
+        {
+            return e.r * 0.2126f + e.g * 0.7152f + e.b * 0.0722f;
+        }
+    }
+
     static bool ensureCudaReadyForTests()
     {
         // Forces CUDA runtime initialization and surfaces driver/runtime issues early.
@@ -96,7 +104,7 @@ namespace VRTR::CUDA
                 hostPatches[i].center = glm::vec3(i, i, i);
                 hostPatches[i].normal = glm::vec3(0, 1, 0);
                 hostPatches[i].albedo = glm::vec3(0.8f, 0.8f, 0.8f);
-                hostPatches[i].unshotEnergy = unshootEnergyDist(gen);
+                hostPatches[i].unshotEnergy = glm::vec3(unshootEnergyDist(gen));
                 hostPatches[i].radiosity = glm::vec3(0.0f);
             }
             
@@ -138,9 +146,9 @@ namespace VRTR::CUDA
         std::vector<SelectedPatch> result(BlockCount);
         ASSERT_EQ(cudaMemcpy(result.data(), d_selectedPatch, sizeof(SelectedPatch) * BlockCount, cudaMemcpyDeviceToHost), cudaSuccess);
         
-        float cpuMaxUnshoot = std::max_element(hostPatches.begin(), hostPatches.end(), [](const Patch& a, const Patch&b) {
-            return a.unshotEnergy < b.unshotEnergy;
-        })->unshotEnergy;
+        float cpuMaxUnshoot = energyMetric(std::max_element(hostPatches.begin(), hostPatches.end(), [](const Patch& a, const Patch&b) {
+            return energyMetric(a.unshotEnergy) < energyMetric(b.unshotEnergy);
+        })->unshotEnergy);
 
         EXPECT_FLOAT_EQ(result[0].unshotEnergy, cpuMaxUnshoot);
     }
@@ -150,7 +158,7 @@ namespace VRTR::CUDA
         float testEnergy = 0.8f;
         std::vector<Patch> singlePatch(1);
         singlePatch[0].id = 0;
-        singlePatch[0].unshotEnergy = testEnergy;
+        singlePatch[0].unshotEnergy = glm::vec3(testEnergy);
         singlePatch[0].center = glm::vec3(0, 0, 0);
         singlePatch[0].normal = glm::vec3(0, 1, 0);
         
@@ -183,7 +191,7 @@ namespace VRTR::CUDA
         for (size_t i = 0; i < zeroEnergyPatches.size(); ++i)
         {
             zeroEnergyPatches[i].id = i;
-            zeroEnergyPatches[i].unshotEnergy = 0.0f;
+            zeroEnergyPatches[i].unshotEnergy = glm::vec3(0.0f);
             zeroEnergyPatches[i].center = glm::vec3(0, 0, 0);
             zeroEnergyPatches[i].normal = glm::vec3(0, 1, 0);
         }
@@ -216,7 +224,7 @@ namespace VRTR::CUDA
         for (uint32_t i = 0; i < LARGE_NUM; ++i)
         {
             largePatches[i].id = i;
-            largePatches[i].unshotEnergy = static_cast<float>(i) * 0.001f;
+            largePatches[i].unshotEnergy = glm::vec3(static_cast<float>(i) * 0.001f);
             largePatches[i].center = glm::vec3(i, i, i);
             largePatches[i].normal = glm::vec3(0, 1, 0);
         }
@@ -252,7 +260,7 @@ namespace VRTR::CUDA
         for (uint32_t i = 0; i < LARGE_NUM; ++i)
         {
             largePatches[i].id = i;
-            largePatches[i].unshotEnergy = unshootEnergyDist(gen);
+            largePatches[i].unshotEnergy = glm::vec3(unshootEnergyDist(gen));
             largePatches[i].center = glm::vec3(i, i, i);
             largePatches[i].normal = glm::vec3(0, 1, 0);
         }
@@ -262,7 +270,7 @@ namespace VRTR::CUDA
         SelectedPatch* d_large_selected = allocateAndCopyToGPU(&initialSelected, static_cast<size_t>(BlockCount));
 
         Patch CPUMaxEnergy = *std::max_element(largePatches.begin(), largePatches.end(), [](const Patch& a, const Patch& b) {
-            return a.unshotEnergy < b.unshotEnergy;
+            return energyMetric(a.unshotEnergy) < energyMetric(b.unshotEnergy);
         });
 
         runFilterPatchesKernel(d_largePatches, LARGE_NUM, d_large_selected, 0);
@@ -272,7 +280,7 @@ namespace VRTR::CUDA
         ASSERT_EQ(cudaMemcpy(result.data(), d_large_selected, sizeof(SelectedPatch) * BlockCount, cudaMemcpyDeviceToHost), cudaSuccess);
         
         EXPECT_EQ(result[0].patchId, CPUMaxEnergy.id);
-        EXPECT_FLOAT_EQ(result[0].unshotEnergy, CPUMaxEnergy.unshotEnergy);
+        EXPECT_FLOAT_EQ(result[0].unshotEnergy, energyMetric(CPUMaxEnergy.unshotEnergy));
 
         cudaFree(d_largePatches);
         cudaFree(d_large_selected);

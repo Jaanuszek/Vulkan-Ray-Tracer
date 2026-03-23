@@ -4,6 +4,59 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+namespace
+{
+    constexpr float DEFAULT_MAX_WORLD_TRIANGLE_AREA = 0.001f;
+    constexpr uint32_t DEFAULT_MAX_SUBDIV_DEPTH = 18;
+    constexpr float EPSILON = 1e-8f;
+
+    VRTR::VertexRT midpointVertex(const VRTR::VertexRT& a, const VRTR::VertexRT& b)
+    {
+        VRTR::VertexRT v{};
+        v.pos = (a.pos + b.pos) * 0.5f;
+
+        const glm::vec3 n = (a.normal + b.normal) * 0.5f;
+        if (glm::length(n) > EPSILON)
+        {
+            v.normal = glm::normalize(n);
+        }
+        else
+        {
+            v.normal = a.normal;
+        }
+
+        v.texCoord = (a.texCoord + b.texCoord) * 0.5f;
+        return v;
+    }
+
+    float triangleAreaWorld(const glm::mat4& modelTransform,
+                            const VRTR::VertexRT& v0,
+                            const VRTR::VertexRT& v1,
+                            const VRTR::VertexRT& v2)
+    {
+        const glm::vec3 p0 = glm::vec3(modelTransform * glm::vec4(v0.pos, 1.0f));
+        const glm::vec3 p1 = glm::vec3(modelTransform * glm::vec4(v1.pos, 1.0f));
+        const glm::vec3 p2 = glm::vec3(modelTransform * glm::vec4(v2.pos, 1.0f));
+        return 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
+    }
+
+    void appendTriangle(const VRTR::VertexRT& v0,
+                        const VRTR::VertexRT& v1,
+                        const VRTR::VertexRT& v2,
+                        std::vector<VRTR::VertexRT>& outVertices,
+                        std::vector<uint32_t>& outIndices)
+    {
+        const uint32_t base = static_cast<uint32_t>(outVertices.size());
+        outVertices.push_back(v0);
+        outVertices.push_back(v1);
+        outVertices.push_back(v2);
+
+        outIndices.push_back(base + 0);
+        outIndices.push_back(base + 1);
+        outIndices.push_back(base + 2);
+    }
+}
+
 namespace VRTR
 {
     Model::Model(RendererContext& ctx,
@@ -19,9 +72,14 @@ namespace VRTR
             withTexture = true;
 
         loadModel(modelPath);
+        tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
         createVertexBuffer();
         createIndexBuffer();
         setGeometryInfo();
+
+        #ifdef enableRadiosity
+            buildPatches(1);
+        #endif
 
         if(withTexture)
         {
@@ -40,6 +98,8 @@ namespace VRTR
         modelMesh->vertices = vertices;
         modelMesh->indices = indices;
         material = mat;
+
+        tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
 
         createVertexBuffer();
         createIndexBuffer();
@@ -115,10 +175,87 @@ namespace VRTR
             }
         }
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
+    }
 
-        #ifdef enableRadiosity
-            buildPatches(0);
-        #endif
+    void Model::tessellateLargeTriangles(float maxWorldTriangleArea, uint32_t maxDepth)
+    {
+        if (!modelMesh || modelMesh->indices.size() < 3)
+        {
+            return;
+        }
+
+        const size_t originalTriangleCount = modelMesh->indices.size() / 3;
+        std::vector<VertexRT> refinedVertices;
+        std::vector<uint32_t> refinedIndices;
+        refinedVertices.reserve(modelMesh->vertices.size());
+        refinedIndices.reserve(modelMesh->indices.size());
+
+        auto subdivide = [&](auto&& self,
+                             const VertexRT& v0,
+                             const VertexRT& v1,
+                             const VertexRT& v2,
+                             uint32_t depth) -> void
+        {
+            const float area = triangleAreaWorld(modelTransform, v0, v1, v2);
+            if (area <= maxWorldTriangleArea || depth >= maxDepth)
+            {
+                appendTriangle(v0, v1, v2, refinedVertices, refinedIndices);
+                return;
+            }
+
+            const glm::vec3 p0 = glm::vec3(modelTransform * glm::vec4(v0.pos, 1.0f));
+            const glm::vec3 p1 = glm::vec3(modelTransform * glm::vec4(v1.pos, 1.0f));
+            const glm::vec3 p2 = glm::vec3(modelTransform * glm::vec4(v2.pos, 1.0f));
+
+            const glm::vec3 d01 = p1 - p0;
+            const glm::vec3 d12 = p2 - p1;
+            const glm::vec3 d20 = p0 - p2;
+            const float e01 = glm::dot(d01, d01);
+            const float e12 = glm::dot(d12, d12);
+            const float e20 = glm::dot(d20, d20);
+
+            if (e01 >= e12 && e01 >= e20)
+            {
+                const VertexRT m01 = midpointVertex(v0, v1);
+                self(self, v0, m01, v2, depth + 1);
+                self(self, m01, v1, v2, depth + 1);
+            }
+            else if (e12 >= e20)
+            {
+                const VertexRT m12 = midpointVertex(v1, v2);
+                self(self, v0, v1, m12, depth + 1);
+                self(self, v0, m12, v2, depth + 1);
+            }
+            else
+            {
+                const VertexRT m20 = midpointVertex(v2, v0);
+                self(self, v0, v1, m20, depth + 1);
+                self(self, m20, v1, v2, depth + 1);
+            }
+        };
+
+        for (size_t tri = 0; tri < originalTriangleCount; ++tri)
+        {
+            const uint32_t i0 = modelMesh->indices[3 * tri + 0];
+            const uint32_t i1 = modelMesh->indices[3 * tri + 1];
+            const uint32_t i2 = modelMesh->indices[3 * tri + 2];
+
+            const VertexRT& v0 = modelMesh->vertices[i0];
+            const VertexRT& v1 = modelMesh->vertices[i1];
+            const VertexRT& v2 = modelMesh->vertices[i2];
+            subdivide(subdivide, v0, v1, v2, 0);
+        }
+
+        const size_t refinedTriangleCount = refinedIndices.size() / 3;
+        if (refinedTriangleCount == originalTriangleCount)
+        {
+            return;
+        }
+
+        VRTR_INFO("Adaptive tessellation '{}': triangles {} -> {}", modelName, originalTriangleCount, refinedTriangleCount);
+
+        modelMesh->vertices = std::move(refinedVertices);
+        modelMesh->indices = std::move(refinedIndices);
     }
 
     const VmaAllocationCreateInfo Model::getVmaAllocCreateInfo()
@@ -202,15 +339,27 @@ namespace VRTR
                 const auto& v1 = modelMesh->vertices[i1];
                 const auto& v2 = modelMesh->vertices[i2];
 
-                glm::vec3 e1 = v1.pos - v0.pos; 
+                glm::vec3 e1 = v1.pos - v0.pos;
                 glm::vec3 e2 = v2.pos - v0.pos;
-                glm::vec3 triNormal = glm::cross(e1, e2);
-                float triArea = 0.5f * glm::length(triNormal);
+                glm::vec3 triNormalGeom = glm::cross(e1, e2);
+                float triArea = 0.5f * glm::length(triNormalGeom);
                 glm::vec3 triCenter = (v0.pos + v1.pos + v2.pos) / 3.0f;
+
+                if (triArea <= 1e-8f)
+                {
+                    patchIdToTriangleId[tri] = patchIdx;
+                    continue;
+                }
+
+                const glm::vec3 shadingNormal = glm::normalize(v0.normal + v1.normal + v2.normal);
+                if (glm::length(shadingNormal) > 1e-8f && glm::dot(triNormalGeom, shadingNormal) < 0.0f)
+                {
+                    triNormalGeom = -triNormalGeom;
+                }
 
                 area += triArea;
                 center += triCenter * triArea; // nie wiem po co tak, weighted center. Duze trójkąty maja większy wpływ na pozycje patcha, wiec to jest pewnie po to
-                normal += triNormal;
+                normal += triNormalGeom;
                 patchIdToTriangleId[tri] = patchIdx;
             }
 
@@ -236,7 +385,7 @@ namespace VRTR
                 p.emission = material.metallic;
             }
 
-            p.unshotEnergy = p.emission;
+            p.unshotEnergy = p.albedo * p.emission;
             p.radiosity = glm::vec3(0.0f);
 
             patches.push_back(p);
@@ -263,10 +412,10 @@ namespace VRTR
     std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createCube()
     {
         std::vector<VertexRT> vertices = {
-            {{-1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{1.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{1.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-            {{-1.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+            {{-1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+            {{-1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices = {

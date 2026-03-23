@@ -12,7 +12,7 @@ namespace VRTR
         glm::vec3 albedo;
         
         // RADIOSITY - energia wysłana i otrzymana
-        float unshotEnergy{0.0f};      // energia, ktora jeszcze nie byla radiosity
+        glm::vec3 unshotEnergy{0.0f, 0.0f, 0.0f}; // energia RGB, ktora jeszcze nie byla wyslana
         glm::vec3 radiosity{0.0f, 0.0f, 0.0f};
     };
 

@@ -6,6 +6,11 @@ namespace VRTR::CUDA
     namespace
     {
         constexpr float CONVERGENCE_UNSHOT_EPSILON = 1e-5f;
+
+        __host__ __device__ inline float energyMetric(const glm::vec3& e)
+        {
+            return e.r * 0.2126f + e.g * 0.7152f + e.b * 0.0722f;
+        }
     }
 
     __device__ inline float3 makeDiff(const glm::vec3& a, const glm::vec3& b)
@@ -47,9 +52,10 @@ namespace VRTR::CUDA
 
         for (uint32_t i = idx; i < numPatches; i += gridDim.x * blockDim.x)
         {
-            if (patches[i].unshotEnergy > localMaxEnergy)
+            const float patchEnergy = energyMetric(patches[i].unshotEnergy);
+            if (patchEnergy > localMaxEnergy)
             {
-                localMaxEnergy = patches[i].unshotEnergy;
+                localMaxEnergy = patchEnergy;
                 localMaxPatchId = patches[i].id;
             }
         }
@@ -136,57 +142,43 @@ namespace VRTR::CUDA
             return;
         
         PatchVisibility &vis = visibilities[idx];
+
+        if (vis.srcPatchId >= numPatches || vis.dstPatchId >= numPatches)
+            return;
         
         // Jeśli to nie jest nasze source patch, skip
         if (vis.srcPatchId != selectedPatch->patchId)
+            return;
+
+        if (vis.dstPatchId == selectedPatch->patchId)
             return;
         
         Patch &srcPatch = patches[selectedPatch->patchId];
         Patch &dstPatch = patches[vis.dstPatchId];
         
         // Jeśli destination patch nie jest widoczny, skip
-        if (vis.visibility < 0.001f || dstPatch.id == 0xFFFFFFFF)
+        if (vis.visibility < 0.001f || dstPatch.id == 0xFFFFFFFF || dstPatch.id >= numPatches)
             return;
 
     
-        // numVisibilities to liczba promieni wystrzelanych z patchy
-        // narazie robie to w jednym wymiarze
-        // ale trzeba bedzie to zmienic na 3d
-        float energyPerRay = srcPatch.unshotEnergy / numVisibilities;
+        // Monte Carlo: energia jednej probki z wybranego source patcha (RGB).
+        glm::vec3 energyPerRay = srcPatch.unshotEnergy / static_cast<float>(numVisibilities);
 
-        // Obliczamy form factor F (solid angle approximation)
-        glm::vec3 diff = dstPatch.center - srcPatch.center;
-        float distance = glm::length(diff);
-        
-        if (distance < 0.001f)
-            return; // Zbyt blisko, ignoruj
-        
-        glm::vec3 dir = diff / distance;
-        
-        // Cosine term z obu stron
-        float cosSrc = glm::max(0.0f, glm::dot(srcPatch.normal, dir));
-        float cosDst = glm::max(0.0f, glm::dot(dstPatch.normal, -dir));
-        
-        // Form factor (uproszczona wersja)
-        float distSq = distance * distance;
-        float formFactor = (cosSrc * cosDst) / (M_PI * distSq);
-        formFactor *= dstPatch.area;
-        formFactor = min(1.0f, formFactor);
-
-        // Radiosity transfer z visibility
-        // float transferEnergy = srcPatch.unshotEnergy * formFactor * vis.visibility;
-        // glm::vec3 transferEnergy = srcPatch.unshotEnergy * formFactor * vis.visibility * dstPatch.albedo;
-        glm::vec3 transferEnergy = energyPerRay * dstPatch.albedo;
+        // Demo: energia niesie kolor source patcha i odbija sie przez albedo destination.
+        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo;
         // Aktualizuj radiosity destination patcha
         // Note: w idealnym case miałbyś reduction/atomic, ale dla prostoty używamy atomic
         atomicAdd(&dstPatch.radiosity.r, transferEnergy.r);
         atomicAdd(&dstPatch.radiosity.g, transferEnergy.g);
         atomicAdd(&dstPatch.radiosity.b, transferEnergy.b);
-        dstPatch.unshotEnergy += energyPerRay;
-        // atomicAdd(&dstPatch.unshotEnergy, 0.2f);
-        // dstPatch.unshotEnergy += transferEnergy.r + transferEnergy.g + transferEnergy.b;
+        atomicAdd(&dstPatch.unshotEnergy.r, transferEnergy.r);
+        atomicAdd(&dstPatch.unshotEnergy.g, transferEnergy.g);
+        atomicAdd(&dstPatch.unshotEnergy.b, transferEnergy.b);
 
-        d_lightMap[dstPatch.id] = make_float4(transferEnergy.r, transferEnergy.g, transferEnergy.b, 1.0f);
+        atomicAdd(&d_lightMap[dstPatch.id].x, transferEnergy.r);
+        atomicAdd(&d_lightMap[dstPatch.id].y, transferEnergy.g);
+        atomicAdd(&d_lightMap[dstPatch.id].z, transferEnergy.b);
+        atomicExch(&d_lightMap[dstPatch.id].w, 1.0f);
     }
 
     __global__ void resetSelectedPatchUnshotEnergy(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch)
@@ -201,7 +193,7 @@ namespace VRTR::CUDA
             const uint32_t selectedPatchId = selectedPatch->patchId;
             if (selectedPatchId < numPatches)
             {
-                patches[selectedPatchId].unshotEnergy = 0.0f;
+                patches[selectedPatchId].unshotEnergy = glm::vec3(0.0f);
                 selectedPatch->unshotEnergy = 0.0f;
             }
         }
@@ -271,12 +263,12 @@ namespace VRTR::CUDA
                                         SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
                                         uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream)
     {
-        if (numPatches == 0)
+        if (numPatches == 0 || numVisibilities == 0)
         {
             return;
         }
 
-        int blocks = (numPatches + TPB - 1) / TPB;
+        int blocks = (numVisibilities + TPB - 1) / TPB;
         blocks = min(blocks, 1024);
 
         calculateRadiosity<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_visibilities, numVisibilities, d_selectedPatch, d_lightMap);

@@ -92,10 +92,43 @@ float3 sampleCosineHemisphereWorld(float2 u, float3 normal)
     );
 }
 
+float radicalInverseVdC(uint bits)
+{
+    bits = (bits << 16) | (bits >> 16);
+    bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
+    bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
+    bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
+    bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
+    return float(bits) * 2.3283064365386963e-10f;
+}
+
+float2 hammersley2D(uint i, uint n)
+{
+    float invN = 1.0f / max(float(n), 1.0f);
+    return float2((float(i) + 0.5f) * invN, radicalInverseVdC(i));
+}
+
+float hash11(uint n)
+{
+    n ^= 2747636419u;
+    n *= 2654435769u;
+    n ^= n >> 16;
+    n *= 2654435769u;
+    n ^= n >> 16;
+    n *= 2654435769u;
+    return float(n) * 2.3283064365386963e-10f;
+}
+
+float2 hash22(uint n)
+{
+    return float2(hash11(n * 0x9E3779B9u + 0x7F4A7C15u), hash11(n * 0x85EBCA6Bu + 0xC2B2AE35u));
+}
+
 [shader("raygeneration")]
 void rayGenShader()
 {
     const uint3 dispatchIndex = DispatchRaysIndex();
+    const uint3 dispatchDim = DispatchRaysDimensions();
 
     uint32_t selectedPatchID = selectedPatchesBuffer[0].patchId;
     if (selectedPatchID == 0xFFFFFFFF)
@@ -108,8 +141,6 @@ void rayGenShader()
     float3 normal = patch.normal;
     float3 origin = patch.center + normal * 0.02f;
 
-    uint32_t hitCount = 0;
-
     RayDesc ray;
     ray.Origin = origin;
     ray.TMin = 0.001f;
@@ -119,10 +150,9 @@ void rayGenShader()
     payload.distance = -1.0f;
     payload.dstPatchId = 0xFFFFFFFF;
 
-    float2 seed = float2(
-        fract(sin(dispatchIndex.x * 12.9898f) * 43758.5453f),
-        fract(sin(dispatchIndex.x * 78.233f) * 12345.6789f)
-    );
+    uint32_t rayCount = max(dispatchDim.x, 1u);
+    float2 seed = hammersley2D(dispatchIndex.x, rayCount);
+    seed = frac(seed + hash22(selectedPatchID));
     ray.Direction = sampleCosineHemisphereWorld(seed, normal);
 
     TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
@@ -134,7 +164,6 @@ void rayGenShader()
     {
         patchVisibilityBuffer[visibilityBufferIndex].dstPatchId = payload.dstPatchId;
         patchVisibilityBuffer[visibilityBufferIndex].visibility = 1.0f;
-        hitCount += 1; // <--- nie wiem czy mi sie to przyda
     }
     else
     {

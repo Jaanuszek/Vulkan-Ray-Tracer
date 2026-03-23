@@ -6,7 +6,12 @@ namespace VRTR
     namespace
     {
         // Keep this in sync with visibility raygen dispatch/sampling setup.
-        constexpr uint32_t VISIBILITY_DISPATCH_RAYS = 16;
+        constexpr uint32_t VISIBILITY_DISPATCH_RAYS = 128;
+
+        inline float unshotMetric(const glm::vec3& e)
+        {
+            return e.r * 0.2126f + e.g * 0.7152f + e.b * 0.0722f;
+        }
     }
 
     vkCudaInterop::vkCudaInterop(RendererContext& ctx, uint32_t passCount) : ctx(ctx), passCount(passCount) {}
@@ -34,10 +39,11 @@ namespace VRTR
         float totalInitialUnshot = 0.0f;
         for (const auto& p : patches)
         {
-            if (p.unshotEnergy > 0.0f)
+            const float patchEnergy = unshotMetric(p.unshotEnergy);
+            if (patchEnergy > 0.0f)
             {
                 ++emittingPatchCount;
-                totalInitialUnshot += p.unshotEnergy;
+                totalInitialUnshot += patchEnergy;
             }
         }
         std::cout << "[CUDA init] patches=" << patches.size()

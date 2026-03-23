@@ -41,21 +41,35 @@ namespace VRTR
         auto [wallVertices, wallIndices] = CustomModels::createRectangle();
         Material wallMat{
             .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-            .type = MaterialType::METALLIC,
+            .type = MaterialType::LIGHT,
         };
-        glm::mat4 wallModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
+        glm::mat4 wallModel(1.0f);
+        wallModel = glm::translate(wallModel, glm::vec3(0.0f, 0.5f, -1.0f));
         wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        wallModel = glm::translate(wallModel, glm::vec3(0.0f, -10.0f, -2.0f));
+        wallModel = glm::scale(wallModel, glm::vec3(0.1f));
 
         addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
 
         auto [cubeVertices, cubeIndices] = CustomModels::createCube();
 
-        glm::mat4 lightObjectModel = glm::translate(glm::mat4(1.0f), lightPos);
-        lightObjectModel = glm::scale(lightObjectModel, glm::vec3(0.2f));
-        lightSourceTLASIdx = addObject(LIGHT_MODEL_NAME, cubeVertices, cubeIndices, Material{
-            .type = MaterialType::LIGHT,
-        }, lightObjectModel);
+            auto addLightCube = [&](const std::string& name, const glm::vec3& pos, const glm::vec3& scale, const glm::vec4& color)
+            {
+                glm::mat4 model(1.0f);
+                model = glm::translate(model, pos);
+                model = glm::scale(model, scale);
+                return addObject(name, cubeVertices, cubeIndices, Material{
+                    .albedo = color,
+                    .type = MaterialType::LIGHT,
+                }, model);
+            };
+
+            // Glowne zrodlo sterowane przez GUI (Light Position).
+            lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
+
+            // Dodatkowe wypelniajace zrodla, z unikalnymi nazwami i transformacjami.
+            addLightCube("light_fill_left", glm::vec3(0.0f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(1.0f));
+            addLightCube("light_fill_right", glm::vec3(0.5f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(1.0f));
+            addLightCube("light_fill_front", glm::vec3(0.0f, 1.0f, 0.3f), glm::vec3(0.14f), glm::vec4(0.95f, 0.95f, 1.0f, 1.0f));
 
         // To musi byc na końcu
         buildTLAS();
@@ -77,7 +91,8 @@ namespace VRTR
         std::uniform_real_distribution<float> dist (0.0f, 1.0f);
 
         Material mat{
-            .albedo = glm::vec4(dist(rng), dist(rng), dist(rng), 1.0f),
+            // .albedo = glm::vec4(dist(rng), dist(rng), dist(rng), 1.0f),
+            .albedo = glm::vec4(1.0f),
             // TODO dodac obsluge PBR
             .type = MaterialType::PBR,
         };

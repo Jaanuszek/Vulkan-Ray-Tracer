@@ -96,6 +96,7 @@ namespace VRTR
             void createIndexBuffer();
             void setGeometryInfo();
             void loadTexture(const std::string &path);
+            void tessellateLargeTriangles(float maxWorldTriangleArea = 0.5f, uint32_t maxDepth = 6);
             void buildPatches(uint8_t patchSize = 1);
 
         private:

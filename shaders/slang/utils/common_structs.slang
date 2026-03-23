@@ -20,8 +20,7 @@ public struct Patch
     float3 center;
     float3 normal;
     float3 albedo;
-    // float unshotEnergy = 0.0f;
-    float unshotEnergy = 0.0f;
+    float3 unshotEnergy = float3(0.0f, 0.0f, 0.0f);
     float3 radiosity = float3(0.0f, 0.0f, 0.0f);
 };
 

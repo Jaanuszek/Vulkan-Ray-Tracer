@@ -168,15 +168,21 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
     float4 color = float4(mat.albedo.rgb, 1.0);
     // jezeli textureIndex == MAX_TEXTURES to znaczy ze obiekt nie ma tekstury
-    if (textureIndex < MAX_TEXTURES)
-    {
-        color = colorSampler[textureIndex].SampleLevel(tri.uv, 0.0);
-    }
+
+
+    // ============================= TEKSTURY ==================
+    // if (textureIndex < MAX_TEXTURES)
+    // {
+    //     color = colorSampler[textureIndex].SampleLevel(tri.uv, 0.0);
+    // }
+
+
+
     // // payload.hitValue = color.bgr; // Color from texture
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
-    if(patchId == selectedPatchId)
+    if(cameraData.enableRadiosityPass && patchId == selectedPatchId)
     {
         color = float4(1.0, unshotEnergy, 0.0, 1.0);
         payload.hitValue = color.bgr;
@@ -214,6 +220,31 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         payload.reflector = 0.0;
         return;
     }
+
+    // if (patchId == 58)
+    // {
+    //     payload.hitValue = float3(1.0, 0.0, 0.0);
+    //     payload.distance = RayTCurrent();
+    //     payload.normal = tri.normal;
+    //     payload.reflector = 0.0f;
+    //     return;
+    // }
+    //     if (patchId ==180)
+    // {
+    //     payload.hitValue = float3(0.0, 1.0, 0.0);
+    //     payload.distance = RayTCurrent();
+    //     payload.normal = tri.normal;
+    //     payload.reflector = 0.0f;
+    //     return;
+    // }
+    //     if (patchId == 480)
+    // {
+    //     payload.hitValue = float3(0.0, 0.0, 1.0);
+    //     payload.distance = RayTCurrent();
+    //     payload.normal = tri.normal;
+    //     payload.reflector = 0.0f;
+    //     return;
+    // }
     
     if(cameraData.shadowMode)
     {
@@ -248,15 +279,17 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     }
 
 
+    // TEST
     bool isMetallic = materialBuffer[instanceIndex].type == MaterialType::METALLIC;
-    if (isMetallic)
-    {
-        color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
-    }
+    // if (isMetallic)
+    // {
+    //     color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
+    // }
+
     bool isLight = materialBuffer[instanceIndex].type == MaterialType::LIGHT;
     if (isLight){
-        color = float4(1.0f, 1.0f, 1.0f, 1.0f);
-        payload.hitValue = color.rgb;
+        float3 lightColor = materialBuffer[instanceIndex].albedo.rgb;
+        payload.hitValue = lightColor;
         payload.distance = RayTCurrent();
         payload.normal = tri.normal;
         payload.reflector = 0.0f;
@@ -275,21 +308,21 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float3 lightVector = toLight / max(lightDistance, 1e-4);
     float dot_product = max(dot(lightVector, normal), 0.0f);
     float3 directLighting = (color * dot_product).rgb;
+    float3 ambientFloor = color.rgb * 0.03f;
 
-    float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
+    // float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
+    float3 FinalColor = directLighting + ambientFloor;
+
     if (cameraData.useRadiosityLightmap)
     {
-        // const float indirectStrength = 0.01f;
-        // directLighting += radiosityLightmapBuffer[patchId].bgr * indirectStrength;
-        if(radiosityLightmapBuffer[patchId].x > 0.01f || radiosityLightmapBuffer[patchId].y > 0.01f || radiosityLightmapBuffer[patchId].z > 0.01f)
-        {
-            float3 c = patchColor(patchId);
-            FinalColor += radiosityLightmapBuffer[patchId].bgr + c;
-        }
+        const float indirectStrength = 0.17f;
+        float3 indirect = radiosityLightmapBuffer[patchId].rgb * indirectStrength;
+        FinalColor += indirect;
     }
 
     payload.hitValue.rgb = FinalColor;
     payload.distance = RayTCurrent();
     payload.normal = normal;
-    payload.reflector = isMetallic ? 0.75f : 0.0f;
+    payload.reflector = 0.0f;
+    // payload.reflector = isMetallic ? 0.75f : 0.0f;
 }

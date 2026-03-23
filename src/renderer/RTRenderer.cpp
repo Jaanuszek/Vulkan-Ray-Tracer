@@ -150,6 +150,15 @@ namespace VRTR
                 frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
 
                 frameManager->runCudaPostVisibilityPass(scene->getPatches().size());
+
+                ++radiosityDemoFrameCounter;
+                if (radiosityDemoFrameCounter >= 4096)
+                {
+                    frameManager->setComputeRadiosity(false);
+                    sceneSettings.ubo.enableRadiosityPass = false;
+                    sceneSettings.ubo.useRadiosityLightmap = true;
+                    radiosityBootstrapDone = true;
+                }
             }
 
             // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne
@@ -191,6 +200,11 @@ namespace VRTR
                 case UpdateRequest::EnableRadiosityPass:
                 {
                     frameManager->setComputeRadiosity(sceneSettings.ubo.enableRadiosityPass);
+                    if (sceneSettings.ubo.enableRadiosityPass)
+                    {
+                        radiosityDemoFrameCounter = 0;
+                        radiosityBootstrapDone = false;
+                    }
                     break;
                 }
                 default:
@@ -205,11 +219,6 @@ namespace VRTR
             // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
-
-            // if(frameCount == 2)
-            // {
-                // frameManager->setComputeRadiosity(false);
-            // }
         }
         catch (const vk::OutOfDateKHRError &e)
         {

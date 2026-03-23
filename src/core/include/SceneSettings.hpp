@@ -34,7 +34,7 @@ struct SceneTransformations
     // bool LightPosChange = false;
     // bool PatchTriangleSizeChange = false;
     UpdateRequest updateRequest = UpdateRequest::None;
-    float rotationAngle{0.0f};
+    float rotationAngle{90.0f};
     int patchTriangleSize{1};
 };
 
