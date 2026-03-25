@@ -29,14 +29,14 @@ namespace VRTR
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
-        auto [floorVertices, floorIndices] = CustomModels::createRectangle();
-        Material floorMat{
-            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
+        // auto [floorVertices, floorIndices] = CustomModels::createRectangle();
+        // Material floorMat{
+        //     .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+        //     .type = MaterialType::METALLIC,
+        // };
 
-        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-        addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
+        // glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
+        // addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
 
         auto [wallVertices, wallIndices] = CustomModels::createRectangle();
         Material wallMat{
@@ -49,6 +49,17 @@ namespace VRTR
         wallModel = glm::scale(wallModel, glm::vec3(0.1f));
 
         addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
+
+        Material wallMat2{
+            .albedo = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+            .type = MaterialType::LIGHT,
+        };
+        glm::mat4 wallModel2(1.0f);
+        wallModel2 = glm::translate(wallModel2, glm::vec3(1.0f, 0.5f, 0.0f));
+        wallModel2 = glm::rotate(wallModel2, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        wallModel2 = glm::scale(wallModel2, glm::vec3(0.1f));
+
+        addObject("wall2", wallVertices, wallIndices, wallMat2, wallModel2);
 
         auto [cubeVertices, cubeIndices] = CustomModels::createCube();
 
@@ -67,12 +78,13 @@ namespace VRTR
             lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
 
             // Dodatkowe wypelniajace zrodla, z unikalnymi nazwami i transformacjami.
-            addLightCube("light_fill_left", glm::vec3(0.0f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(1.0f));
-            addLightCube("light_fill_right", glm::vec3(0.5f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(1.0f));
-            addLightCube("light_fill_front", glm::vec3(0.0f, 1.0f, 0.3f), glm::vec3(0.14f), glm::vec4(0.95f, 0.95f, 1.0f, 1.0f));
+            addLightCube("light_fill_left", glm::vec3(0.0f, 1.0f, -0.1f), glm::vec3(0.7f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
+            // addLightCube("light_fill_right", glm::vec3(0.5f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
+            // addLightCube("light_fill_front", glm::vec3(0.0f, 1.0f, 0.3f), glm::vec3(0.14f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 
         // To musi byc na końcu
         buildTLAS();
+        std::cout << "Patch size: " << sizeof(Patch)*patchesGlobal.size() << " bytes" << std::endl;
     }
 
     uint32_t Scene::importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform)

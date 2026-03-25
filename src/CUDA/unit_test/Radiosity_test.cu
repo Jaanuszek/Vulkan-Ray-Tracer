@@ -164,10 +164,12 @@ namespace VRTR::CUDA
         
         Patch* d_singlePatch = allocateAndCopyToGPU(singlePatch.data(), 1);
         SelectedPatch initialSelected = {0, 0.0f};
-        SelectedPatch* d_single_selected = allocateAndCopyToGPU(&initialSelected, 1);
+        const size_t selectedCount = static_cast<size_t>(SELECTED_PATCHES_COUNT);
+        std::vector<SelectedPatch> selectedInit(selectedCount, initialSelected);
+        SelectedPatch* d_single_selected = allocateAndCopyToGPU(selectedInit.data(), selectedCount);
         
         // Act
-        ASSERT_EQ(cudaMemset(d_single_selected, 0, sizeof(SelectedPatch)), cudaSuccess);
+        ASSERT_EQ(cudaMemset(d_single_selected, 0, sizeof(SelectedPatch) * selectedCount), cudaSuccess);
         runFilterPatchesKernel(d_singlePatch, 1, d_single_selected, 0);
         ASSERT_EQ(cudaGetLastError(), cudaSuccess);
         ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
@@ -198,10 +200,12 @@ namespace VRTR::CUDA
         
         Patch* d_zeroPatch = allocateAndCopyToGPU(zeroEnergyPatches.data(), zeroEnergyPatches.size());
         SelectedPatch initialSelected = {0, 0.0f};
-        SelectedPatch* d_zero_selected = allocateAndCopyToGPU(&initialSelected, 1);
+        const size_t selectedCount = static_cast<size_t>(SELECTED_PATCHES_COUNT);
+        std::vector<SelectedPatch> selectedInit(selectedCount, initialSelected);
+        SelectedPatch* d_zero_selected = allocateAndCopyToGPU(selectedInit.data(), selectedCount);
         
         // Act
-        ASSERT_EQ(cudaMemset(d_zero_selected, 0, sizeof(SelectedPatch)), cudaSuccess);
+        ASSERT_EQ(cudaMemset(d_zero_selected, 0, sizeof(SelectedPatch) * selectedCount), cudaSuccess);
         runFilterPatchesKernel(d_zeroPatch, 10, d_zero_selected, 0);
         ASSERT_EQ(cudaGetLastError(), cudaSuccess);
         ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);

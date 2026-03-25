@@ -129,35 +129,44 @@ void rayGenShader()
 {
     const uint3 dispatchIndex = DispatchRaysIndex();
     const uint3 dispatchDim = DispatchRaysDimensions();
+    const uint32_t visibilityBufferIndex = dispatchIndex.y * dispatchDim.x + dispatchIndex.x;
 
-    uint32_t selectedPatchID = selectedPatchesBuffer[0].patchId;
+    uint32_t selectedPatchID = selectedPatchesBuffer[dispatchIndex.y].patchId;
     if (selectedPatchID == 0xFFFFFFFF)
     {
+        patchVisibilityBuffer[visibilityBufferIndex].srcPatchId = 0xFFFFFFFF;
+        patchVisibilityBuffer[visibilityBufferIndex].dstPatchId = 0xFFFFFFFF;
+        patchVisibilityBuffer[visibilityBufferIndex].visibility = 0.0f;
         return;
     }
 
     Patch patch = patchBuffer[selectedPatchID];
 
     float3 normal = patch.normal;
-    float3 origin = patch.center + normal * 0.02f;
+
+    float2 uv = hash22(dispatchIndex.x + selectedPatchID);
+    float offset = sqrt(patch.area) * 0.5f;
+    // float3 origin = patch.center + normal * patch.area * 0.003f;
+    float3 origin = patch.center + normal * offset;
+
 
     RayDesc ray;
     ray.Origin = origin;
-    ray.TMin = 0.001f;
+    ray.TMin = 0.0005f;
     ray.TMax = 1000.0f;
 
     visibilityRayPayload payload;
     payload.distance = -1.0f;
     payload.dstPatchId = 0xFFFFFFFF;
+    payload.srcPatchId = selectedPatchID;
 
     uint32_t rayCount = max(dispatchDim.x, 1u);
     float2 seed = hammersley2D(dispatchIndex.x, rayCount);
     seed = frac(seed + hash22(selectedPatchID));
     ray.Direction = sampleCosineHemisphereWorld(seed, normal);
 
-    TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
+    TraceRay(topLevelAS, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
-    const uint32_t visibilityBufferIndex = dispatchIndex.x;
     patchVisibilityBuffer[visibilityBufferIndex].srcPatchId = selectedPatchID;
 
     if (payload.distance > 0.0f)
@@ -182,6 +191,20 @@ void closestHitShader(inout visibilityRayPayload payload, in HitAttribute attrib
 
     payload.distance = RayTCurrent();
     payload.dstPatchId = patchId;
+}
+
+[shader("anyhit")]
+void anyHitShader(inout visibilityRayPayload payload, in HitAttribute attribs)
+{
+    uint instanceIndex = InstanceIndex();
+    uint triangleIndex = PrimitiveIndex();
+    uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
+    uint patchId = triToPatchBuffer[triGlobalIndex];
+
+    if (patchId == payload.srcPatchId)
+    {
+        IgnoreHit();
+    }
 }
 
 [shader("miss")]

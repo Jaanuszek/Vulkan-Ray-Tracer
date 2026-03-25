@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "VisibilityPipeline.hpp"
+#include "Radiosity.cuh"
 
 namespace VRTR
 {
@@ -64,11 +65,12 @@ namespace VRTR
 
         // Closest hit shader
         shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "visibilityPass.spv", vk::ShaderStageFlagBits::eClosestHitKHR, "closestHitShader"));
+        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "visibilityPass.spv", vk::ShaderStageFlagBits::eAnyHitKHR, "anyHitShader"));
         vk::RayTracingShaderGroupCreateInfoKHR hitGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup,
             .generalShader = VK_SHADER_UNUSED_KHR,
             .closestHitShader = 2, // third entry in shaderStages
-            .anyHitShader = VK_SHADER_UNUSED_KHR,
+            .anyHitShader = 3, // fourth entry in shaderStages
             .intersectionShader = VK_SHADER_UNUSED_KHR};
         shaderGroups.push_back(hitGroup);
     }
@@ -184,7 +186,7 @@ namespace VRTR
                 hitShaderSBTEntry,
                 callableShaderSBTEntry,
                 RAYS_PER_PATCH, // ilosc promieni do wystrzelenia w poziomie - trzeba bedzie to dopasowac do ilosci promieni wystrzelonych w hemisferze
-                1, // ilosc promieni do wystrzelenia w pionie
+                CUDA::SELECTED_PATCHES_COUNT, // jedna warstwa dispatchu na kazdy selected patch
                 1);
 
             if (visibilityOutputBuffer)

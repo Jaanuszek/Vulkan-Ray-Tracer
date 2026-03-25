@@ -6,16 +6,16 @@
 
 namespace
 {
-    constexpr float DEFAULT_MAX_WORLD_TRIANGLE_AREA = 0.001f;
-    constexpr uint32_t DEFAULT_MAX_SUBDIV_DEPTH = 18;
+    constexpr float DEFAULT_MAX_WORLD_TRIANGLE_AREA = 0.0001f;
+    constexpr uint32_t DEFAULT_MAX_SUBDIV_DEPTH = 128;
     constexpr float EPSILON = 1e-8f;
 
     VRTR::VertexRT midpointVertex(const VRTR::VertexRT& a, const VRTR::VertexRT& b)
     {
         VRTR::VertexRT v{};
-        v.pos = (a.pos + b.pos) * 0.5f;
+        v.pos = (a.pos + b.pos) / 2.0f;
 
-        const glm::vec3 n = (a.normal + b.normal) * 0.5f;
+        const glm::vec3 n = (a.normal + b.normal) / 2.0f;
         if (glm::length(n) > EPSILON)
         {
             v.normal = glm::normalize(n);
@@ -25,19 +25,8 @@ namespace
             v.normal = a.normal;
         }
 
-        v.texCoord = (a.texCoord + b.texCoord) * 0.5f;
+        v.texCoord = (a.texCoord + b.texCoord) / 2.0f;
         return v;
-    }
-
-    float triangleAreaWorld(const glm::mat4& modelTransform,
-                            const VRTR::VertexRT& v0,
-                            const VRTR::VertexRT& v1,
-                            const VRTR::VertexRT& v2)
-    {
-        const glm::vec3 p0 = glm::vec3(modelTransform * glm::vec4(v0.pos, 1.0f));
-        const glm::vec3 p1 = glm::vec3(modelTransform * glm::vec4(v1.pos, 1.0f));
-        const glm::vec3 p2 = glm::vec3(modelTransform * glm::vec4(v2.pos, 1.0f));
-        return 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
     }
 
     void appendTriangle(const VRTR::VertexRT& v0,
@@ -196,42 +185,26 @@ namespace VRTR
                              const VertexRT& v2,
                              uint32_t depth) -> void
         {
-            const float area = triangleAreaWorld(modelTransform, v0, v1, v2);
+            const glm::vec3 p0 = glm::vec3(modelTransform * glm::vec4(v0.pos, 1.0f));
+            const glm::vec3 p1 = glm::vec3(modelTransform * glm::vec4(v1.pos, 1.0f));
+            const glm::vec3 p2 = glm::vec3(modelTransform * glm::vec4(v2.pos, 1.0f));
+
+            const float area = 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
             if (area <= maxWorldTriangleArea || depth >= maxDepth)
             {
                 appendTriangle(v0, v1, v2, refinedVertices, refinedIndices);
                 return;
             }
 
-            const glm::vec3 p0 = glm::vec3(modelTransform * glm::vec4(v0.pos, 1.0f));
-            const glm::vec3 p1 = glm::vec3(modelTransform * glm::vec4(v1.pos, 1.0f));
-            const glm::vec3 p2 = glm::vec3(modelTransform * glm::vec4(v2.pos, 1.0f));
+            // Uniform 1->4 split gives denser, more even tessellation near edges.
+            const VertexRT m01 = midpointVertex(v0, v1);
+            const VertexRT m12 = midpointVertex(v1, v2);
+            const VertexRT m20 = midpointVertex(v2, v0);
 
-            const glm::vec3 d01 = p1 - p0;
-            const glm::vec3 d12 = p2 - p1;
-            const glm::vec3 d20 = p0 - p2;
-            const float e01 = glm::dot(d01, d01);
-            const float e12 = glm::dot(d12, d12);
-            const float e20 = glm::dot(d20, d20);
-
-            if (e01 >= e12 && e01 >= e20)
-            {
-                const VertexRT m01 = midpointVertex(v0, v1);
-                self(self, v0, m01, v2, depth + 1);
-                self(self, m01, v1, v2, depth + 1);
-            }
-            else if (e12 >= e20)
-            {
-                const VertexRT m12 = midpointVertex(v1, v2);
-                self(self, v0, v1, m12, depth + 1);
-                self(self, v0, m12, v2, depth + 1);
-            }
-            else
-            {
-                const VertexRT m20 = midpointVertex(v2, v0);
-                self(self, v0, v1, m20, depth + 1);
-                self(self, m20, v1, v2, depth + 1);
-            }
+            self(self, v0,  m01, m20, depth + 1);
+            self(self, m01, v1,  m12, depth + 1);
+            self(self, m20, m12, v2,  depth + 1);
+            self(self, m01, m12, m20, depth + 1);
         };
 
         for (size_t tri = 0; tri < originalTriangleCount; ++tri)
@@ -376,13 +349,9 @@ namespace VRTR
             {
                 p.emission = 1.0f;
             }
-            else if(material.type == MaterialType::ALBEDO)
+            else
             {
-                p.emission = material.albedo.r; 
-            }
-            else if (material.type == MaterialType::METALLIC)
-            {
-                p.emission = material.metallic;
+                p.emission = 0.0f;
             }
 
             p.unshotEnergy = p.albedo * p.emission;

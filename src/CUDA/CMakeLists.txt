@@ -21,6 +21,8 @@ target_link_libraries(${PROJECT_NAME}
     common
     Core
     CUDA::cudart
+    # Trust::CUDA
+    CCCL::CCCL
     Vulkan::Vulkan
 )
 

@@ -151,14 +151,14 @@ namespace VRTR
 
                 frameManager->runCudaPostVisibilityPass(scene->getPatches().size());
 
-                ++radiosityDemoFrameCounter;
-                if (radiosityDemoFrameCounter >= 4096)
-                {
-                    frameManager->setComputeRadiosity(false);
-                    sceneSettings.ubo.enableRadiosityPass = false;
-                    sceneSettings.ubo.useRadiosityLightmap = true;
-                    radiosityBootstrapDone = true;
-                }
+                // ++radiosityDemoFrameCounter;
+                // if (radiosityDemoFrameCounter >= 4096)
+                // {
+                //     frameManager->setComputeRadiosity(false);
+                //     sceneSettings.ubo.enableRadiosityPass = false;
+                //     sceneSettings.ubo.useRadiosityLightmap = true;
+                //     radiosityBootstrapDone = true;
+                // }
             }
 
             // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne

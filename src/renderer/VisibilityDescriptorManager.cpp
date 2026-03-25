@@ -53,7 +53,7 @@ namespace VRTR
             .binding = 4,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eAnyHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding materialBufferLayout{
@@ -74,7 +74,7 @@ namespace VRTR
             .binding = 7,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eAnyHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding patchBufferLayout{

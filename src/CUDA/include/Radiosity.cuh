@@ -2,6 +2,7 @@
 
 #include <cuda_runtime_api.h>
 #include "CommonStructs.h"
+#include <cccl/thrust/host_vector.h>
 
 
 // Poniewaz mam problemy z linkerem bo krzyczy o libke CORE gdy includuje Logger.hpp, 
@@ -23,7 +24,12 @@ namespace VRTR
     namespace CUDA
     {
         constexpr uint32_t TPB = 1024;
+
+        constexpr uint32_t SELECTED_PATCHES_COUNT = 64;
+
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
+                                      const SelectedPatch* alreadySelectedPatches,
+                                      uint32_t alreadySelectedCount,
                                       SelectedPatch* selectedPatch);
 
         __global__ void reduceSelectedPatches(SelectedPatch *input, uint32_t n, SelectedPatch *output);
@@ -38,7 +44,9 @@ namespace VRTR
          */
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
-                                          SelectedPatch* selectedPatch, float4* d_lightMap);
+                                          const SelectedPatch* selectedPatch,
+                                          const uint32_t* sourceHitCounts,
+                                          float4* d_lightMap);
 
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
         __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 

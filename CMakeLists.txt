@@ -17,6 +17,18 @@ find_package(glfw3 REQUIRED)
 
 find_package(CUDAToolkit REQUIRED)
 
+find_package(CCCL QUIET CONFIG)
+if(NOT CCCL_FOUND)
+    find_package(CCCL REQUIRED CONFIG
+        HINTS
+            "${CUDAToolkit_TARGET_DIR}/lib/cmake/cccl"
+            "${CUDAToolkit_LIBRARY_ROOT}/cmake/cccl"
+            "${CUDAToolkit_ROOT}/targets/x86_64-linux/lib/cmake/cccl"
+            "/usr/local/cuda/targets/x86_64-linux/lib/cmake/cccl"
+            "/usr/local/cuda-13.1/targets/x86_64-linux/lib/cmake/cccl"
+    )
+endif()
+
 set(CMAKE_CUDA_ARCHITECTURES 89)
 
 #internal

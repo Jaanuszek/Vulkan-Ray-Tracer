@@ -44,6 +44,7 @@ public struct visibilityRayPayload
 {
     float distance;
     uint32_t dstPatchId;
+    uint32_t srcPatchId;
 };
 
 public struct HitAttribute

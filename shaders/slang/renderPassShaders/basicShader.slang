@@ -220,31 +220,6 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         payload.reflector = 0.0;
         return;
     }
-
-    // if (patchId == 58)
-    // {
-    //     payload.hitValue = float3(1.0, 0.0, 0.0);
-    //     payload.distance = RayTCurrent();
-    //     payload.normal = tri.normal;
-    //     payload.reflector = 0.0f;
-    //     return;
-    // }
-    //     if (patchId ==180)
-    // {
-    //     payload.hitValue = float3(0.0, 1.0, 0.0);
-    //     payload.distance = RayTCurrent();
-    //     payload.normal = tri.normal;
-    //     payload.reflector = 0.0f;
-    //     return;
-    // }
-    //     if (patchId == 480)
-    // {
-    //     payload.hitValue = float3(0.0, 0.0, 1.0);
-    //     payload.distance = RayTCurrent();
-    //     payload.normal = tri.normal;
-    //     payload.reflector = 0.0f;
-    //     return;
-    // }
     
     if(cameraData.shadowMode)
     {
@@ -311,11 +286,12 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float3 ambientFloor = color.rgb * 0.03f;
 
     // float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
-    float3 FinalColor = directLighting + ambientFloor;
+    float3 FinalColor = 0.8f * directLighting + ambientFloor;
+    FinalColor = 0;
 
     if (cameraData.useRadiosityLightmap)
     {
-        const float indirectStrength = 0.17f;
+        const float indirectStrength = 0.4f;
         float3 indirect = radiosityLightmapBuffer[patchId].rgb * indirectStrength;
         FinalColor += indirect;
     }
