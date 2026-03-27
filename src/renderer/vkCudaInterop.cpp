@@ -32,7 +32,7 @@ namespace VRTR
         CUDA_CHECK_ERROR(cudaStreamDestroy(cudaStream));
     }
 
-    void vkCudaInterop::init(const std::vector<Patch>& patches)
+    void vkCudaInterop::init(const std::vector<Patch>& patches, uint32_t vertexCount)
     {
         setupCuda();
 
@@ -51,60 +51,45 @@ namespace VRTR
                   << " emittingPatches=" << emittingPatchCount
                   << " totalInitialUnshot=" << totalInitialUnshot << std::endl;
 
-        vk::DeviceSize cudaBuffSize = sizeof(glm::vec4);
-        cudaInteropBuffer = std::make_unique<Buffer>(ctx, cudaBuffSize,
-                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        cudaInteropBuffer = createCudaBuffer(
+            sizeof(glm::vec4), 
+            (void**)&cudaData, 
+            cudaExternalMemory
+        );
 
-        auto cudaBuffDevMem = cudaInteropBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaData, cudaExternalMemory,
-                                        cudaBuffDevMem, sizeof(glm::vec4), vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        cudaPatchesBuffer = createCudaBuffer(
+            patches.size() * sizeof(Patch),
+            (void**)&cudaPatchesData, 
+            cudaPatchesExternalMemory
+        );
 
-        vk::DeviceSize cudaPatchesDataSize = patches.size() * sizeof(Patch);
-        cudaPatchesBuffer = std::make_unique<Buffer>(ctx, cudaPatchesDataSize,
-                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
-
-        auto cudaPatchesDevMem = cudaPatchesBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaPatchesData, cudaPatchesExternalMemory,
-                        cudaPatchesDevMem, cudaPatchesDataSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
-
-        vk::DeviceSize cudaSelectedPatchSize = sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT;
-        cudaSelectedPatchBuffer = std::make_unique<Buffer>(ctx, cudaSelectedPatchSize,
-                                                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                     vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
-
-        auto cudaSelectedPatchDevMem = cudaSelectedPatchBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaSelectedPatchData, cudaSelectedPatchExternalMemory,
-                                        cudaSelectedPatchDevMem, cudaSelectedPatchSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
-
+        cudaSelectedPatchBuffer = createCudaBuffer(
+            sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT, 
+            (void**)&cudaSelectedPatchData, 
+            cudaSelectedPatchExternalMemory
+        );
 
         patchVisibilityCount = VISIBILITY_DISPATCH_RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT;
-        vk::DeviceSize cudaPatchVisibilitySize = sizeof(PatchVisibility) * patchVisibilityCount;
-        cudaPatchVisibilityBuffer = std::make_unique<Buffer>(ctx, cudaPatchVisibilitySize,
-                                                             vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                                             vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                             vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        cudaPatchVisibilityBuffer = createCudaBuffer(
+            sizeof(PatchVisibility) * patchVisibilityCount,
+            (void**)&cudaPatchVisibilityData,
+            cudaPatchVisibilityExternalMemory
+        );
 
-        auto cudaPatchVisibilityDevMem = cudaPatchVisibilityBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice,(void**)&cudaPatchVisibilityData, cudaPatchVisibilityExternalMemory,
-                                        cudaPatchVisibilityDevMem, cudaPatchVisibilitySize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        cudaRadiosityLightmapBuffer = createCudaBuffer(
+            sizeof(float4) * patches.size(),
+            (void**)&cudaRadiosityLightmapData,
+            cudaRadiosityLightmapExternalMemory
+        );
 
-        vk::DeviceSize cudaRadiosityLightmapSize = sizeof(float4) * patches.size();
-        cudaRadiosityLightmapBuffer = std::make_unique<Buffer>(ctx, cudaRadiosityLightmapSize,
-                                       vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                       vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
-
-        auto cudaRadiosityLightmapDevMem = cudaRadiosityLightmapBuffer->getBufferMemory();
-        CUDA::importCudaExternalMemory(ctx.logicalDevice, (void**)&cudaRadiosityLightmapData, cudaRadiosityLightmapExternalMemory,
-                           cudaRadiosityLightmapDevMem, cudaRadiosityLightmapSize, vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd);
+        cudaVertexRadiosityBuffer = createCudaBuffer(
+            sizeof(float3) * vertexCount,
+            (void**)&cudaVertexRadiosityData,
+            cudaVertexRadiosityExternalMemory
+        );
 
         CUDA_CHECK_ERROR(cudaMemcpy(cudaPatchesData, patches.data(), patches.size() * sizeof(Patch), cudaMemcpyHostToDevice));
-        CUDA_CHECK_ERROR(cudaMemset(cudaRadiosityLightmapData, 0, cudaRadiosityLightmapSize));
+        CUDA_CHECK_ERROR(cudaMemset(cudaRadiosityLightmapData, 0, sizeof(float4) * patches.size()));
 
         std::array<SelectedPatch, CUDA::SELECTED_PATCHES_COUNT> selectedInit{};
         for (auto& selected : selectedInit)
@@ -114,6 +99,7 @@ namespace VRTR
         }
         CUDA_CHECK_ERROR(cudaMemcpy(cudaSelectedPatchData, selectedInit.data(), sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT, cudaMemcpyHostToDevice));
 
+        CUDA_CHECK_ERROR(cudaMemset(cudaVertexRadiosityData, 0, sizeof(float3) * vertexCount));
 
         createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
 
@@ -279,6 +265,7 @@ namespace VRTR
         resources.selectedPatchBuffer = cudaSelectedPatchBuffer->getBufferHandle();
         resources.patchVisibilityBuffer = cudaPatchVisibilityBuffer->getBufferHandle();
         resources.radiosityLightmapBuffer = cudaRadiosityLightmapBuffer->getBufferHandle();
+        resources.vertexRadiosityBuffer = cudaVertexRadiosityBuffer->getBufferHandle();
     }
 
     void vkCudaInterop::setupCuda()
@@ -320,5 +307,29 @@ namespace VRTR
             .flags = {}
         };
         cudaCompleteSemaphore = vk::raii::Semaphore(ctx.logicalDevice, semaphoreCreateInfo);
+    }
+
+    std::unique_ptr<Buffer> vkCudaInterop::createCudaBuffer(vk::DeviceSize size, void** cudaPtr, cudaExternalMemory_t& externalMemory)
+    {
+        auto buffer = std::make_unique<Buffer>(
+                    ctx, 
+                    size,
+                    vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd
+                );
+
+        auto cudaBuffDevMem = buffer->getBufferMemory();
+
+        CUDA::importCudaExternalMemory(
+            ctx.logicalDevice,
+            cudaPtr, 
+            externalMemory,
+            cudaBuffDevMem, 
+            size,
+            vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd
+        );
+
+        return buffer;
     }
 }

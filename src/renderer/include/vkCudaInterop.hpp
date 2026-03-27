@@ -16,7 +16,7 @@ namespace VRTR
             vkCudaInterop(RendererContext& ctx, uint32_t passCount);
             ~vkCudaInterop();
 
-            void init(const std::vector<Patch>& patches);
+            void init(const std::vector<Patch>& patches, uint32_t vertexCount);
 
             void runCudaFrame(uint32_t patchesCount);
             void runCudaSelectPass(uint32_t patchesCount);
@@ -43,6 +43,8 @@ namespace VRTR
             void waitForSemapore(uint64_t waitValue);
 
             void signalSemaphore(uint64_t signalValue);
+
+            std::unique_ptr<Buffer> createCudaBuffer(vk::DeviceSize size, void** cudaPtr, cudaExternalMemory_t& externalMemory);
 
             // void runKernel();
 
@@ -73,6 +75,10 @@ namespace VRTR
             std::unique_ptr<Buffer> cudaRadiosityLightmapBuffer;
             float4* cudaRadiosityLightmapData{};
             cudaExternalMemory_t cudaRadiosityLightmapExternalMemory{nullptr};
+
+            std::unique_ptr<Buffer> cudaVertexRadiosityBuffer;
+            float3* cudaVertexRadiosityData{};
+            cudaExternalMemory_t cudaVertexRadiosityExternalMemory{nullptr};
 
             uint32_t passCount;
 

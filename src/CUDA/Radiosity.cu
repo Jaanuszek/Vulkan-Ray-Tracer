@@ -233,6 +233,39 @@ namespace VRTR::CUDA
         atomicExch(&d_lightMap[dstPatch.id].w, 1.0f);
     }
 
+    __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+                                            const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
+                                            uint32_t numVertices)
+    {
+        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if (idx >= numVertices) return;
+
+        for (uint32_t i = idx; i < numVertices; i += blockDim.x * gridDim.x)
+        {
+            glm::vec3 color(0.0f);
+            float totalArea = 0.0f;
+
+            uint32_t patchStart = vertexPatchOffsets[i];
+            uint32_t patchEnd = vertexPatchOffsets[i + 1];
+
+            for (uint32_t j = patchStart; j < patchEnd; ++j)
+            {
+                uint32_t patchId = vertexPatchIndices[j];
+                if (patchId < numPatches)
+                {
+                    float area = patches[patchId].area;
+                    color += patches[patchId].radiosity * area;
+                    totalArea += area;
+                }
+            }
+
+            // atomicAdd(&d_lightMap[i].x, (totalArea > 0.0f) ? (color.r / totalArea) : 0.0f);
+            // atomicAdd(&d_lightMap[i].y, (totalArea > 0.0f) ? (color.g / totalArea) : 0.0f);
+            // atomicAdd(&d_lightMap[i].z, (totalArea > 0.0f) ? (color.b / totalArea) : 0.0f);
+        }
+    }
+
     __global__ void resetSelectedPatchUnshotEnergy(Patch* patches, uint32_t numPatches, SelectedPatch* selectedPatch)
     {
         if (patches == nullptr || selectedPatch == nullptr)

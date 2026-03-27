@@ -38,7 +38,7 @@ namespace VRTR
         // glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
         // addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
 
-        auto [wallVertices, wallIndices] = CustomModels::createRectangle();
+        auto [wallVertices, wallIndices] = CustomModels::createRectangle(glm::vec3(0.0f, 1.0f, 0.0f));
         Material wallMat{
             .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
             .type = MaterialType::LIGHT,
@@ -50,6 +50,7 @@ namespace VRTR
 
         addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
 
+        auto [wallVertices2, wallIndices2] = CustomModels::createRectangle(glm::vec3(1.0f, 0.0f, 0.0f));
         Material wallMat2{
             .albedo = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
             .type = MaterialType::LIGHT,
@@ -59,9 +60,9 @@ namespace VRTR
         wallModel2 = glm::rotate(wallModel2, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         wallModel2 = glm::scale(wallModel2, glm::vec3(0.1f));
 
-        addObject("wall2", wallVertices, wallIndices, wallMat2, wallModel2);
+        addObject("wall2", wallVertices2, wallIndices2, wallMat2, wallModel2);
 
-        auto [cubeVertices, cubeIndices] = CustomModels::createCube();
+        auto [cubeVertices, cubeIndices] = CustomModels::createCube(glm::vec3(0.0f, 0.0f, 1.0f));
 
             auto addLightCube = [&](const std::string& name, const glm::vec3& pos, const glm::vec3& scale, const glm::vec4& color)
             {
@@ -235,11 +236,15 @@ namespace VRTR
         patchesGlobal.clear();
         geometryInfos.clear();
         materials.clear();
+        vertexToPatchGlobal.clear();
+        vertexToPatchOffsetGlobal.clear();
+        
         geometryInfos.reserve(models.size());
         materials.reserve(models.size());
 
         uint32_t globalPatchBase = 0;
-        uint32_t triToPatchOffset = 0;
+        uint32_t triToPatchOffset = 0; // offset trójkąta w globalnym kontenerze triToPatchGlobal - który mapuje indekst trójkąta na indeks patcha
+        uint32_t globalIndexBase = 0;  // całkowita liczba indeksów patchy już dodanych (dla CSR)
 
         for (const auto& modelName : modelInstanceOrder)
         {
@@ -251,26 +256,61 @@ namespace VRTR
             const auto& model = models.at(modelName);
 
             GeometryInfo gi = model->getGeometryInfo();
-            gi.triToPatchOffset = triToPatchOffset;
+            gi.triToPatchOffset = triToPatchOffset; // jeden na model
             gi.triangleCount = static_cast<uint32_t>(model->getTriangleCount());
             geometryInfos.push_back(gi);
 
             materials.push_back(model->getMaterial());
 
+            // Przechodzimy przez kontener TRI -> PatchId: arr[tri] = patchId 
             for(uint32_t localPatchId : model->getPatchIdToTriangleId())
             {
+                // triToPatchGlobal[tri] = globalPatchId
                 triToPatchGlobal.push_back(globalPatchBase + localPatchId);
             }
 
+            // Przechodzimy po kontenerze przechowującym wszystkie lokalne pathce modelu
             for(const auto& patchLocal : model->getPatches())
             {
                 Patch p = patchLocal;
+                // podmianka id z lokalnej na globalną
                 p.id = globalPatchBase + patchLocal.id;
                 patchesGlobal.push_back(p);
             }
 
+            // Budowanie globalnej adjacency: vertex -> patch mapping (CSR format)
+            const auto& localVertexToPatchIds = model->getLocalVertexToPatchIds();
+            const auto& localVertexToPatchOffsets = model->getLocalVertexToPatchOffsets();
+            uint32_t vertexCount = static_cast<uint32_t>(model->getVertexCount());
+
+            // Dodaj wszystkie indeksy patchy dla wierzchołków tego modelu
+            for (uint32_t localPatchId : localVertexToPatchIds)
+            {
+                vertexToPatchGlobal.push_back(globalPatchBase + localPatchId);
+            }
+
+            // Dodaj offsety dla każdego wierzchołka
+            for (uint32_t v = 0; v < vertexCount; ++v)
+            {
+                vertexToPatchOffsetGlobal.push_back(globalIndexBase + localVertexToPatchOffsets[v]);
+            }
+
             triToPatchOffset += gi.triangleCount;
             globalPatchBase += static_cast<uint32_t>(model->getPatches().size());
+            globalIndexBase += static_cast<uint32_t>(localVertexToPatchIds.size());
         }
+
+        // Dodaj sentinel na koniec CSR - wskazuje za ostatni indeks
+        vertexToPatchOffsetGlobal.push_back(globalIndexBase);
+    }
+
+    uint32_t Scene::getVertexCount() const
+    {
+        uint32_t vertexCount = 0;
+        for (const auto& [name, model] : models)
+        {
+            vertexCount += static_cast<uint32_t>(model->getVertexCount());
+        }
+        return vertexCount;
     }
 }

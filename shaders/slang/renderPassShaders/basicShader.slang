@@ -164,8 +164,13 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     Material mat = materialBuffer[instanceIndex];
     uint32_t textureIndex = mat.textureIndex; // text
 
-    Triangle tri = unpackTriangle(triangleIndex, instanceIndex, attribs);
+    Triangle tri = unpackTriangle(triangleIndex, attribs, geometryInfoBuffer[instanceIndex]);
 
+    // float3 interpolatedVertexColor =
+        // barycentricCoords.x * tri.vertices[0].color +
+        // barycentricCoords.y * tri.vertices[1].color +
+        // barycentricCoords.z * tri.vertices[2].color;
+    // float4 color = float4(interpolatedVertexColor, 1.0);
     float4 color = float4(mat.albedo.rgb, 1.0);
     // jezeli textureIndex == MAX_TEXTURES to znaczy ze obiekt nie ma tekstury
 
@@ -184,7 +189,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
     if(cameraData.enableRadiosityPass && patchId == selectedPatchId)
     {
-        color = float4(1.0, unshotEnergy, 0.0, 1.0);
+        color = float4(1.0, 0.0, 0.0, 1.0);
         payload.hitValue = color.bgr;
         payload.distance = RayTCurrent();
         payload.normal = tri.normal;
@@ -223,7 +228,10 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     
     if(cameraData.shadowMode)
     {
-        float3 normal = tri.normal;
+        // float3 normal = tri.normal;
+        float3 normal = normalize(
+          mul((float3x3)ObjectToWorld3x4(), tri.normal)
+        );
         float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
         float3 toLight = cameraData.light_pos - hitPosition;
         float lightDistance = length(toLight);
@@ -231,6 +239,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         float dot_product = max(dot(lightVector, normal), 0.2);
 
         float3 baseColor = materialBuffer[instanceIndex].albedo.rgb;
+        // float3 baseColor = color.rgb;
         float3 shadedColor = baseColor * dot_product;
         payload.hitValue = shadedColor;
 
@@ -264,6 +273,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     bool isLight = materialBuffer[instanceIndex].type == MaterialType::LIGHT;
     if (isLight){
         float3 lightColor = materialBuffer[instanceIndex].albedo.rgb;
+        // payload.hitValue = color.rgb; // Color from material buffer
         payload.hitValue = lightColor;
         payload.distance = RayTCurrent();
         payload.normal = tri.normal;
@@ -287,7 +297,6 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
     // float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
     float3 FinalColor = 0.8f * directLighting + ambientFloor;
-    FinalColor = 0;
 
     if (cameraData.useRadiosityLightmap)
     {

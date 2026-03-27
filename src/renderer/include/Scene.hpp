@@ -36,6 +36,8 @@ namespace VRTR
             std::vector<Patch>& getPatches() { return patchesGlobal; }
             uint32_t getPatchCount() const { return static_cast<uint32_t>(patchesGlobal.size()); }
 
+            uint32_t getVertexCount() const;
+
             void updatePatchData(uint8_t patchSize);
 
         private:
@@ -66,6 +68,9 @@ namespace VRTR
 
             std::vector<uint32_t> triToPatchGlobal;
             std::vector<Patch> patchesGlobal;
+
+            std::vector<uint32_t> vertexToPatchGlobal;
+            std::vector<uint32_t> vertexToPatchOffsetGlobal;
 
             std::vector<GeometryInfo> geometryInfos;
             std::vector<Material> materials;

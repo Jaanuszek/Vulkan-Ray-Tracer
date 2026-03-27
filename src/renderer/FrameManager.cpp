@@ -7,13 +7,13 @@ namespace VRTR
         : ctx(ctx), swapChainManager(swapChainManager)
         {}
 
-    void FrameManager::init(const std::vector<Patch>& patches)
+    void FrameManager::init(const std::vector<Patch>& patches, uint32_t vertexCount)
     {
         frameSyncManager = std::make_unique<vkFrameSync>(ctx);
         frameSyncManager->init();
 
         vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx, PASS_COUNT);
-        vkCudaInteropManager->init(patches);
+        vkCudaInteropManager->init(patches, vertexCount);
     }
     uint32_t FrameManager::acquireNextImage()
     {

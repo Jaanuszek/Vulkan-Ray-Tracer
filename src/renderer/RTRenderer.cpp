@@ -45,7 +45,7 @@ namespace VRTR
         scene->createScene(sceneSettings.ubo.light_pos);
 
         frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
-        frameManager->init(scene->getPatches());
+        frameManager->init(scene->getPatches(), scene->getVertexCount());
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                             vk::BufferUsageFlagBits{},

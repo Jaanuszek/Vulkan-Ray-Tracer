@@ -84,6 +84,7 @@ public struct Vertex
 {
     float3 pos;
     float3 normal;
+    float3 color;
     float2 uv;
 };
 
@@ -92,7 +93,7 @@ public struct Triangle
     Vertex[3] vertices;
     float3 normal;
     float2 uv;
-}
+};
 
 public struct pc_blas
 {
@@ -124,6 +125,7 @@ public func unpackTriangle(uint idx, HitAttribute attribs, GeometryInfo geometry
         Vertex* v = (Vertex*)vertexOffset;
         tri.vertices[i].pos = v->pos;
         tri.vertices[i].normal = v->normal;
+        tri.vertices[i].color = v->color;
         tri.vertices[i].uv = v->uv;
     }
     

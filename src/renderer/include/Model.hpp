@@ -76,6 +76,9 @@ namespace VRTR
             size_t getVertexCount() const { return modelMesh->vertices.size(); }
             size_t getIndexCount() const { return modelMesh->indices.size(); }
 
+            const std::vector<uint32_t>& getLocalVertexToPatchIds() const { return vertexPatchIndices; }
+            const std::vector<uint32_t>& getLocalVertexToPatchOffsets() const { return vertexPatchOffsets; }
+
             vk::DeviceAddress getVertexBufferAddress() const { return geometryInfo.vertexBufferAddr; }
             vk::DeviceAddress getIndexBufferAddress() const { return geometryInfo.indexBufferAddr; }
 
@@ -98,6 +101,8 @@ namespace VRTR
             void loadTexture(const std::string &path);
             void tessellateLargeTriangles(float maxWorldTriangleArea = 0.5f, uint32_t maxDepth = 6);
             void buildPatches(uint8_t patchSize = 1);
+            void removeDuplicateVertices();
+            void buildVertexPatchAdjacency();
 
         private:
             RendererContext &ctx;
@@ -112,7 +117,17 @@ namespace VRTR
 
             std::vector<Patch> patches;
 
+            // Kontener mapujący indeks trójkąta na indeks patcha do którego należy.
             std::vector<uint32_t> patchIdToTriangleId;
+
+            // Struktura ktora mapuje indeks wierzchołka na listę patchy
+            // potrzebne do interpolacji kolorów wierzchołków
+            std::vector<std::vector<uint32_t>> vertexToPatchIds;
+
+
+            // GPU friendly kontenery ktore robia to samo co vvertexToPatchIds
+            std::vector<uint32_t> vertexPatchOffsets;
+            std::vector<uint32_t> vertexPatchIndices;
 
             std::unique_ptr<Texture> texture;
             Material material;
@@ -122,7 +137,7 @@ namespace VRTR
 
     namespace CustomModels
     {
-        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createRectangle();
-        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createCube();
+        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createRectangle(const glm::vec3& color = glm::vec3(0.0f));
+        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createCube(const glm::vec3& color = glm::vec3(0.0f));
     }
 }

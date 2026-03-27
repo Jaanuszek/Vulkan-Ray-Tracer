@@ -68,9 +68,11 @@ namespace VRTR
 
         #ifdef enableRadiosity
             buildPatches(1);
+            removeDuplicateVertices();
+            buildVertexPatchAdjacency();
         #endif
 
-        if(withTexture)
+        if (withTexture)
         {
             loadTexture(texturePath);
         }
@@ -96,6 +98,8 @@ namespace VRTR
 
         #ifdef enableRadiosity
             buildPatches(1);
+            removeDuplicateVertices();
+            buildVertexPatchAdjacency();
         #endif
     }
 
@@ -150,6 +154,19 @@ namespace VRTR
                     attrib.normals[3 * idx.normal_index + 1],
                     attrib.normals[3 * idx.normal_index + 2]
                 };
+
+                if(!attrib.colors.empty())
+                {
+                    vertex.color = {
+                        attrib.colors[3 * idx.vertex_index + 0],
+                        attrib.colors[3 * idx.vertex_index + 1],
+                        attrib.colors[3 * idx.vertex_index + 2]
+                    };
+                }
+                else
+                {
+                    vertex.color = material.albedo;
+                }
 
                 if(withTexture) // bede tu mial puste texCoordy, co jest niewydajne. Miej o tym swiadomość
                 {
@@ -290,6 +307,7 @@ namespace VRTR
         triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
 
         patchIdToTriangleId.resize(triCount);
+        vertexToPatchIds.resize(modelMesh->vertices.size(), std::vector<uint32_t>{});
         patches.clear();
         patches.reserve((triCount + trianglesPerPatch - 1) / trianglesPerPatch);
 
@@ -311,6 +329,10 @@ namespace VRTR
                 const auto& v0 = modelMesh->vertices[i0];
                 const auto& v1 = modelMesh->vertices[i1];
                 const auto& v2 = modelMesh->vertices[i2];
+
+                vertexToPatchIds[i0].push_back(patchIdx);
+                vertexToPatchIds[i1].push_back(patchIdx);
+                vertexToPatchIds[i2].push_back(patchIdx);
 
                 glm::vec3 e1 = v1.pos - v0.pos;
                 glm::vec3 e2 = v2.pos - v0.pos;
@@ -361,13 +383,51 @@ namespace VRTR
         }
     }
 
-    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle()
+    void Model::removeDuplicateVertices()
+    {
+        for (auto& ver : vertexToPatchIds)
+        {
+            std::sort(ver.begin(), ver.end());
+            ver.erase(std::unique(ver.begin(), ver.end()), ver.end());
+        }
+    }
+
+    void Model::buildVertexPatchAdjacency()
+    {
+        const uint32_t vertexCount = static_cast<uint32_t>(vertexToPatchIds.size());
+        vertexPatchOffsets.clear();
+        vertexPatchIndices.clear();
+        // Trzeba dodac jeden zeby miec offset dla ostatniego wierzchołka
+        vertexPatchOffsets.resize(vertexCount + 1);
+        uint32_t offset = 0;
+
+
+        // wypelnienie tablicy vertexPatchOffsets offsetami
+        for (uint32_t v = 0; v < vertexCount; v++)
+        {
+            vertexPatchOffsets[v] = offset;
+            offset += static_cast<uint32_t>(vertexToPatchIds[v].size());
+        }
+
+        vertexPatchOffsets[vertexCount] = offset;
+
+        // rezerwujemy tyle miejsca ile wynosi offset czyli ilosc patchy w sumie
+        vertexPatchIndices.clear();
+        vertexPatchIndices.resize(offset);
+        
+        for(const auto& list : vertexToPatchIds)
+        {
+            vertexPatchIndices.insert(vertexPatchIndices.end(), list.begin(), list.end());
+        }
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle(const glm::vec3& color)
     {
         std::vector<VertexRT> vertices = {
-            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}
+            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {0.0f, 0.0f}},
+            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {1.0f, 0.0f}},
+            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {1.0f, 1.0f}},
+            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices = {
@@ -378,13 +438,13 @@ namespace VRTR
         return {vertices, indices};
     }
 
-    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createCube()
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createCube(const glm::vec3& color)
     {
         std::vector<VertexRT> vertices = {
-            {{-1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-            {{-1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}
+            {{-1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {0.0f, 0.0f}},
+            {{1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {1.0f, 0.0f}},
+            {{1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {1.0f, 1.0f}},
+            {{-1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {0.0f, 1.0f}}
         };
 
         std::vector<uint32_t> indices = {

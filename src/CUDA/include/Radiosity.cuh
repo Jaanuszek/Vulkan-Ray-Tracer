@@ -48,6 +48,12 @@ namespace VRTR
                                           const uint32_t* sourceHitCounts,
                                           float4* d_lightMap);
 
+        // Kernel odpowiadający za interpolacje kolorów wierzchołków
+        // Bierze patche przypisane do danego wierzchołka i robi średnią ich kolorów
+        __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+                                                const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
+                                                uint32_t numVertices);
+
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
         __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                                 SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 

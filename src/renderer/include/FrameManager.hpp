@@ -17,7 +17,7 @@ namespace VRTR
             FrameManager(RendererContext &ctx, std::shared_ptr<SwapChainManager> swapChainManager);
             ~FrameManager() = default;
 
-            void init(const std::vector<Patch>& patches);
+            void init(const std::vector<Patch>& patches, uint32_t vertexCount);
 
             /* AKA acquireNextFrame */
             uint32_t acquireNextImage();
