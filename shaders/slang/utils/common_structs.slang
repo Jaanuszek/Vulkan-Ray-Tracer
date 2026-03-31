@@ -16,7 +16,6 @@ public struct Patch
 {
     uint32_t id;
     float area;
-    float emission = 0.0f;
     float3 center;
     float3 normal;
     float3 albedo;
@@ -56,6 +55,8 @@ public struct GeometryInfo
 {
     uint32_t triToPatchOffset;
     uint32_t triangleCount;
+    uint32_t vertexGlobalOffset;
+    uint32_t triToMaterialOffset;
     uint64_t verticesAddress;
     uint64_t indicesAddress;
 };
@@ -73,6 +74,7 @@ public enum class MaterialType
 public struct Material
 {
     float4 albedo;
+    float3 emission;
     float metallic; // 4B
     float roughness; // 4B
     MaterialType type; // 4B
@@ -91,6 +93,7 @@ public struct Vertex
 public struct Triangle
 {
     Vertex[3] vertices;
+    uint vertexIndices[3];
     float3 normal;
     float2 uv;
 };
@@ -121,6 +124,7 @@ public func unpackTriangle(uint idx, HitAttribute attribs, GeometryInfo geometry
     {
         const uint localVertexIdx = triIdx + i;
         const uint vertexIdx = ((uint*)geometryInfo.indicesAddress)[localVertexIdx];
+        tri.vertexIndices[i] = vertexIdx;
         const uint64_t vertexOffset = geometryInfo.verticesAddress + vertexIdx * vertexSize;
         Vertex* v = (Vertex*)vertexOffset;
         tri.vertices[i].pos = v->pos;

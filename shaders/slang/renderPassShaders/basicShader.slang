@@ -40,6 +40,12 @@ RWStructuredBuffer<SelectedPatch, Std140DataLayout> selectedPatchesBuffer;
 [[vk::binding(10, 0)]]
 StructuredBuffer<float4> radiosityLightmapBuffer;
 
+[[vk::binding(11, 0)]]
+StructuredBuffer<float3> vertexRadiosityBuffer;
+
+[[vk::binding(12, 0)]]
+StructuredBuffer<uint32_t> triToMaterialIdxBuffer;
+
 [[vk::push_constant]] internal pc_blas blasAddr;
 
 [shader("raygeneration")]
@@ -152,29 +158,34 @@ void missShader(inout RayPayload payload)
 void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 {
     const float3 barycentricCoords = float3(1.0 - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
-    // payload.hitValue = barycentricCoords; // Color based on barycentric coordinates
     uint instanceIndex = InstanceIndex();
     uint triangleIndex = PrimitiveIndex();
-    uint triGlobalIndex = geometryInfoBuffer[instanceIndex].triToPatchOffset + triangleIndex;
+    const GeometryInfo geometryInfo = geometryInfoBuffer[instanceIndex];
+    uint triGlobalIndex = geometryInfo.triToPatchOffset + triangleIndex;
+    uint triGlobalIndexForMat = geometryInfo.triToMaterialOffset + triangleIndex;
     uint patchId = triToPatchBuffer[triGlobalIndex];
 
     uint selectedPatchId = selectedPatchesBuffer[0].patchId;
     float unshotEnergy = selectedPatchesBuffer[0].unshotEnergy;
 
-    Material mat = materialBuffer[instanceIndex];
+    uint matIdx = triToMaterialIdxBuffer[triGlobalIndexForMat];
+    Material mat = materialBuffer[matIdx];
     uint32_t textureIndex = mat.textureIndex; // text
 
-    Triangle tri = unpackTriangle(triangleIndex, attribs, geometryInfoBuffer[instanceIndex]);
+    Triangle tri = unpackTriangle(triangleIndex, attribs, geometryInfo);
 
-    // float3 interpolatedVertexColor =
-        // barycentricCoords.x * tri.vertices[0].color +
-        // barycentricCoords.y * tri.vertices[1].color +
-        // barycentricCoords.z * tri.vertices[2].color;
-    // float4 color = float4(interpolatedVertexColor, 1.0);
-    float4 color = float4(mat.albedo.rgb, 1.0);
+    const uint globalVertexIdx0 = geometryInfo.vertexGlobalOffset + tri.vertexIndices[0];
+    const uint globalVertexIdx1 = geometryInfo.vertexGlobalOffset + tri.vertexIndices[1];
+    const uint globalVertexIdx2 = geometryInfo.vertexGlobalOffset + tri.vertexIndices[2];
+
+    const float3 interpolatedVertexRadiosity =
+        vertexRadiosityBuffer[globalVertexIdx0] * barycentricCoords.x +
+        vertexRadiosityBuffer[globalVertexIdx1] * barycentricCoords.y +
+        vertexRadiosityBuffer[globalVertexIdx2] * barycentricCoords.z;
+
+    float4 color = float4(mat.albedo.rgb, 1.0f);
+
     // jezeli textureIndex == MAX_TEXTURES to znaczy ze obiekt nie ma tekstury
-
-
     // ============================= TEKSTURY ==================
     // if (textureIndex < MAX_TEXTURES)
     // {
@@ -238,8 +249,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         float3 lightVector = toLight / max(lightDistance, 1e-4);
         float dot_product = max(dot(lightVector, normal), 0.2);
 
-        float3 baseColor = materialBuffer[instanceIndex].albedo.rgb;
-        // float3 baseColor = color.rgb;
+        float3 baseColor = color.bgr;
         float3 shadedColor = baseColor * dot_product;
         payload.hitValue = shadedColor;
 
@@ -264,22 +274,11 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
 
     // TEST
-    bool isMetallic = materialBuffer[instanceIndex].type == MaterialType::METALLIC;
+    bool isMetallic = mat.type == MaterialType::METALLIC;
     // if (isMetallic)
     // {
     //     color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
     // }
-
-    bool isLight = materialBuffer[instanceIndex].type == MaterialType::LIGHT;
-    if (isLight){
-        float3 lightColor = materialBuffer[instanceIndex].albedo.rgb;
-        // payload.hitValue = color.rgb; // Color from material buffer
-        payload.hitValue = lightColor;
-        payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
-        payload.reflector = 0.0f;
-        return;
-    }
 
     // ========================== REFLECTIONS
     float3 normal = normalize(mul((float3x3)ObjectToWorld3x4(), tri.normal));
@@ -301,11 +300,23 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     if (cameraData.useRadiosityLightmap)
     {
         const float indirectStrength = 0.4f;
-        float3 indirect = radiosityLightmapBuffer[patchId].rgb * indirectStrength;
+        float3 indirect = interpolatedVertexRadiosity;
+        if (dot(indirect, indirect) < 1e-10f)
+        {
+            // Fallback for seam/island vertices that have no valid adjacency in vertexRadiosityBuffer.
+            indirect = radiosityLightmapBuffer[patchId].xyz;
+        }
+
+        indirect *= indirectStrength;
         FinalColor += indirect;
+
+        // To jest po to, ze jak uzywam wyzsze wartosci emission > 1.0
+        // To musze znormalizowac tą wartosc do przedzialu 0-1 zeby patche nie byly biale
+        // To sie nazywa tone mapping
+        FinalColor = FinalColor / (FinalColor + float3(1.0f));
     }
 
-    payload.hitValue.rgb = FinalColor;
+    payload.hitValue = FinalColor;
     payload.distance = RayTCurrent();
     payload.normal = normal;
     payload.reflector = 0.0f;

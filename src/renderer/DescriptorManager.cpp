@@ -108,6 +108,14 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
+        vk::DescriptorSetLayoutBinding triToMaterialIdLayout{
+            .binding = 12,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .pImmutableSamplers = nullptr
+        };
+
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             ASLayout,
             storageImageLayout,
@@ -120,7 +128,8 @@ namespace VRTR
             patchBufferLayout,
             selectedPatchLayout,
             radiosityLightmapLayout,
-            vertexRadiosityLayout
+            vertexRadiosityLayout,
+            triToMaterialIdLayout
         };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -149,6 +158,7 @@ namespace VRTR
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla selected patch buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla radiosity lightmap buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla vertex radiosity buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla triToMaterialId buffera
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -233,21 +243,31 @@ namespace VRTR
         //     });
         // }
         // TEMPORARY tylko jedna pierwsza tekstura idzie do shadera
-        std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        textureImageInfos.push_back(vk::DescriptorImageInfo{
-            .sampler = descriptorResources.texSamplers[0],
-            .imageView = descriptorResources.texImageViews[0],
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-        });
+        const bool hasTexture = !descriptorResources.texSamplers.empty() && !descriptorResources.texImageViews.empty();
+        if (descriptorResources.texSamplers.size() != descriptorResources.texImageViews.size())
+        {
+            throw std::runtime_error("Descriptor texture arrays size mismatch");
+        }
 
-        vk::WriteDescriptorSet textureWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 3,
-            .dstArrayElement = 0,
-            .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = textureImageInfos.data()};
+        std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        vk::WriteDescriptorSet textureWrite{};
+        if (hasTexture)
+        {
+            textureImageInfos.push_back(vk::DescriptorImageInfo{
+                .sampler = descriptorResources.texSamplers[0],
+                .imageView = descriptorResources.texImageViews[0],
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+            });
+
+            textureWrite = vk::WriteDescriptorSet{
+                .pNext = nullptr,
+                .dstSet = *descriptorSet,
+                .dstBinding = 3,
+                .dstArrayElement = 0,
+                .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .pImageInfo = textureImageInfos.data()};
+        }
 
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,
@@ -361,11 +381,26 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &vertexRadiosityBufferInfo};
 
+        vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
+            .buffer = descriptorResources.triToMaterialIdBuffer,
+            .offset = 0,
+            .range = vk::WholeSize
+        };
+
+        vk::WriteDescriptorSet triToMaterialIdBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 12,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &triToMaterialIdBufferInfo
+        };
+        
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
             resultImageWrite,
             uniformBufferWrite,
-            textureWrite,
             geometryInfoBufferWrite,
             materialBufferWrite,
             cudaColorBufferWrite,
@@ -373,8 +408,15 @@ namespace VRTR
             patchBufferWrite,
             selectedPatchBufferWrite,
             radiosityLightmapBufferWrite,
-            vertexRadiosityBufferWrite
+            vertexRadiosityBufferWrite,
+            triToMaterialIdBufferWrite
         };
+
+        if (hasTexture)
+        {
+            WriteDescriptorSets.push_back(textureWrite);
+        }
+
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
@@ -422,21 +464,31 @@ namespace VRTR
         //     });
         // }
 
-        std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        textureImageInfos.push_back(vk::DescriptorImageInfo{
-            .sampler = descriptorResources.texSamplers[0],
-            .imageView = descriptorResources.texImageViews[0],
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-        });
+        const bool hasTexture = !descriptorResources.texSamplers.empty() && !descriptorResources.texImageViews.empty();
+        if (descriptorResources.texSamplers.size() != descriptorResources.texImageViews.size())
+        {
+            throw std::runtime_error("Descriptor texture arrays size mismatch");
+        }
 
-        vk::WriteDescriptorSet textureWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 3,
-            .dstArrayElement = 0,
-            .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo = textureImageInfos.data()};
+        std::vector<vk::DescriptorImageInfo> textureImageInfos;
+        vk::WriteDescriptorSet textureWrite{};
+        if (hasTexture)
+        {
+            textureImageInfos.push_back(vk::DescriptorImageInfo{
+                .sampler = descriptorResources.texSamplers[0],
+                .imageView = descriptorResources.texImageViews[0],
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+            });
+
+            textureWrite = vk::WriteDescriptorSet{
+                .pNext = nullptr,
+                .dstSet = *descriptorSet,
+                .dstBinding = 3,
+                .dstArrayElement = 0,
+                .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .pImageInfo = textureImageInfos.data()};
+        }
 
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,
@@ -549,10 +601,25 @@ namespace VRTR
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &vertexRadiosityBufferInfo};
+        
+        vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
+            .buffer = descriptorResources.triToMaterialIdBuffer,
+            .offset = 0,
+            .range = vk::WholeSize
+        };
+
+        vk::WriteDescriptorSet triToMaterialIdBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 12,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &triToMaterialIdBufferInfo
+        };
 
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             resultImageWrite,
-            textureWrite,
             geometryInfoBufferWrite,
             materialBufferWrite,
             cudaColorBufferWrite,
@@ -560,8 +627,15 @@ namespace VRTR
             patchBufferWrite,
             selectedPatchBufferWrite,
             radiosityLightmapBufferWrite,
-            vertexRadiosityBufferWrite
+            vertexRadiosityBufferWrite,
+            triToMaterialIdBufferWrite
         };
+
+        if (hasTexture)
+        {
+            WriteDescriptorSets.push_back(textureWrite);
+        }
+
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 }

@@ -98,6 +98,13 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
             .pImmutableSamplers = nullptr};
 
+        vk::DescriptorSetLayoutBinding triToMaterialIdLayout{
+            .binding = 12,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr};
+
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             ASLayout,
             uniformBufferLayout,
@@ -107,7 +114,8 @@ namespace VRTR
             triToPatchBufferLayout,
             patchBufferLayout,
             selectedPatchLayout,
-            patchVisibilityLayout
+            patchVisibilityLayout,
+            triToMaterialIdLayout
         };
 
         vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -132,6 +140,7 @@ namespace VRTR
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla selected patch buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch visibility buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -285,6 +294,21 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &patchVisibilityBufferInfo};
 
+        vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
+            .buffer = descriptorResources.triToMaterialIdBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+        
+        vk::WriteDescriptorSet triToMaterialIdBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 12,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &triToMaterialIdBufferInfo};
+
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
             uniformBufferWrite,
@@ -294,7 +318,8 @@ namespace VRTR
             triToPatchBufferWrite,
             patchBufferWrite,
             selectedPatchBufferWrite,
-            patchVisibilityBufferWrite
+            patchVisibilityBufferWrite,
+            triToMaterialIdBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
@@ -399,6 +424,22 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &patchVisibilityBufferInfo};
 
+        
+        vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
+            .buffer = descriptorResources.triToMaterialIdBuffer,
+            .offset = 0,
+            .range = vk::WholeSize};
+        
+        vk::WriteDescriptorSet triToMaterialIdBufferWrite{
+            .pNext = nullptr,
+            .dstSet = *descriptorSet,
+            .dstBinding = 12,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &triToMaterialIdBufferInfo};
+
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             geometryInfoBufferWrite,
             materialBufferWrite,
@@ -406,7 +447,8 @@ namespace VRTR
             triToPatchBufferWrite,
             patchBufferWrite,
             selectedPatchBufferWrite,
-            patchVisibilityBufferWrite
+            patchVisibilityBufferWrite,
+            triToMaterialIdBufferWrite
         };
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }

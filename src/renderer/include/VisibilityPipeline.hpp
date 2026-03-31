@@ -9,7 +9,7 @@
 
 namespace VRTR
 {
-    constexpr uint32_t RAYS_PER_PATCH = 4092;
+    constexpr uint32_t RAYS_PER_PATCH = 1024;
     class VisibilityPipeline
     {
     public:

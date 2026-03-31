@@ -7,13 +7,17 @@ namespace VRTR
         : ctx(ctx), swapChainManager(swapChainManager)
         {}
 
-    void FrameManager::init(const std::vector<Patch>& patches, uint32_t vertexCount)
+    void FrameManager::init(
+                const std::vector<Patch>& patches,
+                uint32_t vertexCount,
+                const std::vector<uint32_t>& vertexPatchIndices, 
+                const std::vector<uint32_t>& vertexPatchOffsets)
     {
         frameSyncManager = std::make_unique<vkFrameSync>(ctx);
         frameSyncManager->init();
 
         vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx, PASS_COUNT);
-        vkCudaInteropManager->init(patches, vertexCount);
+        vkCudaInteropManager->init(patches, vertexCount, vertexPatchIndices, vertexPatchOffsets);
     }
     uint32_t FrameManager::acquireNextImage()
     {
@@ -204,19 +208,19 @@ namespace VRTR
         frameSyncManager->updateFrameIndex();
     }
 
-    void FrameManager::runCudaFrame(uint32_t patchesCount)
-    {
-        vkCudaInteropManager->runCudaFrame(patchesCount);
-    }
+    // void FrameManager::runCudaFrame(uint32_t patchesCount)
+    // {
+    //     vkCudaInteropManager->runCudaFrame(patchesCount);
+    // }
 
     void FrameManager::runCudaSelectPass(uint32_t patchesCount)
     {
         vkCudaInteropManager->runCudaSelectPass(patchesCount);
     }
 
-    void FrameManager::runCudaPostVisibilityPass(uint32_t patchesCount)
+    void FrameManager::runCudaPostVisibilityPass(uint32_t patchesCount, uint32_t vertexCount)
     {
-        vkCudaInteropManager->runCudaPostVisibilityPass(patchesCount);
+        vkCudaInteropManager->runCudaPostVisibilityPass(patchesCount, vertexCount);
     }
 
     void FrameManager::waitForFence()

@@ -6,7 +6,6 @@ namespace VRTR
     {
         uint32_t id;
         float area;
-        float emission{0.0f}; // wartosc z przedmialu [0,1]
         glm::vec3 center;
         glm::vec3 normal;
         glm::vec3 albedo;

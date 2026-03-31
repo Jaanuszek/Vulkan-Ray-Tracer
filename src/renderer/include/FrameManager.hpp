@@ -17,7 +17,12 @@ namespace VRTR
             FrameManager(RendererContext &ctx, std::shared_ptr<SwapChainManager> swapChainManager);
             ~FrameManager() = default;
 
-            void init(const std::vector<Patch>& patches, uint32_t vertexCount);
+            void init(                
+                const std::vector<Patch>& patches,
+                uint32_t vertexCount,
+                const std::vector<uint32_t>& vertexPatchIndices, 
+                const std::vector<uint32_t>& vertexPatchOffsets
+            );
 
             /* AKA acquireNextFrame */
             uint32_t acquireNextImage();
@@ -28,11 +33,11 @@ namespace VRTR
 
             void presentFrame(uint32_t imageIndex);
 
-            void runCudaFrame(uint32_t patchesCount);
+            // void runCudaFrame(uint32_t patchesCount);
 
             void runCudaSelectPass(uint32_t patchesCount);
 
-            void runCudaPostVisibilityPass(uint32_t patchesCount);
+            void runCudaPostVisibilityPass(uint32_t patchesCount, uint32_t vertexCount);
 
             void appendDescriptorResources(DescriptorResources& resources)
             {

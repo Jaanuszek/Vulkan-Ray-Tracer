@@ -16,11 +16,17 @@ namespace VRTR
             vkCudaInterop(RendererContext& ctx, uint32_t passCount);
             ~vkCudaInterop();
 
-            void init(const std::vector<Patch>& patches, uint32_t vertexCount);
+            void init(
+                const std::vector<Patch>& patches,
+                uint32_t vertexCount,
+                const std::vector<uint32_t>& vertexPatchIndices, 
+                const std::vector<uint32_t>& vertexPatchOffsets
+            );
 
-            void runCudaFrame(uint32_t patchesCount);
+            // void runCudaFrame(uint32_t patchesCount);
             void runCudaSelectPass(uint32_t patchesCount);
-            void runCudaPostVisibilityPass(uint32_t patchesCount);
+            void runCudaPostVisibilityPass(uint32_t patchesCount, uint32_t vertexCount);
+            // void runCudaInterpolateVertexColorsPass(uint32_t patchesCount, uint32_t vertexCount);
 
             void appendDescriptorResources(DescriptorResources& resources);
 
@@ -76,8 +82,16 @@ namespace VRTR
             float4* cudaRadiosityLightmapData{};
             cudaExternalMemory_t cudaRadiosityLightmapExternalMemory{nullptr};
 
+            std::unique_ptr<Buffer> b_VertexPatchIndices;
+            uint32_t* d_VertexPatchIndices{};
+            cudaExternalMemory_t e_VertexPatchIndices{nullptr};
+
+            std::unique_ptr<Buffer> b_VertexPatchOffsets;
+            uint32_t* d_VertexPatchOffsets{};
+            cudaExternalMemory_t e_VertexPatchOffsets{nullptr};
+
             std::unique_ptr<Buffer> cudaVertexRadiosityBuffer;
-            float3* cudaVertexRadiosityData{};
+            glm::vec3* cudaVertexRadiosityData{};
             cudaExternalMemory_t cudaVertexRadiosityExternalMemory{nullptr};
 
             uint32_t passCount;

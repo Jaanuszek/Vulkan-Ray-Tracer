@@ -45,7 +45,12 @@ namespace VRTR
         scene->createScene(sceneSettings.ubo.light_pos);
 
         frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
-        frameManager->init(scene->getPatches(), scene->getVertexCount());
+        frameManager->init(
+            scene->getPatches(),
+            scene->getVertexCount(),
+            scene->getVertexPatchIndices(),
+            scene->getVertexPatchOffsets()
+        );
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                             vk::BufferUsageFlagBits{},
@@ -56,7 +61,7 @@ namespace VRTR
 
         DescriptorResources dr = buildDescriptorResources();
 
-        auto gi = scene->getGeometryInfo("viking_room");
+        auto gi = scene->getFirstGeometryInfo();
         PushConstant vikingRoomModelPC{
             .vertices = gi.vertexBufferAddr,
             .indices = gi.indexBufferAddr
@@ -149,7 +154,7 @@ namespace VRTR
 
                 frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
 
-                frameManager->runCudaPostVisibilityPass(scene->getPatches().size());
+                frameManager->runCudaPostVisibilityPass(scene->getPatches().size(), scene->getVertexCount());
 
                 // ++radiosityDemoFrameCounter;
                 // if (radiosityDemoFrameCounter >= 4096)

@@ -235,7 +235,7 @@ namespace VRTR::CUDA
 
     __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
                                             const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
-                                            uint32_t numVertices)
+                                            uint32_t numVertices, glm::vec3* radVertexColors)
     {
         uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -260,9 +260,14 @@ namespace VRTR::CUDA
                 }
             }
 
-            // atomicAdd(&d_lightMap[i].x, (totalArea > 0.0f) ? (color.r / totalArea) : 0.0f);
-            // atomicAdd(&d_lightMap[i].y, (totalArea > 0.0f) ? (color.g / totalArea) : 0.0f);
-            // atomicAdd(&d_lightMap[i].z, (totalArea > 0.0f) ? (color.b / totalArea) : 0.0f);
+            if (totalArea > 0.0f)
+            {
+                radVertexColors[i] = color / totalArea;
+            }
+            else
+            {
+                radVertexColors[i] = glm::vec3(0.0f);
+            }
         }
     }
 
@@ -413,5 +418,21 @@ namespace VRTR::CUDA
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
 
         cudaFree(d_sourceHitCounts);
+    }
+
+    __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
+                                    const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
+                                    uint32_t numVertices, glm::vec3* radVertexColors)
+    {
+        if (numPatches == 0 || numVertices == 0)
+        {
+            return;
+        }
+
+        int blocks = (numVertices + TPB - 1) / TPB;
+        blocks = min(blocks, 1024);
+
+        interpolateVertexColors<<<blocks, TPB>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
+        CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 }

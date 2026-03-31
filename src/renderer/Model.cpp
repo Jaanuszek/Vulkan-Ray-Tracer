@@ -6,9 +6,16 @@
 
 namespace
 {
-    constexpr float DEFAULT_MAX_WORLD_TRIANGLE_AREA = 0.0001f;
-    constexpr uint32_t DEFAULT_MAX_SUBDIV_DEPTH = 128;
+    constexpr float DEFAULT_MAX_WORLD_TRIANGLE_AREA = 1.0f;
+    constexpr uint32_t DEFAULT_MAX_SUBDIV_DEPTH = 32;
     constexpr float EPSILON = 1e-8f;
+    constexpr float RADIOSITY_ALBEDO_EMISSION_SCALE = 0.6f;
+
+    float luminance(const glm::vec3& c)
+    {
+        // return glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+        return (c.r + c.g + c.b) / 3.0f;
+    }
 
     VRTR::VertexRT midpointVertex(const VRTR::VertexRT& a, const VRTR::VertexRT& b)
     {
@@ -49,9 +56,10 @@ namespace
 namespace VRTR
 {
     Model::Model(RendererContext& ctx,
-                const std::string& modelPath, const std::string& texturePath,
-                const Material& mat, const glm::mat4& transform)
-        : ctx(ctx), material(mat), modelTransform(transform)
+                const std::string& modelPath, 
+                const std::string& texturePath,
+                const glm::mat4& transform)
+        : ctx(ctx), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from path: {}", modelPath);
 
@@ -61,7 +69,8 @@ namespace VRTR
             withTexture = true;
 
         loadModel(modelPath);
-        tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
+        // tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
+        weldVertices();
         createVertexBuffer();
         createIndexBuffer();
         setGeometryInfo();
@@ -79,19 +88,19 @@ namespace VRTR
     }
 
     Model::Model(RendererContext& ctx,
-        const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices,
-        const Material& mat, const glm::mat4& transform)
-        : ctx(ctx), material(mat), modelTransform(transform)
+        const std::vector<VertexRT>& vertices, 
+        const std::vector<uint32_t>& indices,
+        const std::vector<Material>& mats, const glm::mat4& transform)
+        : ctx(ctx), materials(mats), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
         modelMesh = std::make_unique<mesh>();
         modelMesh->vertices = vertices;
         modelMesh->indices = indices;
-        material = mat;
 
-        tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
-
+        // tessellateLargeTriangles(DEFAULT_MAX_WORLD_TRIANGLE_AREA, DEFAULT_MAX_SUBDIV_DEPTH);
+        weldVertices();
         createVertexBuffer();
         createIndexBuffer();
         setGeometryInfo();
@@ -116,11 +125,17 @@ namespace VRTR
 
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
+        std::vector<tinyobj::material_t> mtl_materials;
         std::string warn, err;
-        bool containTexture = false;
 
-        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str());
+        const std::filesystem::path modelPath(path);
+        std::string baseDir = modelPath.parent_path().string();
+        if (!baseDir.empty() && baseDir.back() != '/')
+        {
+            baseDir.push_back('/');
+        }
+
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &mtl_materials, &warn, &err, path.c_str(), baseDir.c_str());
         if(!warn.empty())
         {
             VRTR_WARN("Model loading warning: {}", warn);
@@ -135,52 +150,88 @@ namespace VRTR
             exit(1);
         }
 
+        std::unordered_map<int, uint32_t> mtlIdToMaterialIdx;
+        for (uint32_t id = 0; id < mtl_materials.size(); id++)
+        {
+            const float emissionMean = (mtl_materials[id].emission[0] + mtl_materials[id].emission[1] + mtl_materials[id].emission[2]) / 3.0f;
+            Material mat = {
+                .albedo = glm::vec4(
+                    mtl_materials[id].diffuse[0], 
+                    mtl_materials[id].diffuse[1], 
+                    mtl_materials[id].diffuse[2], 
+                    1.0f),
+                .emission = glm::vec3(
+                    mtl_materials[id].emission[0],
+                    mtl_materials[id].emission[1],
+                    mtl_materials[id].emission[2]),
+                .metallic = mtl_materials[id].metallic,
+                .roughness = mtl_materials[id].roughness,
+                .type = emissionMean > 0 ? MaterialType::LIGHT : MaterialType::ALBEDO,
+                .textureIndex = 0
+            };
+            mtlIdToMaterialIdx[id] = materials.size();
+            materials.push_back(mat);
+        }
+
         mesh Mesh{};
 
+        // loop po wszystkich shapeach o i g w pliku .obj
         for (const auto& shape : shapes)
         {
-            for(const auto& idx : shape.mesh.indices)
+            size_t indexOffset = 0;
+
+            // loop po faceach shape'a, czyli po trójkątach lub innych wielokątach
+            for (size_t face = 0; face < shape.mesh.num_face_vertices.size(); face++)
             {
-                VertexRT vertex{};
+                // ilość face'ów w shapie
+                const int fv = shape.mesh.num_face_vertices[face];
+                const int materialId = shape.mesh.material_ids[face];
 
-                vertex.pos = {
-                    attrib.vertices[3 * idx.vertex_index + 0],
-                    attrib.vertices[3 * idx.vertex_index + 1],
-                    attrib.vertices[3 * idx.vertex_index + 2]
-                };
-
-                vertex.normal = {
-                    attrib.normals[3 * idx.normal_index + 0],
-                    attrib.normals[3 * idx.normal_index + 1],
-                    attrib.normals[3 * idx.normal_index + 2]
-                };
-
-                if(!attrib.colors.empty())
+                // Loop po wierzchołkach wszystkich face'ów
+                for (int v = 0; v < fv; ++v)
                 {
-                    vertex.color = {
-                        attrib.colors[3 * idx.vertex_index + 0],
-                        attrib.colors[3 * idx.vertex_index + 1],
-                        attrib.colors[3 * idx.vertex_index + 2]
+                    const auto& idx = shape.mesh.indices[indexOffset + v];
+                    VertexRT vertex{};
+
+                    vertex.pos = {
+                        attrib.vertices[3 * idx.vertex_index + 0],
+                        attrib.vertices[3 * idx.vertex_index + 1],
+                        attrib.vertices[3 * idx.vertex_index + 2]
                     };
-                }
-                else
-                {
-                    vertex.color = material.albedo;
+
+                    if (!attrib.normals.empty() && idx.normal_index >= 0)
+                    {
+                        vertex.normal = {
+                            attrib.normals[3 * idx.normal_index + 0],
+                            attrib.normals[3 * idx.normal_index + 1],
+                            attrib.normals[3 * idx.normal_index + 2]
+                        };
+                    }
+
+                    if(withTexture && !attrib.texcoords.empty() && idx.texcoord_index >= 0)
+                    {
+                        vertex.texCoord = {
+                            attrib.texcoords[2 * idx.texcoord_index + 0],
+                            attrib.texcoords[2 * idx.texcoord_index + 1]
+                        };
+                    }
+
+                    Mesh.vertices.push_back(vertex);
+                    Mesh.indices.push_back(Mesh.indices.size());
                 }
 
-                if(withTexture) // bede tu mial puste texCoordy, co jest niewydajne. Miej o tym swiadomość
-                {
-                    vertex.texCoord = {
-                        attrib.texcoords[2 * idx.texcoord_index + 0],
-                        attrib.texcoords[2 * idx.texcoord_index + 1]
-                    };
-                }
+                indexOffset += static_cast<size_t>(fv);
 
-                Mesh.vertices.push_back(vertex);
-                Mesh.indices.push_back(Mesh.indices.size());
+                if(face < shape.mesh.material_ids.size())
+                {
+                    int mtlIdFromFile = shape.mesh.material_ids[face];
+                    uint32_t matIdx = mtlIdToMaterialIdx.count(mtlIdFromFile) ? mtlIdToMaterialIdx[mtlIdFromFile] : 0;
+                    triangleIdToMaterialId.push_back(matIdx);
+                }
             }
         }
         modelMesh = std::make_unique<mesh>(std::move(Mesh));
+        loadedFromFile = true;
     }
 
     void Model::tessellateLargeTriangles(float maxWorldTriangleArea, uint32_t maxDepth)
@@ -263,6 +314,7 @@ namespace VRTR
 
     void Model::createVertexBuffer()
     {
+        VRTR_DEBUG("Creating vertex buffer for model: {}", modelName);
         vk::DeviceSize bufferSize = modelMesh->vertices.size() * sizeof(VertexRT);
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
         auto vmaAllocInfo = getVmaAllocCreateInfo();
@@ -273,6 +325,7 @@ namespace VRTR
 
     void Model::createIndexBuffer()
     {
+        VRTR_DEBUG("Creating index buffer for model: {}", modelName);
         vk::DeviceSize bufferSize = modelMesh->indices.size() * sizeof(uint32_t);
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress;
         auto vmaAllocInfo = getVmaAllocCreateInfo();
@@ -283,6 +336,7 @@ namespace VRTR
 
     void Model::setGeometryInfo()
     {
+        VRTR_DEBUG("Setting geometry info for model: {}", modelName);
         vk::BufferDeviceAddressInfo addrInfo{
             .buffer = vertexBuffer->getBufferHandle()
         };
@@ -318,6 +372,8 @@ namespace VRTR
             float area{};
             glm::vec3 center{};
             glm::vec3 normal{};
+            glm::vec3 albedoAccum{};
+            glm::vec3 emissionAccum{};
 
             for (uint32_t j = 0; j < trianglesInPatch; ++j)
             {
@@ -355,6 +411,31 @@ namespace VRTR
                 area += triArea;
                 center += triCenter * triArea; // nie wiem po co tak, weighted center. Duze trójkąty maja większy wpływ na pozycje patcha, wiec to jest pewnie po to
                 normal += triNormalGeom;
+
+                if (loadedFromFile)
+                {
+                    glm::vec3 triEmission(0.0f);
+                    glm::vec3 triAlbedo(0.5f);
+
+                    if (tri < triangleIdToMaterialId.size())
+                    {
+                        const uint32_t matIdx = triangleIdToMaterialId[tri];
+                        if (matIdx < materials.size())
+                        {
+                            triEmission = materials[matIdx].emission;
+                            triAlbedo = glm::vec3(materials[matIdx].albedo);
+                        }
+                    }
+
+                    emissionAccum += triEmission * triArea;
+                    // emissionAccum += triEmission;
+                    albedoAccum += triAlbedo * triArea;
+                }
+                else
+                {
+                    const glm::vec3 triAlbedo = (v0.color + v1.color + v2.color) / 3.0f;
+                    albedoAccum += triAlbedo * triArea;
+                }
                 patchIdToTriangleId[tri] = patchIdx;
             }
 
@@ -366,21 +447,56 @@ namespace VRTR
             p.area = area;
             p.center = (area > 0.0f) ? worldCenter : glm::vec3(0.0f);
             p.normal = (glm::length(normal) > 0.0f) ? worldNormal : glm::vec3(0.0f);
-            p.albedo = material.albedo;
-            if(material.type == MaterialType::LIGHT)
-            {
-                p.emission = 1.0f;
-            }
-            else
-            {
-                p.emission = 0.0f;
-            }
+            p.albedo = (area > 0.0f) ? (albedoAccum / area) : glm::vec3(0.5f);
+            // p.emission = (area > 0.0f) ? (emissionAccum / area) : glm::vec3(0.0f);
+            // p.emission = emissionAccum;
 
-            p.unshotEnergy = p.albedo * p.emission;
+            p.unshotEnergy = (area > 0.0f) ? (emissionAccum / area) : glm::vec3(0.0f);
             p.radiosity = glm::vec3(0.0f);
 
             patches.push_back(p);
         }
+    }
+
+    void Model::weldVertices()
+    {
+        std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVertices;
+
+        std::vector<VertexRT> newVertices;
+        std::vector<uint32_t> newIndices;
+
+        for (uint32_t i = 0; i < modelMesh->indices.size(); ++i)
+        {
+            uint32_t idx = modelMesh->indices[i];
+            const auto& v = modelMesh->vertices[idx];
+
+            VertexKey key{
+                v.pos,
+                v.normal,
+                v.color,
+                v.texCoord
+            };
+
+            auto it = uniqueVertices.find(key);
+
+            if (it == uniqueVertices.end())
+            {
+                uint32_t newIndex = static_cast<uint32_t>(newVertices.size());
+                uniqueVertices[key] = newIndex;
+
+                newVertices.push_back(v);
+                newIndices.push_back(newIndex);
+            }
+            else
+            {
+                newIndices.push_back(it->second);
+            }
+        }
+
+        modelMesh->vertices = std::move(newVertices);
+        modelMesh->indices = std::move(newIndices);
+
+        VRTR_INFO("Vertex welding: {} vertices", modelMesh->vertices.size());
     }
 
     void Model::removeDuplicateVertices()
@@ -413,7 +529,7 @@ namespace VRTR
 
         // rezerwujemy tyle miejsca ile wynosi offset czyli ilosc patchy w sumie
         vertexPatchIndices.clear();
-        vertexPatchIndices.resize(offset);
+        vertexPatchIndices.reserve(offset);
         
         for(const auto& list : vertexToPatchIds)
         {

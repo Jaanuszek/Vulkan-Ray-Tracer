@@ -32,11 +32,23 @@ namespace VRTR
 
             uint32_t getLightTLASIdx() const { return lightSourceTLASIdx; }
             const GeometryInfo& getGeometryInfo(const std::string& modelName) const { return models.at(modelName)->getGeometryInfo(); }
+            const GeometryInfo& getFirstGeometryInfo() const
+            {
+                if (modelInstanceOrder.empty())
+                {
+                    throw std::runtime_error("Scene has no model instances");
+                }
+
+                return models.at(modelInstanceOrder.front())->getGeometryInfo();
+            }
 
             std::vector<Patch>& getPatches() { return patchesGlobal; }
             uint32_t getPatchCount() const { return static_cast<uint32_t>(patchesGlobal.size()); }
 
             uint32_t getVertexCount() const;
+
+            const std::vector<uint32_t>& getVertexPatchIndices() const { return vertexToPatchGlobal; }
+            const std::vector<uint32_t>& getVertexPatchOffsets() const { return vertexToPatchOffsetGlobal; }
 
             void updatePatchData(uint8_t patchSize);
 
@@ -44,7 +56,7 @@ namespace VRTR
             uint32_t importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform);
 
             uint32_t addObject(const std::string& objName, const std::vector<VertexRT>& vertices, 
-                    const std::vector<uint32_t>& indices, const Material& mat,
+                    const std::vector<uint32_t>& indices, const std::vector<Material>& mats,
                     const glm::mat4& transform);
 
             void buildTLAS();
@@ -72,6 +84,8 @@ namespace VRTR
             std::vector<uint32_t> vertexToPatchGlobal;
             std::vector<uint32_t> vertexToPatchOffsetGlobal;
 
+            std::vector<uint32_t> triToMaterialIdGlobal; // Trójkąt -> material Id (globalne)
+
             std::vector<GeometryInfo> geometryInfos;
             std::vector<Material> materials;
 
@@ -79,5 +93,6 @@ namespace VRTR
             std::unique_ptr<StorageBuffer> materialSBO;
             std::unique_ptr<StorageBuffer> triToPatchBuffer;
             std::unique_ptr<StorageBuffer> patchBuffer;
+            std::unique_ptr<StorageBuffer> triToMaterialIdBuffer;
     };
 }

@@ -100,7 +100,6 @@ namespace VRTR::CUDA
             {
                 hostPatches[i].id = i;
                 hostPatches[i].area = 1.0f;
-                hostPatches[i].emission = 0.5f;
                 hostPatches[i].center = glm::vec3(i, i, i);
                 hostPatches[i].normal = glm::vec3(0, 1, 0);
                 hostPatches[i].albedo = glm::vec3(0.8f, 0.8f, 0.8f);

@@ -24,6 +24,7 @@ namespace VRTR
         vk::Buffer patchVisibilityBuffer = nullptr;
         vk::Buffer radiosityLightmapBuffer = nullptr;
         vk::Buffer vertexRadiosityBuffer = nullptr;
+        vk::Buffer triToMaterialIdBuffer = nullptr;
     };
 
     class DescriptorManager
