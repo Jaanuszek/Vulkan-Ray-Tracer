@@ -1,6 +1,6 @@
 # Blender 5.1.0
 # www.blender.org
-mtllib cornell_box.mtl
+mtllib cornell_box_sub10.mtl
 o area_light
 v -0.884011 5.319334 -2.517968
 v -0.884011 5.318497 -3.567968

@@ -67,16 +67,16 @@ namespace VRTR
     };
 
     struct VertexKeyHash
-{
-    size_t operator()(const VertexKey& k) const
     {
-        size_t h1 = std::hash<float>{}(k.pos.x);
-        size_t h2 = std::hash<float>{}(k.pos.y);
-        size_t h3 = std::hash<float>{}(k.pos.z);
+        size_t operator()(const VertexKey& k) const
+        {
+            size_t h1 = std::hash<float>{}(k.pos.x);
+            size_t h2 = std::hash<float>{}(k.pos.y);
+            size_t h3 = std::hash<float>{}(k.pos.z);
 
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
-    }
-};
+            return h1 ^ (h2 << 1) ^ (h3 << 2);
+        }
+    };
 
     class Model
     {
@@ -97,16 +97,11 @@ namespace VRTR
 
             static std::string getModelNameFromPath(const std::string& path) { return std::filesystem::path(path).stem().string(); }
 
-            // void setMaterial(const Material& mat) { material = mat; }
             const GeometryInfo& getGeometryInfo() const { return geometryInfo; }
-            Material getMaterial() const { return materials[0]; }
 
             std::vector<Material>& getMaterials() { return materials; }
             std::vector<uint32_t>& getTriIdxToMaterialIdx() { return triangleIdToMaterialId; }
 
-            std::string& getName() { return modelName; }
-
-            // mesh& getMesh() { return *modelMesh; }
             const std::vector<Patch>& getPatches() const { return patches; }
             const std::vector<uint32_t>& getPatchIdToTriangleId() const { return patchIdToTriangleId; }
 
@@ -121,7 +116,7 @@ namespace VRTR
             vk::DeviceAddress getVertexBufferAddress() const { return geometryInfo.vertexBufferAddr; }
             vk::DeviceAddress getIndexBufferAddress() const { return geometryInfo.indexBufferAddr; }
 
-            void setTextureIndex(uint32_t index) { materials[0].textureIndex = index; }
+            void setTextureIndex(uint32_t index);
 
             bool hasTexture() const { return withTexture; }
 
@@ -143,7 +138,6 @@ namespace VRTR
             void createIndexBuffer();
             void setGeometryInfo();
             void loadTexture(const std::string &path);
-            void tessellateLargeTriangles(float maxWorldTriangleArea = 0.5f, uint32_t maxDepth = 6);
             void buildPatches(uint8_t patchSize = 1);
             void weldVertices();
             void removeDuplicateVertices();
@@ -181,6 +175,7 @@ namespace VRTR
             GeometryInfo geometryInfo;
             bool withTexture = false;
             bool loadedFromFile = false;
+            bool vertexInterpolation = true;
     };
 
     namespace CustomModels
