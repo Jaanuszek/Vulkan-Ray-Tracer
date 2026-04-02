@@ -31,7 +31,7 @@ namespace VRTR
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
         std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
-        std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub10.obj";
+        std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
         glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
 
@@ -116,23 +116,17 @@ namespace VRTR
             texPath,
             transform));
 
-        std::cout << "Import Model ====1\n";
         if(it->second->hasTexture())
         {
-            std::cout << "Import Model ====1.1\n";
             it->second->setTextureIndex(textureIndexCounter++);
         }
         else
         {
-            std::cout << "Import Model ====1.2\n";
             it->second->setTextureIndex(CONSTANTS::MAX_TEXTURES);
         }
-        std::cout << "Import Model ====1.5\n";
         uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
-        std::cout << "Import Model ====2\n";
 
         uint32_t instanceIndex = asManager->addInstance(blasIndex, transform);
-        std::cout << "Import Model ====3\n";
         modelInstanceOrder.push_back(model_name);
         return instanceIndex;
     }
