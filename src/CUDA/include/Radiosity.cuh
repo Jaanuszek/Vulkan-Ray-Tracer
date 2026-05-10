@@ -2,11 +2,17 @@
 
 #include <cuda_runtime_api.h>
 #include "CommonStructs.h"
-#include <cccl/thrust/host_vector.h>
-#include <cccl/thrust/device_vector.h>
-#include <cccl/thrust/sequence.h>
-#include <cccl/thrust/sort.h>
-#include <cccl/thrust/execution_policy.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/sort.h>
+#include <thrust/sequence.h>
+#include <thrust/execution_policy.h>
+
+// #include <cccl/thrust/host_vector.h>
+// #include <cccl/thrust/device_vector.h>
+// #include <cccl/thrust/sequence.h>
+// #include <cccl/thrust/sort.h>
+// #include <cccl/thrust/execution_policy.h>
 
 
 // Poniewaz mam problemy z linkerem bo krzyczy o libke CORE gdy includuje Logger.hpp, 

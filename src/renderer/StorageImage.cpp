@@ -7,7 +7,7 @@ namespace VRTR
         : ctx(ctx), width(width), height(height)
     {}
 
-    void StorageImage::init(vk::raii::CommandPool& commandPool)
+    void StorageImage::init()
     {
         VRTR_DEBUG("Creating storage image");
 
@@ -43,12 +43,6 @@ namespace VRTR
             .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
         ImageView = vk::raii::ImageView(ctx.logicalDevice, viewCreateInfo);
 
-        // TODO OGARNAC TE TYMCZASOWE COMMAND BUFFERY
-        vk::CommandBufferAllocateInfo cmdBufferAllocInfo{
-            .commandPool = commandPool,
-            .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1};
-
         std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
         vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
 
@@ -66,7 +60,7 @@ namespace VRTR
         tempCmdBufferManager->submitAndWaitTempCmdBuffer();
     }
 
-    void StorageImage::recreate(vk::raii::CommandPool& commandPool, uint32_t newWidth, uint32_t newHeight)
+    void StorageImage::recreate(uint32_t newWidth, uint32_t newHeight)
     {
         width = newWidth;
         height = newHeight;
@@ -75,6 +69,6 @@ namespace VRTR
         ImageView = nullptr;
         Memory = nullptr;
 
-        init(commandPool);
+        init();
     }
 }

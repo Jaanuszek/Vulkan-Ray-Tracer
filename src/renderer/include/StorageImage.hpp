@@ -13,8 +13,8 @@ namespace VRTR
             StorageImage(RendererContext& ctx,
                 uint32_t width, uint32_t height);
 
-            void init(vk::raii::CommandPool& commandPool);
-            void recreate(vk::raii::CommandPool& commandPool, uint32_t newWidth, uint32_t newHeight);
+            void init();
+            void recreate(uint32_t newWidth, uint32_t newHeight);
             const vk::raii::Image &getImage() const { return Image; };
             vk::Image getImageHandle() const { return *Image; };
             const vk::raii::ImageView& getImageView() const { return ImageView; };

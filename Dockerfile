@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM nvidia/cuda:13.1.1-devel-ubuntu24.04
+FROM nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 
 ENV rootpath=/app
 

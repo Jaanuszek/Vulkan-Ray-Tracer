@@ -17,7 +17,6 @@ ConstantBuffer<CameraData> cameraData;
 
 [[vk::binding(3, 0)]]
 uniform Sampler2D colorSampler[1];
-// uniform Sampler2D colorSampler[MAX_TEXTURES];
 
 [[vk::binding(4, 0)]]
 StructuredBuffer<GeometryInfo, Std140DataLayout> geometryInfoBuffer;
@@ -102,7 +101,7 @@ void rayGenShader()
             break;
         }
 
-        float reflectivity = clamp(payload.reflector, 0.0f, 0.95f);
+        float reflectivity = payload.reflector; // No clamp for metallic materials to achieve true mirrors
         color += throughput * hitColor * (1.0f - reflectivity);
 
         if (reflectivity > 0.001f)
@@ -198,6 +197,31 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
+    if(mat.type == MaterialType::LIGHT)
+    {
+        payload.hitValue = color.bgr; // Color from material buffer
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
+    }
+    else if(mat.type == MaterialType::METALLIC)
+    {
+        payload.hitValue = float3(1.0,0.0,0.0); // Color from material buffer
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.95f; // High reflectivity for metallic materials
+        return;
+    }
+    else if (mat.type == MaterialType::NONE)
+    {
+        payload.hitValue = float3(0.0,0.0,0.0); // Color from material buffer
+        payload.distance = RayTCurrent();
+        payload.normal = tri.normal;
+        payload.reflector = 0.0f;
+        return;
+    }
+
     if(cameraData.enableRadiosityPass && patchId == selectedPatchId)
     {
         color = float4(1.0, 0.0, 0.0, 1.0);
@@ -251,7 +275,6 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
         float3 baseColor = color.bgr;
         float3 shadedColor = baseColor * dot_product;
-        payload.hitValue = shadedColor;
 
         RayDesc rayDesc;
         rayDesc.Origin = hitPosition + normal * 0.01;
@@ -275,10 +298,10 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
     // TEST
     bool isMetallic = mat.type == MaterialType::METALLIC;
-    // if (isMetallic)
-    // {
-    //     color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
-    // }
+    if (isMetallic)
+    {
+        color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
+    }
 
     // ========================== REFLECTIONS
     float3 normal = normalize(mul((float3x3)ObjectToWorld3x4(), tri.normal));
@@ -291,34 +314,48 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
     float dot_product = max(dot(lightVector, normal), 0.0f);
-    float3 directLighting = (color * dot_product).rgb;
-    float3 ambientFloor = color.rgb * 0.03f;
-
-    // float3 FinalColor = isMetallic ? directLighting * 0.3f : directLighting;
-    float3 FinalColor = 0.8f * directLighting + ambientFloor;
-
-    if (cameraData.useRadiosityLightmap)
+    
+    float3 FinalColor;
+    
+    if (isMetallic)
     {
-        const float indirectStrength = 0.4f;
-        float3 indirect = interpolatedVertexRadiosity;
-        if (dot(indirect, indirect) < 1e-10f)
+        // For metallic materials: use specular reflection based on metallic albedo
+        // The actual reflection is computed in rayGenShader via reflected rays
+        float3 specularColor = color.rgb;
+        float3 directLighting = specularColor * dot_product;
+        // Metallic materials do not receive ambient or radiosity contributions
+        FinalColor = directLighting;
+    }
+    else
+    {
+        // For diffuse materials: standard Lambertian shading with ambient and radiosity
+        float3 directLighting = (color * dot_product).rgb;
+        float3 ambientFloor = color.rgb * 0.03f;
+        FinalColor = 0.8f * directLighting + ambientFloor;
+
+        if (cameraData.useRadiosityLightmap)
         {
-            // Fallback for seam/island vertices that have no valid adjacency in vertexRadiosityBuffer.
-            indirect = radiosityLightmapBuffer[patchId].xyz;
+            const float indirectStrength = 0.4f;
+            float3 indirect = interpolatedVertexRadiosity;
+            if (dot(indirect, indirect) < 1e-10f)
+            {
+                // Fallback for seam/island vertices that have no valid adjacency in vertexRadiosityBuffer.
+                indirect = radiosityLightmapBuffer[patchId].xyz;
+            }
+
+            indirect *= indirectStrength;
+            FinalColor += indirect;
+
+            // To jest po to, ze jak uzywam wyzsze wartosci emission > 1.0
+            // To musze znormalizowac tą wartosc do przedzialu 0-1 zeby patche nie byly biale
+            // To sie nazywa tone mapping
+            FinalColor = FinalColor / (FinalColor + float3(1.0f));
         }
-
-        indirect *= indirectStrength;
-        FinalColor += indirect;
-
-        // To jest po to, ze jak uzywam wyzsze wartosci emission > 1.0
-        // To musze znormalizowac tą wartosc do przedzialu 0-1 zeby patche nie byly biale
-        // To sie nazywa tone mapping
-        FinalColor = FinalColor / (FinalColor + float3(1.0f));
     }
 
     payload.hitValue = FinalColor;
     payload.distance = RayTCurrent();
     payload.normal = normal;
-    payload.reflector = 0.0f;
-    // payload.reflector = isMetallic ? 0.75f : 0.0f;
+    // Set high reflectivity for metallic to achieve mirror-like appearance
+    payload.reflector = isMetallic ? 0.95f : 0.0f;
 }

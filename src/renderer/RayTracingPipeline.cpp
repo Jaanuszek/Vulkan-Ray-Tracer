@@ -20,7 +20,7 @@ namespace VRTR
         this->height = height;
 
         storageImage = std::make_unique<StorageImage>(ctx, width, height);
-        storageImage->init(commandBufferManager->getCommandPool());
+        storageImage->init();
 
         // TODO meh
         resources.storageImageView = storageImage->getImageViewHandle();
@@ -36,7 +36,7 @@ namespace VRTR
 
     void RayTracingPipeline::recreateStorageImage(int width, int height)
     {
-        storageImage->recreate(commandBufferManager->getCommandPool(), width, height);
+        storageImage->recreate(width, height);
     }
 
     void RayTracingPipeline::updatePipelineDescriptors(DescriptorResources& resources, int width, int height)

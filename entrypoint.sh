@@ -3,6 +3,7 @@
 set -e
 
 pythonVenvDir="/app/venv"
+# pythonVenvDir="venvLocal/"
 
 activate_venv_and_install_requirements(){
     if [ ! -d "${pythonVenvDir}/bin" ]; then

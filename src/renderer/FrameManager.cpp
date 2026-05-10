@@ -23,6 +23,7 @@ namespace VRTR
     {
         waitForFence();
 
+        // Problem jest taki, ze ten semafor sie powinien nazywac "imageAvailableSemaphore"
         auto [result, imageIndex] = swapChainManager->getSwapChain().acquireNextImage(TIMEOUT, frameSyncManager->getPresentCompleteSemaphore(), nullptr);
 
         if (result == vk::Result::eErrorOutOfDateKHR)
@@ -128,6 +129,7 @@ namespace VRTR
         } 
         else
         {
+            // tu powinienem czekac na getAvailableImageSemaphore, bo czekam az obraz zostanie poprawnie pobrany ze swapchaina
             waitSemaphores = {
                 frameSyncManager->getPresentCompleteSemaphore()
             };

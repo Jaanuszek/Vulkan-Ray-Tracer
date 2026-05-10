@@ -221,7 +221,6 @@ namespace VRTR
             updateUniformBuffer(); // Camera UBO update
 
             frameManager->submitRenderQueue(submitCommandBuffers);
-            // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
         }

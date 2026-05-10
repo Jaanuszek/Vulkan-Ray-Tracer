@@ -51,6 +51,33 @@ namespace VRTR
         modelMesh->vertices = vertices;
         modelMesh->indices = indices;
 
+        // If user provided per-model materials via the constructor, ensure
+        // triangle->material mapping exists so CPU-side upload produces
+        // a correct tri->material index buffer used by the shader.
+        const uint32_t triCountLocal = static_cast<uint32_t>(modelMesh->indices.size() / 3);
+        triangleIdToMaterialId.resize(triCountLocal);
+        if (materials.empty())
+        {
+            // default to material 0 for all triangles
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+        else if (materials.size() == 1)
+        {
+            // single material for whole mesh
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+        else if (materials.size() >= triCountLocal)
+        {
+            // one material per triangle (or more) - assign accordingly
+            for (uint32_t t = 0; t < triCountLocal; ++t)
+                triangleIdToMaterialId[t] = t;
+        }
+        else
+        {
+            // fallback: use first material for all triangles
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+
         if(vertexInterpolation)
         {
             weldVertices();

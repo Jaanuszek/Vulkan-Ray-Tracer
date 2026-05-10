@@ -30,12 +30,12 @@ namespace VRTR
 
     struct Material
     {
-        glm::vec4 albedo;
-        glm::vec3 emission;
-        float metallic; // 4B
-        float roughness; // 4B
-        MaterialType type; // 4B
-        uint32_t textureIndex;
+        glm::vec4 albedo = glm::vec4(0.0f);
+        glm::vec3 emission = glm::vec3(0.0f);
+        float metallic = 0.0f; // 4B
+        float roughness = 1.0f; // 4B
+        MaterialType type = MaterialType::NONE; // 4B
+        uint32_t textureIndex = 0;
     };
 
     // Struktura przechowująca device addresy buforów wierzchołków i indeksów
@@ -45,7 +45,7 @@ namespace VRTR
         uint32_t triToPatchOffset;
         uint32_t triangleCount;
         uint32_t vertexGlobalOffset;
-        uint32_t MaterialGlobalOffset;
+        uint32_t triToMaterialOffset;
         uint64_t vertexBufferAddr;
         uint64_t indexBufferAddr;
     };
@@ -175,7 +175,7 @@ namespace VRTR
             GeometryInfo geometryInfo;
             bool withTexture = false;
             bool loadedFromFile = false;
-            bool vertexInterpolation = true;
+            bool vertexInterpolation = false;
     };
 
     namespace CustomModels
