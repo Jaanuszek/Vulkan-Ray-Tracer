@@ -7,30 +7,12 @@
 
 namespace VRTR
 {
-    struct DescriptorResources
-    {
-        // TODO zaimplementowac dirty flag design pattern tutaj
-        vk::AccelerationStructureKHR TLAS = nullptr;
-        vk::Buffer ubo = nullptr;
-        vk::ImageView storageImageView = nullptr;
-        std::vector<vk::ImageView> texImageViews;
-        std::vector<vk::Sampler> texSamplers;
-        vk::Buffer geometryInfoBuffer = nullptr;
-        vk::Buffer materialBuffer = nullptr;
-        vk::Buffer cudaColorBuffer = nullptr;
-        vk::Buffer triToPatchBuffer = nullptr;
-        vk::Buffer patchBuffer = nullptr;
-        vk::Buffer selectedPatchBuffer = nullptr;
-        vk::Buffer patchVisibilityBuffer = nullptr;
-        vk::Buffer radiosityLightmapBuffer = nullptr;
-        vk::Buffer vertexRadiosityBuffer = nullptr;
-        vk::Buffer triToMaterialIdBuffer = nullptr;
-    };
-
-    class DescriptorManager
+    // TODO moze zrobic interfejs IDescriptorManager?
+    class VisibilityDescriptorManager
     {
         public:
-            DescriptorManager(RendererContext& ctx);
+            VisibilityDescriptorManager(RendererContext& ctx);
+            VisibilityDescriptorManager() = delete;
 
             void init(const DescriptorResources& resources);
 
@@ -46,11 +28,11 @@ namespace VRTR
             void setDescriptorResources(const DescriptorResources& resources) { descriptorResources = resources; }
 
         private:
+            void createDescriptorSets();
             void createDescriptorSetLayout();
             void createDescriptorPool();
-            void writeDescriptorSet();
             void allocateDescriptorSet();
-            void createDescriptorSets();
+            void writeDescriptorSet();
 
         private:
             RendererContext& ctx;

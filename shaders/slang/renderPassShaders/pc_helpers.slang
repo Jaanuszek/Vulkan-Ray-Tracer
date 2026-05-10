@@ -1,48 +1,5 @@
 implementing basicShader;
 
-public struct Vertex
-{
-    float3 pos;
-    float3 normal;
-    float2 uv;
-};
-
-public struct Triangle
-{
-    Vertex[3] vertices;
-    float3 normal;
-    float2 uv;
-}
-
-public struct pc_blas
-{
-    uint64_t verticesAddress;
-    uint64_t indicesAddress;
-};
-
-struct GeometryInfo
-{
-    uint64_t verticesAddress;
-    uint64_t indicesAddress;
-};
-
-enum class MaterialType
-{
-    NONE = 0,
-    ALBEDO = 1,
-    METALLIC = 2,
-    ROUGHNESS = 3
-};
-
-struct Material
-{
-    float4 albedo;
-    float metallic; // 4B
-    float roughness; // 4B
-    MaterialType type; // 4B
-    uint32_t textureIndex;
-};
-
 public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Triangle
 {
     Triangle tri;
@@ -60,11 +17,21 @@ public func unpackTriangle(uint idx, uint objIdx, HitAttribute attribs) -> Trian
         Vertex* v = (Vertex*)vertexOffset;
         tri.vertices[i].pos = v->pos;
         tri.vertices[i].normal = v->normal;
+        tri.vertices[i].color = v->color;
         tri.vertices[i].uv = v->uv;
     }
     
+    float3 n0 = normalize(mul((float3x3)ObjectToWorld3x4(), tri.vertices[0].normal));
+    float3 n1 = normalize(mul((float3x3)ObjectToWorld3x4(), tri.vertices[1].normal));
+    float3 n2 = normalize(mul((float3x3)ObjectToWorld3x4(), tri.vertices[2].normal));
+
     float3 barycentricCoords = float3(1.0f - attribs.bary.x - attribs.bary.y, attribs.bary.x, attribs.bary.y);
     tri.uv = tri.vertices[0].uv * barycentricCoords.x + tri.vertices[1].uv * barycentricCoords.y + tri.vertices[2].uv * barycentricCoords.z;
-    tri.normal = normalize(tri.vertices[0].normal * barycentricCoords.x + tri.vertices[1].normal * barycentricCoords.y + tri.vertices[2].normal * barycentricCoords.z);
+    // tri.normal = normalize(tri.vertices[0].normal * barycentricCoords.x + tri.vertices[1].normal * barycentricCoords.y + tri.vertices[2].normal * barycentricCoords.z);
+    tri.normal = normalize(
+        n0 * barycentricCoords.x +
+        n1 * barycentricCoords.y +
+        n2 * barycentricCoords.z
+    );
     return tri;
 }

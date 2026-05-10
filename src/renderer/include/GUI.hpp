@@ -31,7 +31,7 @@ namespace VRTR
         bool newFrame();
 
         bool updateRequired() const { return updated; }
-        void setUpdated(bool value) { updated = value; }
+        void setUpdateNeed(bool value) { updated = value; }
 
         vk::CommandBuffer buildDrawCommandBuffer(uint32_t imageIndex, vk::Image swapchainImage, vk::ImageView swapchainImageView, vk::Extent2D extent);
 

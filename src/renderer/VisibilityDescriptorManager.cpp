@@ -1,26 +1,38 @@
 #include "pch.h"
-#include "DescriptorManager.hpp"
+#include "VisibilityDescriptorManager.hpp"
 
 namespace VRTR
 {
-    DescriptorManager::DescriptorManager(RendererContext& ctx)
+    VisibilityDescriptorManager::VisibilityDescriptorManager(RendererContext& ctx)
         : ctx(ctx)
     {
     }
 
-    void DescriptorManager::init(const DescriptorResources& resources)
+    void VisibilityDescriptorManager::init(const DescriptorResources& resources)
     {
         descriptorResources = resources;
 
         assert(resources.TLAS);
         assert(resources.ubo);
-        assert(resources.storageImageView);
 
         createDescriptorSets();
         updateDescriptorSets();
     }
 
-    void DescriptorManager::createDescriptorSetLayout()
+    void VisibilityDescriptorManager::createDescriptorSets()
+    {
+        VRTR_DEBUG("Creating Descriptor Sets");
+
+        createDescriptorSetLayout();
+
+        createDescriptorPool();
+
+        allocateDescriptorSet();
+
+        writeDescriptorSet();
+    }
+
+    void VisibilityDescriptorManager::createDescriptorSetLayout()
     {
         VRTR_DEBUG("Creating Descriptor Set Layout");
         vk::DescriptorSetLayoutBinding ASLayout{
@@ -30,24 +42,9 @@ namespace VRTR
             .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
 
-        vk::DescriptorSetLayoutBinding storageImageLayout{
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR,
-            .pImmutableSamplers = nullptr};
-
         vk::DescriptorSetLayoutBinding uniformBufferLayout{
             .binding = 2,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
-            .pImmutableSamplers = nullptr};
-
-        vk::DescriptorSetLayoutBinding textureBinding{
-            .binding = 3,
-            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-            // .descriptorCount = CONSTANTS::MAX_TEXTURES,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR,
             .pImmutableSamplers = nullptr};
@@ -56,7 +53,7 @@ namespace VRTR
             .binding = 4,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eAnyHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding materialBufferLayout{
@@ -77,58 +74,47 @@ namespace VRTR
             .binding = 7,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eAnyHitKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding patchBufferLayout{
             .binding = 8,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding selectedPatchLayout{
             .binding = 9,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
             .pImmutableSamplers = nullptr};
 
-        vk::DescriptorSetLayoutBinding radiosityLightmapLayout{
+        vk::DescriptorSetLayoutBinding patchVisibilityLayout{
             .binding = 10,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
-            .pImmutableSamplers = nullptr};
-
-        vk::DescriptorSetLayoutBinding vertexRadiosityLayout{
-            .binding = 11,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
             .pImmutableSamplers = nullptr};
 
         vk::DescriptorSetLayoutBinding triToMaterialIdLayout{
             .binding = 12,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR,
-            .pImmutableSamplers = nullptr
-        };
+            .stageFlags = vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eRaygenKHR,
+            .pImmutableSamplers = nullptr};
 
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             ASLayout,
-            storageImageLayout,
             uniformBufferLayout,
-            textureBinding,
             geometryInfoBufferLayout,
             materialBufferLayout,
             cudaColorBufferLayout,
             triToPatchBufferLayout,
             patchBufferLayout,
             selectedPatchLayout,
-            radiosityLightmapLayout,
-            vertexRadiosityLayout,
+            patchVisibilityLayout,
             triToMaterialIdLayout
         };
 
@@ -139,26 +125,22 @@ namespace VRTR
         descriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.logicalDevice, layoutInfo);
     }
 
-    void DescriptorManager::createDescriptorPool()
+    void VisibilityDescriptorManager::createDescriptorPool()
     {
         VRTR_DEBUG("Creating Descriptor Pool");
         constexpr uint32_t maxSets = 1; // one for now, but later we will need more
         std::vector<vk::DescriptorPoolSize> poolSizes =
             {
                 {vk::DescriptorType::eAccelerationStructureKHR, maxSets},              // wsparcie dla AS
-                {vk::DescriptorType::eStorageImage, maxSets},                          // umozliwienie zapisywania wyniku shaderow do storage image
                 {vk::DescriptorType::eUniformBuffer, maxSets},                         // wsparcie dla uniform bufferow (info ze sceny. np. macierz mvp)
-                // {vk::DescriptorType::eCombinedImageSampler, CONSTANTS::MAX_TEXTURES},  // wsparcie dla tekstur
-                {vk::DescriptorType::eCombinedImageSampler, 1}, 
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla geometry info buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla material buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla CUDA color buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},            // wsparcie dla triToPatch buffera    
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch buffera
                 {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla selected patch buffera
-                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla radiosity lightmap buffera
-                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla vertex radiosity buffera
-                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla triToMaterialId buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},             // wsparcie dla patch visibility buffera
+                {vk::DescriptorType::eStorageBuffer, maxSets},
             };
 
         // Descriptor Pool - zarządzanie pamiecią dla descriptor setów
@@ -171,7 +153,7 @@ namespace VRTR
         descriptorPool = vk::raii::DescriptorPool(ctx.logicalDevice, poolInfo);
     }
 
-    void DescriptorManager::allocateDescriptorSet()
+    void VisibilityDescriptorManager::allocateDescriptorSet()
     {
         vk::DescriptorSetAllocateInfo allocInfo{
             .descriptorPool = descriptorPool,
@@ -183,7 +165,7 @@ namespace VRTR
         descriptorSet = std::move(tempDescriptorSets.front());
     }
 
-    void DescriptorManager::writeDescriptorSet()
+    void VisibilityDescriptorManager::writeDescriptorSet()
     {
         VRTR_DEBUG("Writing Descriptor Sets");
         vk::WriteDescriptorSetAccelerationStructureKHR descriptorASInfo{
@@ -200,20 +182,6 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
         };
 
-        vk::DescriptorImageInfo imageInfo{
-            .sampler = {},
-            .imageView = descriptorResources.storageImageView,
-            .imageLayout = vk::ImageLayout::eGeneral};
-
-        vk::WriteDescriptorSet resultImageWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 1,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .pImageInfo = &imageInfo};
-
         vk::DescriptorBufferInfo bufferInfo{
             .buffer = descriptorResources.ubo,
             .offset = 0,
@@ -228,47 +196,6 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .pBufferInfo = &bufferInfo};
 
-        // TODO zajac sie dodaniem wiekszej ilosci tekstud do shaderow
-        // assert(descriptorResources.texImageViews.size() == CONSTANTS::MAX_TEXTURES);
-        // assert(descriptorResources.texSamplers.size() == CONSTANTS::MAX_TEXTURES);
-
-        // std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        // textureImageInfos.reserve(CONSTANTS::MAX_TEXTURES);
-        // for (size_t i = 0; i < CONSTANTS::MAX_TEXTURES; ++i)
-        // {
-        //     textureImageInfos.emplace_back(vk::DescriptorImageInfo{
-        //         .sampler = descriptorResources.texSamplers[i],
-        //         .imageView = descriptorResources.texImageViews[i],
-        //         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-        //     });
-        // }
-        // TEMPORARY tylko jedna pierwsza tekstura idzie do shadera
-        const bool hasTexture = !descriptorResources.texSamplers.empty() && !descriptorResources.texImageViews.empty();
-        if (descriptorResources.texSamplers.size() != descriptorResources.texImageViews.size())
-        {
-            throw std::runtime_error("Descriptor texture arrays size mismatch");
-        }
-
-        std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        vk::WriteDescriptorSet textureWrite{};
-        if (hasTexture)
-        {
-            textureImageInfos.push_back(vk::DescriptorImageInfo{
-                .sampler = descriptorResources.texSamplers[0],
-                .imageView = descriptorResources.texImageViews[0],
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-            });
-
-            textureWrite = vk::WriteDescriptorSet{
-                .pNext = nullptr,
-                .dstSet = *descriptorSet,
-                .dstBinding = 3,
-                .dstArrayElement = 0,
-                .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
-                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                .pImageInfo = textureImageInfos.data()};
-        }
-
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,
             .offset = 0,
@@ -353,40 +280,25 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &selectedPatchBufferInfo};
 
-        vk::DescriptorBufferInfo radiosityLightmapBufferInfo{
-            .buffer = descriptorResources.radiosityLightmapBuffer,
+        vk::DescriptorBufferInfo patchVisibilityBufferInfo{
+            .buffer = descriptorResources.patchVisibilityBuffer,
             .offset = 0,
             .range = vk::WholeSize};
 
-        vk::WriteDescriptorSet radiosityLightmapBufferWrite{
+        vk::WriteDescriptorSet patchVisibilityBufferWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
             .dstBinding = 10,
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &radiosityLightmapBufferInfo};
-
-        vk::DescriptorBufferInfo vertexRadiosityBufferInfo{
-            .buffer = descriptorResources.vertexRadiosityBuffer,
-            .offset = 0,
-            .range = vk::WholeSize};
-
-        vk::WriteDescriptorSet vertexRadiosityBufferWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 11,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &vertexRadiosityBufferInfo};
+            .pBufferInfo = &patchVisibilityBufferInfo};
 
         vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
             .buffer = descriptorResources.triToMaterialIdBuffer,
             .offset = 0,
-            .range = vk::WholeSize
-        };
-
+            .range = vk::WholeSize};
+        
         vk::WriteDescriptorSet triToMaterialIdBufferWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
@@ -394,12 +306,11 @@ namespace VRTR
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &triToMaterialIdBufferInfo
-        };
-        
+            .pBufferInfo = &triToMaterialIdBufferInfo};
+
+
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
             ASWrite,
-            resultImageWrite,
             uniformBufferWrite,
             geometryInfoBufferWrite,
             materialBufferWrite,
@@ -407,89 +318,14 @@ namespace VRTR
             triToPatchBufferWrite,
             patchBufferWrite,
             selectedPatchBufferWrite,
-            radiosityLightmapBufferWrite,
-            vertexRadiosityBufferWrite,
+            patchVisibilityBufferWrite,
             triToMaterialIdBufferWrite
         };
-
-        if (hasTexture)
-        {
-            WriteDescriptorSets.push_back(textureWrite);
-        }
-
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 
-    void DescriptorManager::createDescriptorSets()
+    void VisibilityDescriptorManager::updateDescriptorSets()
     {
-        VRTR_DEBUG("Creating Descriptor Sets");
-
-        createDescriptorSetLayout();
-
-        createDescriptorPool();
-
-        allocateDescriptorSet();
-
-        writeDescriptorSet();
-    }
-
-    void DescriptorManager::updateDescriptorSets()
-    {
-        vk::DescriptorImageInfo imageInfo{
-            .sampler = {},
-            .imageView = descriptorResources.storageImageView,
-            .imageLayout = vk::ImageLayout::eGeneral};
-
-        vk::WriteDescriptorSet resultImageWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 1,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .pImageInfo = &imageInfo};
-
-        // texImageViews must already be padded to MAX_TEXTURES (done in Scene::updateDescriptorResources)
-        // assert(descriptorResources.texImageViews.size() == CONSTANTS::MAX_TEXTURES);
-        // assert(descriptorResources.texSamplers.size() == CONSTANTS::MAX_TEXTURES);
-
-        // std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        // textureImageInfos.reserve(CONSTANTS::MAX_TEXTURES);
-        // for (size_t i = 0; i < CONSTANTS::MAX_TEXTURES; ++i)
-        // {
-        //     textureImageInfos.emplace_back(vk::DescriptorImageInfo{
-        //         .sampler = descriptorResources.texSamplers[i],
-        //         .imageView = descriptorResources.texImageViews[i],
-        //         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-        //     });
-        // }
-
-        const bool hasTexture = !descriptorResources.texSamplers.empty() && !descriptorResources.texImageViews.empty();
-        if (descriptorResources.texSamplers.size() != descriptorResources.texImageViews.size())
-        {
-            throw std::runtime_error("Descriptor texture arrays size mismatch");
-        }
-
-        std::vector<vk::DescriptorImageInfo> textureImageInfos;
-        vk::WriteDescriptorSet textureWrite{};
-        if (hasTexture)
-        {
-            textureImageInfos.push_back(vk::DescriptorImageInfo{
-                .sampler = descriptorResources.texSamplers[0],
-                .imageView = descriptorResources.texImageViews[0],
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-            });
-
-            textureWrite = vk::WriteDescriptorSet{
-                .pNext = nullptr,
-                .dstSet = *descriptorSet,
-                .dstBinding = 3,
-                .dstArrayElement = 0,
-                .descriptorCount = static_cast<uint32_t>(textureImageInfos.size()),
-                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                .pImageInfo = textureImageInfos.data()};
-        }
-
         vk::DescriptorBufferInfo geometryInfoBufferInfo{
             .buffer = descriptorResources.geometryInfoBuffer,
             .offset = 0,
@@ -574,40 +410,26 @@ namespace VRTR
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo = &selectedPatchBufferInfo};
 
-        vk::DescriptorBufferInfo radiosityLightmapBufferInfo{
-            .buffer = descriptorResources.radiosityLightmapBuffer,
+        vk::DescriptorBufferInfo patchVisibilityBufferInfo{
+            .buffer = descriptorResources.patchVisibilityBuffer,
             .offset = 0,
             .range = vk::WholeSize};
 
-        vk::WriteDescriptorSet radiosityLightmapBufferWrite{
+        vk::WriteDescriptorSet patchVisibilityBufferWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
             .dstBinding = 10,
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &radiosityLightmapBufferInfo};
+            .pBufferInfo = &patchVisibilityBufferInfo};
 
-        vk::DescriptorBufferInfo vertexRadiosityBufferInfo{
-            .buffer = descriptorResources.vertexRadiosityBuffer,
-            .offset = 0,
-            .range = vk::WholeSize};
-
-        vk::WriteDescriptorSet vertexRadiosityBufferWrite{
-            .pNext = nullptr,
-            .dstSet = *descriptorSet,
-            .dstBinding = 11,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &vertexRadiosityBufferInfo};
         
         vk::DescriptorBufferInfo triToMaterialIdBufferInfo{
             .buffer = descriptorResources.triToMaterialIdBuffer,
             .offset = 0,
-            .range = vk::WholeSize
-        };
-
+            .range = vk::WholeSize};
+        
         vk::WriteDescriptorSet triToMaterialIdBufferWrite{
             .pNext = nullptr,
             .dstSet = *descriptorSet,
@@ -615,27 +437,19 @@ namespace VRTR
             .dstArrayElement = 0,
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &triToMaterialIdBufferInfo
-        };
+            .pBufferInfo = &triToMaterialIdBufferInfo};
+
 
         std::vector<vk::WriteDescriptorSet> WriteDescriptorSets = {
-            resultImageWrite,
             geometryInfoBufferWrite,
             materialBufferWrite,
             cudaColorBufferWrite,
             triToPatchBufferWrite,
             patchBufferWrite,
             selectedPatchBufferWrite,
-            radiosityLightmapBufferWrite,
-            vertexRadiosityBufferWrite,
+            patchVisibilityBufferWrite,
             triToMaterialIdBufferWrite
         };
-
-        if (hasTexture)
-        {
-            WriteDescriptorSets.push_back(textureWrite);
-        }
-
         ctx.logicalDevice.updateDescriptorSets(WriteDescriptorSets, {});
     }
 }

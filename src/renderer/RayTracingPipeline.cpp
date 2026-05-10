@@ -73,7 +73,7 @@ namespace VRTR
         Shader shader;
 
         // Raygen shader
-        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "slangTest.spv", vk::ShaderStageFlagBits::eRaygenKHR, "rayGenShader"));
+        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "renderPass.spv", vk::ShaderStageFlagBits::eRaygenKHR, "rayGenShader"));
         vk::RayTracingShaderGroupCreateInfoKHR raygenGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
             .generalShader = 0, // first entry in shaderStages
@@ -83,7 +83,7 @@ namespace VRTR
         shaderGroups.push_back(raygenGroup);
 
         // Miss shader
-        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "slangTest.spv", vk::ShaderStageFlagBits::eMissKHR, "missShader"));
+        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "renderPass.spv", vk::ShaderStageFlagBits::eMissKHR, "missShader"));
         vk::RayTracingShaderGroupCreateInfoKHR missGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eGeneral,
             .generalShader = 1, // second entry in shaderStages
@@ -93,7 +93,7 @@ namespace VRTR
         shaderGroups.push_back(missGroup);
 
         // Closest hit shader
-        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "slangTest.spv", vk::ShaderStageFlagBits::eClosestHitKHR, "closestHitShader"));
+        shaderStages.push_back(shader.createShaderStageInfo(ctx.logicalDevice, CONSTANTS::SHADERS_DIR / "renderPass.spv", vk::ShaderStageFlagBits::eClosestHitKHR, "closestHitShader"));
         vk::RayTracingShaderGroupCreateInfoKHR hitGroup{
             .type = vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup,
             .generalShader = VK_SHADER_UNUSED_KHR,

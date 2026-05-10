@@ -44,6 +44,8 @@ add_library(${PROJECT_NAME} SHARED
     vkCudaInterop.cpp
     vkFrameSync.cpp
     FrameManager.cpp
+    VisibilityDescriptorManager.cpp
+    VisibilityPipeline.cpp
     ${IMGUI_SOURCES}
     ${IMGUI_BACKEND}
 )

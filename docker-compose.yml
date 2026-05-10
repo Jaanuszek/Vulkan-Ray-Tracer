@@ -17,3 +17,8 @@ services:
       - ./:/app:ro
     stdin_open: true
     tty: true
+    gpus: all
+    runtime: nvidia
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    #   - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics

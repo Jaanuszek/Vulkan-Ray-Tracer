@@ -41,12 +41,16 @@ namespace VRTR
 
         initImGUI(window);
 
-        frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
-        frameManager->init();
-
         scene = std::make_unique<Scene>(ctx);
+        scene->createScene(sceneSettings.ubo.light_pos);
 
-        createScene();
+        frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
+        frameManager->init(
+            scene->getPatches(),
+            scene->getVertexCount(),
+            scene->getVertexPatchIndices(),
+            scene->getVertexPatchOffsets()
+        );
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
                                             vk::BufferUsageFlagBits{},
@@ -57,7 +61,7 @@ namespace VRTR
 
         DescriptorResources dr = buildDescriptorResources();
 
-        auto gi = scene->getGeometryInfo("viking_room");
+        auto gi = scene->getFirstGeometryInfo();
         PushConstant vikingRoomModelPC{
             .vertices = gi.vertexBufferAddr,
             .indices = gi.indexBufferAddr
@@ -70,6 +74,9 @@ namespace VRTR
                                 width,
                                 height
                                 );
+
+        visibilityPipeline = std::make_unique<VisibilityPipeline>(ctx);
+        visibilityPipeline->init(dr, commandBufferManager);
     }
 
     void RTRenderer::setupVMA()
@@ -122,43 +129,6 @@ namespace VRTR
         return dr;
     }
 
-    void RTRenderer::createScene()
-    {
-        VRTR_DEBUG("Creating scene");
-
-        std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
-        std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
-
-        scene->importModel(viking_room_model_path, viking_room_texture_path);
-
-        std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
-        std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
-
-        auto [floorVertices, floorIndices] = CustomModels::createRectangle();
-        Material floorMat{
-            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
-
-        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-        scene->addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
-
-        auto [wallVertices, wallIndices] = CustomModels::createRectangle();
-        Material wallMat{
-            .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-            .type = MaterialType::METALLIC,
-        };
-        glm::mat4 wallModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
-        wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        wallModel = glm::translate(wallModel, glm::vec3(0.0f, -10.0f, -2.0f));
-
-        scene->addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
-
-        // To musi byc na końcu
-        scene->buildTLAS();
-    }
-
     void RTRenderer::recreateResources(GLFWwindow *window)
     {
         swapChainManager->recreateSwapChain(window, width, height);
@@ -177,6 +147,24 @@ namespace VRTR
         try
         {
             uint32_t imageIndex = frameManager->acquireNextImage();
+
+            if(frameManager->isComputeRadiosity())
+            {
+                frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
+
+                frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
+
+                frameManager->runCudaPostVisibilityPass(scene->getPatches().size(), scene->getVertexCount());
+
+                // ++radiosityDemoFrameCounter;
+                // if (radiosityDemoFrameCounter >= 4096)
+                // {
+                //     frameManager->setComputeRadiosity(false);
+                //     sceneSettings.ubo.enableRadiosityPass = false;
+                //     sceneSettings.ubo.useRadiosityLightmap = true;
+                //     radiosityBootstrapDone = true;
+                // }
+            }
 
             // Tu są wykonywane jakieś polecenia CPU, które nie są asynchroniczne
             std::vector<vk::CommandBuffer> submitCommandBuffers = {*commandBufferManager->getCommandBuffer(imageIndex)};
@@ -197,15 +185,44 @@ namespace VRTR
 
             if(gui->updateRequired())
             {
-                scene->updateTLAS(deltaTime, sceneSettings.transformations.rotationAngle);
-                gui->setUpdated(false);
+                switch (sceneSettings.transformations.updateRequest)
+                {
+                case UpdateRequest::Rotation:
+                {
+                    scene->updateTLAS(sceneSettings.transformations.rotationAngle);
+                    break;
+                }
+                case UpdateRequest::LightPos:
+                {   
+                    uint32_t lightInstanceIdx = scene->getLightTLASIdx();
+                    scene->updateInstanceTLAS(lightInstanceIdx, glm::translate(glm::mat4(1.0f), sceneSettings.ubo.light_pos));
+                    break;
+                }
+                case UpdateRequest::PatchTriangleSize:
+                {   scene->updatePatchData(static_cast<uint8_t>(sceneSettings.transformations.patchTriangleSize));
+                    break;
+                }
+                case UpdateRequest::EnableRadiosityPass:
+                {
+                    frameManager->setComputeRadiosity(sceneSettings.ubo.enableRadiosityPass);
+                    if (sceneSettings.ubo.enableRadiosityPass)
+                    {
+                        radiosityDemoFrameCounter = 0;
+                        radiosityBootstrapDone = false;
+                    }
+                    break;
+                }
+                default:
+                    break;
+                }
+
+                gui->setUpdateNeed(false);
             }
             updateUniformBuffer(); // Camera UBO update
 
-            frameManager->submitQueue(submitCommandBuffers);
-            frameManager->runCudaFrame(frameCount);
+            frameManager->submitRenderQueue(submitCommandBuffers);
+            // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
-
             frameCount++;
         }
         catch (const vk::OutOfDateKHRError &e)

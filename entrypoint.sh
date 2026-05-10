@@ -16,6 +16,9 @@ command="$1"
 shift # Shift args to right, so $1 becomes $2
 additionalFlags=()
 
+# dla kolorków
+export GTEST_COLOR=1
+
 # $# - number of arguments
 while [ $# -gt 0 ]; do
     case "$1" in

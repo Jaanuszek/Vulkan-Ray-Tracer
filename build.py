@@ -28,11 +28,15 @@ if not NVCC_PATH:
     print("Error: nvcc not found in PATH. Please ensure CUDA is installed and nvcc is accessible.")
     exit(1)
 
-# Delete files in build directory if it exists
 build_dir:str = "build"
-if not args.command == "rebuild" and os.path.exists(build_dir):
-    for filename in os.listdir(build_dir):
-        file_path = os.path.join(build_dir, filename)
+CpuCores:int = os.cpu_count() or 1
+
+def clean_build_directory(path: str) -> None:
+    if not os.path.exists(path):
+        return
+
+    for filename in os.listdir(path):
+        file_path = os.path.join(path, filename)
         try:
             if os.path.isfile(file_path):
                 os.remove(file_path)
@@ -41,22 +45,47 @@ if not args.command == "rebuild" and os.path.exists(build_dir):
         except Exception as e:
             print(f"Error deleting {file_path}: {e}")
 
-os.makedirs(build_dir, exist_ok=True)
 
-# check=True tells that subprocess should raise an exception on error, that's why I implemented a try-catch here
-try:
+def configure_and_build(path: str, install: bool) -> None:
+    os.makedirs(path, exist_ok=True)
+
     cmake_conf_args:list = [
         f"-DCMAKE_BUILD_TYPE={build_type}",
         f"-DCMAKE_CUDA_COMPILER={NVCC_PATH}"
     ]
     cmake_build_args:list = []
+
     if verbose:
         cmake_conf_args.append("-DCMAKE_VERBOSE_MAKEFILE=ON")
         cmake_build_args.append("--verbose")
 
-    subprocess.run(["cmake", ".."] + cmake_conf_args, cwd=build_dir, check=True)
-    # subprocess.run(["cmake", "--build", "."] + cmake_build_args, cwd=build_dir, check=True)
-    subprocess.run(["cmake", "--build", ".", "-j", "4"] + cmake_build_args, cwd=build_dir, check=True)
-    subprocess.run(["cmake", "--install", "."], cwd=build_dir, check=True)
+    subprocess.run(["cmake", ".."] + cmake_conf_args, cwd=path, check=True)
+    subprocess.run(["cmake", "--build", ".", "-j", str(CpuCores)] + cmake_build_args, cwd=path, check=True)
+
+    if install:
+        subprocess.run(["cmake", "--install", "."], cwd=path, check=True)
+
+
+def run_tests(path: str) -> None:
+    subprocess.run(["ctest", "--output-on-failure"], cwd=path, check=True)
+
+
+# check=True tells that subprocess should raise an exception on error, that's why I implemented a try-catch here
+try:
+    if args.command == "build":
+        # Build project and all default targets (including tests if they are part of ALL).
+        configure_and_build(build_dir, install=True)
+
+    elif args.command == "rebuild":
+        # Full clean rebuild from scratch.
+        clean_build_directory(build_dir)
+        configure_and_build(build_dir, install=True)
+
+    elif args.command == "test":
+        # If build directory doesn't exist, build first. Otherwise just run tests.
+        if not os.path.exists(build_dir):
+            configure_and_build(build_dir, install=False)
+        run_tests(build_dir)
+
 except subprocess.CalledProcessError as e:
-    print(f"Error during build: {e}")
+    print(f"Error during build/test: {e}")

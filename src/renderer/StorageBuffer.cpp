@@ -10,14 +10,11 @@ namespace VRTR
     StorageBuffer::StorageBuffer(RendererContext& ctx, size_t typeSize)
         : ctx(ctx)
     {
-        // Dla kazdego Storage buffer, tworzymy tablice MAX_OBJECST elementów
-        vk::DeviceSize bufferSize = typeSize * CONSTANTS::MAX_OBJECTS;
-
         vk::BufferCreateInfo storageBufferCI{
             .sType = vk::StructureType::eBufferCreateInfo,
             .pNext = nullptr,
             .flags = {},
-            .size = bufferSize,
+            .size = typeSize,
             .usage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress,
             .sharingMode = vk::SharingMode::eExclusive,
             .queueFamilyIndexCount = 0,

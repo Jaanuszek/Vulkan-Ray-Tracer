@@ -22,6 +22,7 @@ inline void checkCudaError(cudaError_t err, const char* msg, const char* file, c
     }
 }
 
+
 namespace VRTR
 {
     namespace CUDA

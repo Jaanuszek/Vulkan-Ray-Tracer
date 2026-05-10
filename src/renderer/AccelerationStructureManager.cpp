@@ -73,7 +73,7 @@ namespace VRTR
                                     vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate);
     }
 
-    void AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
+    uint32_t AccelerationStructureManager::addInstance(uint32_t blasIdx, const glm::mat4 &transform)
     {
         vk::TransformMatrixKHR transformMatrix{};
 
@@ -97,9 +97,97 @@ namespace VRTR
         instanceTransforms[vkInstances.size() - 1] = transposedMat; // -1 bo robimy push_back przed tym, wiec indekst to rozmiar - 1
 
         tlas.instanceCount = static_cast<uint32_t>(vkInstances.size());
+        return static_cast<uint32_t>(vkInstances.size() - 1);
     }
 
-    void AccelerationStructureManager::updateTLAS(float deltaTime, const float& rotationAngle)
+    void AccelerationStructureManager::updateInstanceTransform(uint32_t instanceIdx, const glm::mat4 &newTransform)
+    {
+        if (instanceTransforms.find(instanceIdx) == instanceTransforms.end())
+            return;
+
+        glm::mat4 transposedMat = glm::transpose(newTransform);
+        
+        glm::mat4 baseTransform = instanceTransforms[instanceIdx];
+
+        glm::mat4 updatedMat = transposedMat * baseTransform;
+        vk::TransformMatrixKHR transformMatrix{};
+        memcpy(&transformMatrix, &updatedMat, sizeof(vk::TransformMatrixKHR));
+
+        vkInstances[instanceIdx].transform = transformMatrix;
+    
+        tlas.instanceBuffer->Update(vkInstances.data(), vkInstances.size() * sizeof(vk::AccelerationStructureInstanceKHR));
+
+        auto instancesData = vk::AccelerationStructureGeometryInstancesDataKHR{
+            .arrayOfPointers = vk::False,
+            .data = tlas.instanceBuffer->getDeviceAddress()
+        };
+
+        vk::AccelerationStructureGeometryDataKHR geometryData(instancesData);
+
+        vk::AccelerationStructureGeometryKHR tlasGeometry{
+            .geometryType = vk::GeometryTypeKHR::eInstances, // czy eTriangles?
+            .geometry = geometryData,
+            .flags = vk::GeometryFlagBitsKHR::eOpaque
+        };
+
+        vk::AccelerationStructureBuildGeometryInfoKHR tlasBuildGeometryInfo{
+            .type = vk::AccelerationStructureTypeKHR::eTopLevel,
+            .flags = vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate,
+            .mode = vk::BuildAccelerationStructureModeKHR::eUpdate,
+            .srcAccelerationStructure = tlas.as.handle,
+            .dstAccelerationStructure = tlas.as.handle,
+            .geometryCount = 1,
+            .pGeometries = &tlasGeometry};
+
+        vk::BufferDeviceAddressInfo scratchAddressInfo{
+            .buffer = tlas.as.scratchBuffer->getBuffer()
+        };
+        vk::DeviceAddress scratchAddress = ctx.logicalDevice.getBufferAddress(scratchAddressInfo);
+        tlasBuildGeometryInfo.scratchData.deviceAddress = scratchAddress;
+
+        vk::AccelerationStructureBuildRangeInfoKHR tlasRangeInfo{
+            .primitiveCount = tlas.instanceCount,
+            .primitiveOffset = 0,
+            .firstVertex = 0,
+            .transformOffset = 0
+        };
+
+        std::unique_ptr<TempCMDBufferManager> tempCmdBufferManager = std::make_unique<TempCMDBufferManager>(ctx.logicalDevice, ctx.queue, ctx.graphics_queue_index);
+        vk::raii::CommandBuffer& tempCmdBuffer = tempCmdBufferManager->createTempCmdBuffer();
+
+        vk::MemoryBarrier preBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR | vk::AccessFlagBits::eTransferWrite | vk::AccessFlagBits::eShaderRead,
+            .dstAccessMask = vk::AccessFlagBits::eAccelerationStructureReadKHR | vk::AccessFlagBits::eAccelerationStructureWriteKHR};
+
+        tempCmdBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR | vk::PipelineStageFlagBits::eTransfer | vk::PipelineStageFlagBits::eFragmentShader,
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+            {},
+            preBarrier,
+            {},
+            {});
+
+        tempCmdBuffer.buildAccelerationStructuresKHR(
+            {tlasBuildGeometryInfo},
+            {&tlasRangeInfo}
+        );
+
+        vk::MemoryBarrier postBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+            .dstAccessMask = vk::AccessFlagBits::eAccelerationStructureReadKHR | vk::AccessFlagBits::eShaderRead};
+
+        tempCmdBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR | vk::PipelineStageFlagBits::eFragmentShader,
+            {},
+            postBarrier,
+            {},
+            {});
+        
+        tempCmdBufferManager->submitAndWaitTempCmdBuffer();
+    }
+
+    void AccelerationStructureManager::updateTLAS(const float& rotationAngle)
     {        
         for (size_t instIdx = 0; instIdx < vkInstances.size(); instIdx++)
         { 

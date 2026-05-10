@@ -15,27 +15,24 @@ namespace VRTR
 
         void createCommandBuffers();
 
+        void createVisibilityCommandBuffers();
+
         vk::raii::CommandBuffer &getCommandBuffer(uint32_t index);
+
+        vk::raii::CommandBuffer &getVisibilityCommandBuffer(uint32_t index)
+        {
+            return VisibilityCommandBuffers.at(index);
+        }
+
+        std::vector<vk::raii::CommandBuffer> &getVisibilityCommandBuffers() 
+        { 
+            return VisibilityCommandBuffers; 
+        }
         
         inline std::vector<vk::raii::CommandBuffer> &getCommandBuffers()
         {
             return commandBuffers;
         }
-
-        void beginCommandBuffer(uint32_t index, vk::CommandBufferBeginInfo beginInfo = {});
-
-        void endCommandBuffer(uint32_t index);
-
-        // void transition_image_layout(const std::vector<vk::Image> &images,
-        //                              uint32_t imageIndex,
-        //                              vk::ImageLayout oldLayout,
-        //                              vk::ImageLayout newLayout,
-        //                              vk::AccessFlags2 srcAccessMask,
-        //                              vk::AccessFlags2 dstAccessMask,
-        //                              vk::PipelineStageFlags2 srcStageMask,
-        //                              vk::PipelineStageFlags2 dstStageMask,
-        //                              uint32_t baseMipLevel = 0,
-        //                              uint32_t levelCount = 1);
 
         static void transition_image_layout(vk::raii::CommandBuffer &commandBuffer,
                                      const vk::Image &image,
@@ -55,6 +52,7 @@ namespace VRTR
 
         vk::raii::CommandPool commandPool{nullptr};
         std::vector<vk::raii::CommandBuffer> commandBuffers{};
+        std::vector<vk::raii::CommandBuffer> VisibilityCommandBuffers{};
     };
 
     // TODO moze oddzielny plik?

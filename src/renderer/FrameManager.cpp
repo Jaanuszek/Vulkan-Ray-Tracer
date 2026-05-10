@@ -7,13 +7,17 @@ namespace VRTR
         : ctx(ctx), swapChainManager(swapChainManager)
         {}
 
-    void FrameManager::init()
+    void FrameManager::init(
+                const std::vector<Patch>& patches,
+                uint32_t vertexCount,
+                const std::vector<uint32_t>& vertexPatchIndices, 
+                const std::vector<uint32_t>& vertexPatchOffsets)
     {
         frameSyncManager = std::make_unique<vkFrameSync>(ctx);
         frameSyncManager->init();
 
-        vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx);
-        vkCudaInteropManager->init();
+        vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx, PASS_COUNT);
+        vkCudaInteropManager->init(patches, vertexCount, vertexPatchIndices, vertexPatchOffsets);
     }
     uint32_t FrameManager::acquireNextImage()
     {
@@ -38,39 +42,122 @@ namespace VRTR
         return imageIndex;
     }
 
-    void FrameManager::submitQueue(const std::vector<vk::CommandBuffer>& submitCommandBuffers)
+    void FrameManager::submitVisibilityQueue(const std::vector<vk::CommandBuffer>& submitCommandBuffers)
     {
-        std::array<vk::Semaphore, 2> waitSemaphores = {
-            frameSyncManager->getPresentCompleteSemaphore(),
+        std::vector<vk::Semaphore> waitSemaphores{};
+        std::vector<vk::Semaphore> signalSemaphores{};
+        std::vector<uint64_t> waitValues{};
+        std::vector<uint64_t> signalValues{};
+        std::vector<vk::PipelineStageFlags> waitStages{};
+
+        waitSemaphores = {
             vkCudaInteropManager->getCudaCompleteSemaphore()
         };
 
-        std::array<vk::Semaphore, 2> signalSemaphores = {
-            frameSyncManager->getRenderCompleteSemaphore(),
+        signalSemaphores = {
             vkCudaInteropManager->getCudaCompleteSemaphore()
         };
 
-        std::array<uint64_t, 2> waitValues = {
-            0,
-            vkCudaInteropManager->getVkWaitValue()
+        waitValues = {
+            vkCudaInteropManager->getFPSignalValue()
         };
 
-        std::array<uint64_t, 2> signalValues = {
-            0,
-            vkCudaInteropManager->getVkSignalValue()
+        signalValues = {
+            vkCudaInteropManager->getRadiosityWaitValue()
         };
 
-        std::array<vk::PipelineStageFlags, 2> waitStages = {
+        waitStages = {
             vk::PipelineStageFlagBits::eAllCommands,
-            vk::PipelineStageFlagBits::eAllCommands
         };
 
         vk::TimelineSemaphoreSubmitInfo timelineInfo{
-            .waitSemaphoreValueCount = waitSemaphores.size(),
+            .waitSemaphoreValueCount = static_cast<uint32_t>(waitSemaphores.size()),
             .pWaitSemaphoreValues = waitValues.data(),
-            .signalSemaphoreValueCount = signalSemaphores.size(),
+            .signalSemaphoreValueCount = static_cast<uint32_t>(signalSemaphores.size()),
             .pSignalSemaphoreValues = signalValues.data()
         };
+
+        const vk::SubmitInfo queueSubmitInfo{
+            .pNext = &timelineInfo,
+            .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+            .pWaitSemaphores = waitSemaphores.data(),
+            .pWaitDstStageMask = waitStages.data(),
+            .commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size()),
+            .pCommandBuffers = submitCommandBuffers.data(),
+            .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
+            .pSignalSemaphores = signalSemaphores.data()
+        };
+
+        ctx.queue.submit({queueSubmitInfo});
+    }
+
+    void FrameManager::submitRenderQueue(const std::vector<vk::CommandBuffer>& submitCommandBuffers)
+    {
+        std::vector<vk::Semaphore> waitSemaphores{};
+        std::vector<vk::Semaphore> signalSemaphores{};
+        std::vector<uint64_t> waitValues{};
+        std::vector<uint64_t> signalValues{};
+        std::vector<vk::PipelineStageFlags> waitStages{};
+
+        if(computeRadiosity)
+        {
+            waitSemaphores = {
+                frameSyncManager->getPresentCompleteSemaphore(),
+                vkCudaInteropManager->getCudaCompleteSemaphore()
+            };
+
+            signalSemaphores = {
+                frameSyncManager->getRenderCompleteSemaphore(),
+                vkCudaInteropManager->getCudaCompleteSemaphore()
+            };
+
+            waitValues = {
+                0,
+                vkCudaInteropManager->getRadiositySignalValue()
+            };
+
+            signalValues = {
+                0,
+                vkCudaInteropManager->getFPWaitValue()
+            };
+
+            waitStages = {
+                vk::PipelineStageFlagBits::eAllCommands,
+                vk::PipelineStageFlagBits::eAllCommands
+            };
+        } 
+        else
+        {
+            waitSemaphores = {
+                frameSyncManager->getPresentCompleteSemaphore()
+            };
+
+            signalSemaphores = {
+                frameSyncManager->getRenderCompleteSemaphore()
+            };
+
+            waitValues = {
+                0
+            };
+
+            signalValues = {
+                0
+            };
+
+            waitStages = {
+                vk::PipelineStageFlagBits::eAllCommands
+            };
+        }
+
+        // Jezeli semafor nie jest timeline, to vulkan ignoruje wartosc pWaitSemaphoreValues i pSignalSemaphoreValues
+        // dla tego semafora, wiec to bedzie działać.
+        vk::TimelineSemaphoreSubmitInfo timelineInfo{
+            .waitSemaphoreValueCount = static_cast<uint32_t>(waitSemaphores.size()),
+            .pWaitSemaphoreValues = waitValues.data(),
+            .signalSemaphoreValueCount = static_cast<uint32_t>(signalSemaphores.size()),
+            .pSignalSemaphoreValues = signalValues.data()
+        };
+
         const vk::SubmitInfo queueSubmitInfo{
             .pNext = &timelineInfo,
             .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
@@ -121,9 +208,19 @@ namespace VRTR
         frameSyncManager->updateFrameIndex();
     }
 
-    void FrameManager::runCudaFrame(uint64_t frameCount)
+    // void FrameManager::runCudaFrame(uint32_t patchesCount)
+    // {
+    //     vkCudaInteropManager->runCudaFrame(patchesCount);
+    // }
+
+    void FrameManager::runCudaSelectPass(uint32_t patchesCount)
     {
-        vkCudaInteropManager->runCudaFrame(frameCount);
+        vkCudaInteropManager->runCudaSelectPass(patchesCount);
+    }
+
+    void FrameManager::runCudaPostVisibilityPass(uint32_t patchesCount, uint32_t vertexCount)
+    {
+        vkCudaInteropManager->runCudaPostVisibilityPass(patchesCount, vertexCount);
     }
 
     void FrameManager::waitForFence()
