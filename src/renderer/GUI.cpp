@@ -170,7 +170,7 @@ namespace VRTR
 
         auto resetViewFlags = [&]()
         {
-            sceneSettings.ubo.enableCUDA = false;
+            sceneSettings.ubo.toggleDirectLightning = false;
             sceneSettings.ubo.shadowMode = false;
             sceneSettings.ubo.debugPatches = false;
             sceneSettings.ubo.debugNormals = false;
@@ -195,13 +195,13 @@ namespace VRTR
             updated = true;
         }
 
-        if(ImGui::Button("Enable CUDA"))
+        if(ImGui::Button("Toggle Direct Lightning"))
         {
-            const bool wasEnabled = sceneSettings.ubo.enableCUDA;
+            const bool wasEnabled = sceneSettings.ubo.toggleDirectLightning;
             resetViewFlags();
             if(!wasEnabled)
             {
-                sceneSettings.ubo.enableCUDA = true;
+                sceneSettings.ubo.toggleDirectLightning = true;
             }
             updated = true;
         }

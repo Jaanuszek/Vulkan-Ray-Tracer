@@ -219,32 +219,6 @@ namespace VRTR
             cudaRadiosityLightmapData,
             cudaStream);
 
-        // static uint64_t debugLightmapFrame = 0;
-        // if (patchesCount > 0 && (debugLightmapFrame < 120 || (debugLightmapFrame % 120 == 0)))
-        // {
-        //     CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
-
-        //     SelectedPatch hostSelected{};
-        //     CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
-
-        //     if (hostSelected.patchId != 0xFFFFFFFF && hostSelected.patchId < patchesCount)
-        //     {
-
-        //         std::vector<PatchVisibility> hostVisibilities(VISIBILITY_DISPATCH_RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT);
-        //         CUDA_CHECK_ERROR(cudaMemcpy(hostVisibilities.data(), cudaPatchVisibilityData, sizeof(PatchVisibility) * patchVisibilityCount, cudaMemcpyDeviceToHost));
-
-        //         for(uint32_t i = 0; i < patchVisibilityCount; ++i)
-        //         {
-        //             const auto& vis = hostVisibilities[i];
-        //             std::cout << "    visibility srcPatchId=" << vis.srcPatchId
-        //                       << " dstPatchId=" << vis.dstPatchId
-        //                       << " visibility=" << vis.visibility
-        //                       << std::endl;
-        //         }
-        //     }
-        // }
-        // ++debugLightmapFrame;
-
         CUDA::runInterpolateVertexKernel(
             cudaPatchesData,
             patchesCount,

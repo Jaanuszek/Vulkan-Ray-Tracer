@@ -71,27 +71,17 @@ void rayGenShader()
     ray.Direction = direction;
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
-    if (cameraData.shadowMode)
-    {
-        RayPayload payload;
-        payload.hitValue = float3(1.0, 1.0, 1.0);
-        payload.shadowed = false;
-        TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
-        float3 shadowColor = payload.shadowed ? shadowConst : float3(1.0, 1.0, 1.0);
-        float3 finalColor = payload.hitValue * shadowColor;
-        outputImage[dispatchIndex.xy] = float4(finalColor, 1.0);
-        return;
-    }
-    // RayPayload payload;
-    // ========================== SHADOWS
-    // payload.hitValue = float3(1.0, 1.0, 1.0);
-    // payload.shadowed = false;
-    // // ========================== REFLECTIONS
+
     float3 color = float3(0, 0, 0);
     float3 throughput = float3(1, 1, 1);
     for (uint i = 0; i < MAX_RECURSION_DEPTH; i++)
     {
         RayPayload payload;
+        payload.hitValue = float3(0, 0, 0);
+        payload.distance = -1.0f;
+        payload.normal = float3(0, 0, 0);
+        payload.reflector = 0.0f;
+        payload.shadowed = false;
         TraceRay(topLevelAS, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, ray, payload);
         float3 hitColor = payload.hitValue;
 
@@ -111,34 +101,23 @@ void rayGenShader()
             ray.Direction = reflect(ray.Direction, payload.normal);
             throughput *= reflectivity;
         }
-        else
-        {
-            break;
-        }
     }
 
-    if (cameraData.enableCUDA)
-    {
-        color = lerp(color, cudaColorBuffer[0].xyz, 0.5f);
-        outputImage[dispatchIndex.xy] = float4(color, 1.0) + float4(cudaColorBuffer[0]) * 0.3f;
-    } else
-    {
-        outputImage[dispatchIndex.xy] = float4(color, 1.0);
-    }
+    outputImage[dispatchIndex.xy] = float4(color, 1.0).bgra;
 }
 
 [shader("miss")]
 void missShader(inout RayPayload payload)
 {
-    // ========================== SHADOWS
     if (payload.shadowed)
     {
         payload.hitValue = float3(0.0, 0.0, 0.0);
+        payload.distance = -1.0f;
+        payload.normal = float3(0, 0, 0);
+        payload.reflector = 0.0f;
         payload.shadowed = false;
         return;
     }
-    // payload.shadowed = false;
-    // payload.hitValue = float3(0.0, 0.0, 0.0);
 
     float3 worldRayDir = WorldRayDirection();
 
@@ -146,11 +125,11 @@ void missShader(inout RayPayload payload)
     const float3 gradientEnd = float3(1.0, 1.0, 1.0);
     float3 unitDir = normalize(worldRayDir);
     float t = 0.5f * (unitDir.y + 1.0f);
-    // payload.hitValue = lerp(gradientStart, gradientEnd, t);
     payload.hitValue = (1.0f -t) * gradientStart + t * gradientEnd;
     payload.distance = -1.0f; // oznacza brak trafienia
     payload.normal = float3(0, 0, 0);
     payload.reflector = 0.0f;
+    payload.shadowed = false;
 }
 
 [shader("closesthit")]
@@ -172,6 +151,11 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     uint32_t textureIndex = mat.textureIndex; // text
 
     Triangle tri = unpackTriangle(triangleIndex, attribs, geometryInfo);
+    float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), tri.normal));
+    if (dot(worldNormal, WorldRayDirection()) > 0.0f)
+    {
+        worldNormal = -worldNormal;
+    }
 
     const uint globalVertexIdx0 = geometryInfo.vertexGlobalOffset + tri.vertexIndices[0];
     const uint globalVertexIdx1 = geometryInfo.vertexGlobalOffset + tri.vertexIndices[1];
@@ -191,53 +175,38 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     //     color = colorSampler[textureIndex].SampleLevel(tri.uv, 0.0);
     // }
 
-
-
     // // payload.hitValue = color.bgr; // Color from texture
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
-    if(mat.type == MaterialType::LIGHT)
-    {
-        payload.hitValue = color.bgr; // Color from material buffer
-        payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
-        payload.reflector = 0.0f;
-        return;
-    }
-    else if(mat.type == MaterialType::METALLIC)
+    if(mat.type == MaterialType::METALLIC)
     {
         payload.hitValue = float3(1.0,0.0,0.0); // Color from material buffer
         payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
+        payload.normal = worldNormal;
         payload.reflector = 0.95f; // High reflectivity for metallic materials
-        return;
-    }
-    else if (mat.type == MaterialType::NONE)
-    {
-        payload.hitValue = float3(0.0,0.0,0.0); // Color from material buffer
-        payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
-        payload.reflector = 0.0f;
+        payload.shadowed = false;
         return;
     }
 
     if(cameraData.enableRadiosityPass && patchId == selectedPatchId)
     {
         color = float4(1.0, 0.0, 0.0, 1.0);
-        payload.hitValue = color.bgr;
+        payload.hitValue = color.rgb;
         payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
+        payload.normal = worldNormal;
         payload.reflector = 0.0f;
+        payload.shadowed = false;
         return;
     }
 
     if(cameraData.debugNormals)
     {
-        payload.hitValue = tri.normal * 0.5 + 0.5; // mapowanie z [-1,1] na [0,1]
+        payload.hitValue = worldNormal * 0.5 + 0.5; // mapowanie z [-1,1] na [0,1]
         payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
+        payload.normal = worldNormal;
         payload.reflector = 0.0f;
+        payload.shadowed = false;
         return;
     }
 
@@ -245,8 +214,9 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     {
         payload.hitValue = patchBuffer[patchId].center; // Color based on patch center
         payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
+        payload.normal = worldNormal;
         payload.reflector = 0.0f;
+        payload.shadowed = false;
         return;
     }
 
@@ -256,46 +226,12 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         payload.hitValue = c;
 
         payload.distance = RayTCurrent();
-        payload.normal = tri.normal;
+        payload.normal = worldNormal;
         payload.reflector = 0.0;
+        payload.shadowed = false;
         return;
     }
     
-    if(cameraData.shadowMode)
-    {
-        // float3 normal = tri.normal;
-        float3 normal = normalize(
-          mul((float3x3)ObjectToWorld3x4(), tri.normal)
-        );
-        float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-        float3 toLight = cameraData.light_pos - hitPosition;
-        float lightDistance = length(toLight);
-        float3 lightVector = toLight / max(lightDistance, 1e-4);
-        float dot_product = max(dot(lightVector, normal), 0.2);
-
-        float3 baseColor = color.bgr;
-        float3 shadedColor = baseColor * dot_product;
-
-        RayDesc rayDesc;
-        rayDesc.Origin = hitPosition + normal * 0.01;
-        rayDesc.Direction = lightVector;
-        rayDesc.TMin = 0.001;
-        rayDesc.TMax = max(lightDistance - 0.02, 0.001);
-
-        payload.shadowed = true;
-        TraceRay(topLevelAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 0, 0, rayDesc, payload);
-        if (payload.shadowed)
-        {
-            payload.hitValue = shadedColor * shadowConst;
-        }
-        else
-        {
-            payload.hitValue = shadedColor;
-        }
-        return;
-    }
-
-
     // TEST
     bool isMetallic = mat.type == MaterialType::METALLIC;
     if (isMetallic)
@@ -303,44 +239,60 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
         color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
     }
 
-    // ========================== REFLECTIONS
-    float3 normal = normalize(mul((float3x3)ObjectToWorld3x4(), tri.normal));
-    if (dot(normal, WorldRayDirection()) > 0.0f)
-    {
-        normal = -normal;
-    }
     float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 toLight = cameraData.light_pos - hitPosition;
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
-    float dot_product = max(dot(lightVector, normal), 0.0f);
+    float dot_product = max(dot(lightVector, worldNormal), 0.0f);
+
+    float3 FinalColor = 0.0f;
+    float3 directLightning = 0.0f;
+    bool shadowed = false;
+    float shadowFactor = 1.0f;
     
-    float3 FinalColor;
-    
+    if (cameraData.shadowMode)
+    {
+        RayDesc rayDesc;
+        rayDesc.Origin = hitPosition + worldNormal * 0.01;
+        rayDesc.Direction = lightVector;
+        rayDesc.TMin = 0.001;
+        rayDesc.TMax = max(lightDistance - 0.02, 0.001);
+
+        RayPayload shadowPayload;
+        shadowPayload.shadowed = true;
+        shadowPayload.hitValue = float3(0.0, 0.0, 0.0);
+        shadowPayload.distance = -1.0f;
+        shadowPayload.normal = float3(0, 0, 0);
+        shadowPayload.reflector = 0.0f;
+        TraceRay(topLevelAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 0, 0, rayDesc, shadowPayload);
+        shadowFactor = shadowPayload.shadowed ? SHADOW_CONST : 1.0f;
+    }
+
     if (isMetallic)
     {
-        // For metallic materials: use specular reflection based on metallic albedo
-        // The actual reflection is computed in rayGenShader via reflected rays
         float3 specularColor = color.rgb;
         float3 directLighting = specularColor * dot_product;
-        // Metallic materials do not receive ambient or radiosity contributions
         FinalColor = directLighting;
     }
     else
     {
-        // For diffuse materials: standard Lambertian shading with ambient and radiosity
-        float3 directLighting = (color * dot_product).rgb;
+        directLightning = (color * dot_product * shadowFactor).rgb;
+
+        if (cameraData.toggleDirectLightning)
+        {
+            directLightning = 0.0f;
+        }
+        
         float3 ambientFloor = color.rgb * 0.03f;
-        FinalColor = 0.8f * directLighting + ambientFloor;
+        FinalColor = 0.8f * directLightning + ambientFloor;
 
         if (cameraData.useRadiosityLightmap)
         {
-            const float indirectStrength = 0.4f;
+            const float indirectStrength = 0.1f;
             float3 indirect = interpolatedVertexRadiosity;
             if (dot(indirect, indirect) < 1e-10f)
             {
-                // Fallback for seam/island vertices that have no valid adjacency in vertexRadiosityBuffer.
-                indirect = radiosityLightmapBuffer[patchId].xyz;
+                indirect = radiosityLightmapBuffer[patchId].rgb;
             }
 
             indirect *= indirectStrength;
@@ -355,7 +307,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
     payload.hitValue = FinalColor;
     payload.distance = RayTCurrent();
-    payload.normal = normal;
-    // Set high reflectivity for metallic to achieve mirror-like appearance
+    payload.normal = worldNormal;
     payload.reflector = isMetallic ? 0.95f : 0.0f;
+    payload.shadowed = shadowed;
 }

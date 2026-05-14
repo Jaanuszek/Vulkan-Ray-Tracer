@@ -16,7 +16,7 @@ enum class UpdateRequest
 
 struct UniformData
 {
-    alignas(4) bool enableCUDA = false; // bool w std140 jest traktowany jako 4 bajty xd
+    alignas(4) bool toggleDirectLightning = false; // bool w std140 jest traktowany jako 4 bajty xd
     alignas(4) bool shadowMode = false;
     alignas(4) bool debugPatches = false; // pokazuje kolorami patche sceny
     alignas(4) bool debugNormals = false; // pokazuje normalne patchy

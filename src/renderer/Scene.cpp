@@ -30,15 +30,15 @@ namespace VRTR
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
-        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
-        std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
-        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
-        importModel(cornell_box_model_path, "", cornellBoxModel);
-
-        // std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        // std::string cornell_box_model_path = cornell_box_path + "subdivided_sponza.obj";
-        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+        // std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
+        // std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
+        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
         // importModel(cornell_box_model_path, "", cornellBoxModel);
+
+        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
+        std::string cornell_box_model_path = cornell_box_path + "japanese_subdivide_bigger.obj";
+        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+        importModel(cornell_box_model_path, "", cornellBoxModel);
 
         auto [floorVertices, floorIndices] = CustomModels::createRectangle();
         Material floorMat{
@@ -49,7 +49,7 @@ namespace VRTR
         };
 
         glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-        addObject("floor", floorVertices, floorIndices, {floorMat}, floorModel);
+        // addObject("floor", floorVertices, floorIndices, {floorMat}, floorModel);
 
         auto [wallVertices, wallIndices] = CustomModels::createRectangle(glm::vec3(0.0f, 1.0f, 0.0f));
         Material wallMat{
@@ -92,7 +92,7 @@ namespace VRTR
         };
 
         // Glowne zrodlo sterowane przez GUI (Light Position).
-        lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(0.0f));
+        // lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(0.0f));
 
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 

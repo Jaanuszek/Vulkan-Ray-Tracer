@@ -276,7 +276,9 @@ namespace VRTR
         const uint32_t trianglesPerPatch = std::max<uint32_t>(1, patchSize);
         triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
 
+        // chyba bardziej triangleIdToPatchId
         patchIdToTriangleId.resize(triCount);
+        // std::vector<std::vector<uint32_t>>
         vertexToPatchIds.resize(modelMesh->vertices.size(), std::vector<uint32_t>{});
         patches.clear();
         patches.reserve((triCount + trianglesPerPatch - 1) / trianglesPerPatch);
@@ -293,6 +295,9 @@ namespace VRTR
 
             for (uint32_t j = 0; j < trianglesInPatch; ++j)
             {
+                // i to jest trójkąt
+                // j to jest indeks trojkata w patchu, czyli jak patch sklada sie z 2 trojkatow, 
+                // to j=0 dla pierwszego trojkata, a j=1 dla drugiego
                 const uint32_t tri = i + j;
                 uint32_t i0 = modelMesh->indices[3 * tri + 0];
                 uint32_t i1 = modelMesh->indices[3 * tri + 1];
@@ -312,13 +317,9 @@ namespace VRTR
                 float triArea = 0.5f * glm::length(triNormalGeom);
                 glm::vec3 triCenter = (v0.pos + v1.pos + v2.pos) / 3.0f;
 
-                if (triArea <= 1e-8f)
-                {
-                    patchIdToTriangleId[tri] = patchIdx;
-                    continue;
-                }
-
+                // shading normalnej po wierzchołkach
                 const glm::vec3 shadingNormal = glm::normalize(v0.normal + v1.normal + v2.normal);
+                // upewnienie sie ze normalna jest skierowana w odpowiednią stronę
                 if (glm::length(shadingNormal) > 1e-8f && glm::dot(triNormalGeom, shadingNormal) < 0.0f)
                 {
                     triNormalGeom = -triNormalGeom;
@@ -331,7 +332,7 @@ namespace VRTR
                 if (loadedFromFile)
                 {
                     glm::vec3 triEmission(0.0f);
-                    glm::vec3 triAlbedo(0.5f);
+                    glm::vec3 triAlbedo(0.0f);
 
                     if (tri < triangleIdToMaterialId.size())
                     {
@@ -339,7 +340,7 @@ namespace VRTR
                         if (matIdx < materials.size())
                         {
                             triEmission = materials[matIdx].emission;
-                            triAlbedo = glm::vec3(materials[matIdx].albedo);
+                            triAlbedo = glm::vec3(materials[matIdx].albedo); // to jest diffusion a nie albedo ale to mniejsza
                         }
                     }
 
@@ -363,9 +364,8 @@ namespace VRTR
             p.center = (area > 0.0f) ? worldCenter : glm::vec3(0.0f);
             p.normal = (glm::length(normal) > 0.0f) ? worldNormal : glm::vec3(0.0f);
             p.albedo = (area > 0.0f) ? (albedoAccum / area) : glm::vec3(0.5f);
-
-            p.unshotEnergy = (area > 0.0f) ? (emissionAccum / area) : glm::vec3(0.0f);
-            p.radiosity = glm::vec3(0.0f);
+            p.unshotEnergy = (area > 0.0f) ? (emissionAccum/area) : glm::vec3(0.0f);
+            p.radiosity = p.unshotEnergy;
 
             patches.push_back(p);
         }
@@ -441,7 +441,6 @@ namespace VRTR
         vertexPatchOffsets[vertexCount] = offset;
 
         // rezerwujemy tyle miejsca ile wynosi offset czyli ilosc patchy w sumie
-        vertexPatchIndices.clear();
         vertexPatchIndices.reserve(offset);
         
         for(const auto& list : vertexToPatchIds)

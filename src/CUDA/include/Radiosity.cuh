@@ -35,7 +35,7 @@ namespace VRTR
     {
         constexpr uint32_t TPB = 1024;
 
-        constexpr uint32_t SELECTED_PATCHES_COUNT = 256;
+        constexpr uint32_t SELECTED_PATCHES_COUNT = 2048;
 
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       const SelectedPatch* alreadySelectedPatches,
@@ -50,19 +50,17 @@ namespace VRTR
         __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities, uint32_t numVisibilities,
                               const uint32_t* selectedPatchIds, uint32_t* sourceHitCounts);
 
+        __global__ void countSourceRaysShot(const PatchVisibility* visibilities, uint32_t numVisibilities,
+                              const SelectedPatch* selectedPatches, uint32_t* totalRaysShot);
+
         __global__ void setEnergies(Patch *patches, uint32_t numPatches, float* energies);
 
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
                                           const SelectedPatch* selectedPatch,
                                           const uint32_t* sourceHitCounts,
-                                          float4* d_lightMap);
-
-        __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
-                                            PatchVisibility *visibilities, uint32_t numVisibilities,
-                                            const uint32_t* selectedPatchIDs,
-                                            const uint32_t* sourceHitCounts,
-                                            float4* d_lightMap);                       
+                                          const uint32_t* totalRaysShot,
+                                          float4* d_lightMap);              
 
         // Kernel odpowiadający za interpolacje kolorów wierzchołków
         // Bierze patche przypisane do danego wierzchołka i robi średnią ich kolorów
@@ -78,15 +76,15 @@ namespace VRTR
                                              SelectedPatch* selectedPatch);
 
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runFilterPatchesKernelLegacy(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runFilterPatchesKernelTopK(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                                 SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
                                                 uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
-        __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
-                                        uint32_t* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
-        // __host__ void runPostVisibilityKernelStub(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
                                             const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
                                             uint32_t numVertices, glm::vec3* radVertexColors);

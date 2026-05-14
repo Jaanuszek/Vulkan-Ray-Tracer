@@ -1,6 +1,6 @@
 public struct CameraData
 {
-    bool enableCUDA;
+    bool toggleDirectLightning;
     bool shadowMode;
     bool debugPatches;
     bool debugNormals;
@@ -27,6 +27,7 @@ public struct SelectedPatch
 {
     uint32_t patchId;
     float unshotEnergy;
+    uint32_t totalRaysShot;
 };
 
 public struct RayPayload
@@ -35,8 +36,7 @@ public struct RayPayload
     float distance;
     float3 normal;
     float reflector;
-    // ========================== SHADOWS
-    bool shadowed;
+    bool shadowed = false;
 };
 
 public struct visibilityRayPayload
