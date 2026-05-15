@@ -37,6 +37,8 @@ namespace VRTR
 
         constexpr uint32_t SELECTED_PATCHES_COUNT = 2048;
 
+        constexpr uint32_t RAYS_PER_PATCH = 1024;
+
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       const SelectedPatch* alreadySelectedPatches,
                                       uint32_t alreadySelectedCount,
@@ -44,22 +46,11 @@ namespace VRTR
 
         __global__ void reduceSelectedPatches(SelectedPatch *input, uint32_t n, SelectedPatch *output);
 
-        __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities, uint32_t numVisibilities,
-                              const SelectedPatch* selectedPatch, uint32_t* sourceHitCounts);
-
-        __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities, uint32_t numVisibilities,
-                              const uint32_t* selectedPatchIds, uint32_t* sourceHitCounts);
-
-        __global__ void countSourceRaysShot(const PatchVisibility* visibilities, uint32_t numVisibilities,
-                              const SelectedPatch* selectedPatches, uint32_t* totalRaysShot);
-
         __global__ void setEnergies(Patch *patches, uint32_t numPatches, float* energies);
 
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
                                           const SelectedPatch* selectedPatch,
-                                          const uint32_t* sourceHitCounts,
-                                          const uint32_t* totalRaysShot,
                                           float4* d_lightMap);              
 
         // Kernel odpowiadający za interpolacje kolorów wierzchołków
@@ -67,6 +58,8 @@ namespace VRTR
         __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
                                                 const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
                                                 uint32_t numVertices, glm::vec3* radVertexColors);
+
+        __global__ void resetSelectedPatchUnshotEnergy(Patch *patches, uint32_t numPatches, SelectedPatch *selectedPatch);
 
         // Zamienia posortowane indeksy patchy na finalną tablicę SelectedPatch z id i energiami
         __global__ void writeTopKSelectedPatches(const Patch* patches,

@@ -6,9 +6,6 @@ namespace VRTR
 {
     namespace
     {
-        // Must match visibility raygen dispatch width.
-        constexpr uint32_t VISIBILITY_DISPATCH_RAYS_PER_PATCH = RAYS_PER_PATCH;
-
         inline float unshotMetric(const glm::vec3& e)
         {
             return e.r * 0.2126f + e.g * 0.7152f + e.b * 0.0722f;
@@ -74,7 +71,7 @@ namespace VRTR
             cudaSelectedPatchExternalMemory
         );
 
-        patchVisibilityCount = VISIBILITY_DISPATCH_RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT;
+        patchVisibilityCount = CUDA::RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT;
         cudaPatchVisibilityBuffer = createCudaBuffer(
             sizeof(PatchVisibility) * patchVisibilityCount,
             (void**)&cudaPatchVisibilityData,
@@ -234,19 +231,6 @@ namespace VRTR
         radiosityWaitValue += passCount;
         radiositySignalValue += passCount;
     }
-
-    // void vkCudaInterop::runCudaInterpolateVertexColorsPass(uint32_t patchesCount, uint32_t vertexCount)
-    // {
-    //     // tutaj nie czekam na semafory bo to ma byc uruchomione po visibilityPass
-    //     CUDA::runInterpolateVertexKernel(
-    //         cudaPatchesData,
-    //         patchesCount,
-    //         d_VertexPatchIndices,
-    //         d_VertexPatchOffsets,
-    //         vertexCount,
-    //         cudaVertexRadiosityData
-    //     );
-    // }
 
     void vkCudaInterop::waitForSemapore(uint64_t waitValue)
     {

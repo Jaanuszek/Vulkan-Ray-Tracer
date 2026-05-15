@@ -101,6 +101,10 @@ void rayGenShader()
             ray.Direction = reflect(ray.Direction, payload.normal);
             throughput *= reflectivity;
         }
+        else // jezeli trafiony material nie jest refleksyjny to nie ma sensu rekurencyjnie sledzic promienia dalej
+        {
+            break;
+        }
     }
 
     outputImage[dispatchIndex.xy] = float4(color, 1.0).bgra;
@@ -243,7 +247,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     float3 toLight = cameraData.light_pos - hitPosition;
     float lightDistance = length(toLight);
     float3 lightVector = toLight / max(lightDistance, 1e-4);
-    float dot_product = max(dot(lightVector, worldNormal), 0.0f);
+    float dot_product = max(dot(lightVector, tri.normal), 0.0f);
 
     float3 FinalColor = 0.0f;
     float3 directLightning = 0.0f;
