@@ -139,14 +139,10 @@ namespace VRTR
         ImGui::NewFrame();
 
         // Show the demo window
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         // Tutaj trzeba dodac wlasne GUI np:
-        ImGui::Begin("Another Window", nullptr);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        ImGui::Text("Hello from another window!");
-        if (ImGui::Button("Close Me")) {
-            ;
-        }
+        ImGui::Begin("VRTR Renderer", nullptr);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         if(ImGui::SliderFloat("Rotation Angle", &sceneSettings.transformations.rotationAngle, 0.0f, 360.0f))
         {
             sceneSettings.transformations.updateRequest = UpdateRequest::Rotation;
@@ -158,15 +154,15 @@ namespace VRTR
             updated = true;
         }
 
-        {
-            ImGui::SliderInt("Patch Size", &sceneSettings.transformations.patchTriangleSize, 1, 10);
+        // {
+        //     ImGui::SliderInt("Patch Size", &sceneSettings.transformations.patchTriangleSize, 1, 10);
 
-            if(ImGui::Button("Apply Patch Size"))
-            {
-                sceneSettings.transformations.updateRequest = UpdateRequest::PatchTriangleSize;
-                updated = true;
-            }
-        }
+        //     if(ImGui::Button("Apply Patch Size"))
+        //     {
+        //         sceneSettings.transformations.updateRequest = UpdateRequest::PatchTriangleSize;
+        //         updated = true;
+        //     }
+        // }
 
         auto resetViewFlags = [&]()
         {

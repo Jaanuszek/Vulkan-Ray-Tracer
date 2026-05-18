@@ -132,28 +132,45 @@ namespace VRTR
         }
 
         std::unordered_map<int, uint32_t> mtlIdToMaterialIdx;
-        for (uint32_t id = 0; id < mtl_materials.size(); id++)
+        if(mtl_materials.empty())
         {
-            const float emissionMean = (mtl_materials[id].emission[0] + mtl_materials[id].emission[1] + mtl_materials[id].emission[2]) / 3.0f;
-            Material mat = {
-                .albedo = glm::vec4(
-                    mtl_materials[id].diffuse[0], 
-                    mtl_materials[id].diffuse[1], 
-                    mtl_materials[id].diffuse[2], 
-                    1.0f),
-                .emission = glm::vec3(
-                    mtl_materials[id].emission[0],
-                    mtl_materials[id].emission[1],
-                    mtl_materials[id].emission[2]),
-                .metallic = mtl_materials[id].metallic,
-                .roughness = mtl_materials[id].roughness,
-                .type = emissionMean > 0 ? MaterialType::LIGHT : MaterialType::ALBEDO,
+            VRTR_WARN("No materials found in model: {}", path);
+            // If no materials are defined in the .obj file, create a default material
+            Material defaultMat{
+                .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+                .emission = glm::vec3(0.0f),
+                .metallic = 0.0f,
+                .roughness = 1.0f,
+                .type = MaterialType::ALBEDO,
                 .textureIndex = 0
             };
-            mtlIdToMaterialIdx[id] = materials.size();
-            materials.push_back(mat);
+            mtlIdToMaterialIdx[0] = 0;
+            materials.push_back(defaultMat);
         }
-
+        else
+        {
+            for (uint32_t id = 0; id < mtl_materials.size(); id++)
+            {
+                const float emissionMean = (mtl_materials[id].emission[0] + mtl_materials[id].emission[1] + mtl_materials[id].emission[2]) / 3.0f;
+                Material mat = {
+                    .albedo = glm::vec4(
+                        mtl_materials[id].diffuse[0], 
+                        mtl_materials[id].diffuse[1], 
+                        mtl_materials[id].diffuse[2], 
+                        1.0f),
+                    .emission = glm::vec3(
+                        mtl_materials[id].emission[0],
+                        mtl_materials[id].emission[1],
+                        mtl_materials[id].emission[2]),
+                    .metallic = mtl_materials[id].metallic,
+                    .roughness = mtl_materials[id].roughness,
+                    .type = emissionMean > 0 ? MaterialType::LIGHT : MaterialType::ALBEDO,
+                    .textureIndex = 0
+                };
+                mtlIdToMaterialIdx[id] = materials.size();
+                materials.push_back(mat);
+            }
+        }
         mesh Mesh{};
 
         // loop po wszystkich shapeach o i g w pliku .obj

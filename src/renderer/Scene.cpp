@@ -20,9 +20,9 @@ namespace VRTR
         VRTR_DEBUG("Creating scene");
 
         std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        // std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
+        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
         std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
-        std::string viking_room_model_path = viking_room_path + "model/vikin_house_20SubDivision.obj";
+        // std::string viking_room_model_path = viking_room_path + "model/vikin_house_20SubDivision.obj";
 
         glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         // importModel(viking_room_model_path, viking_room_texture_path, rotatedModel);
@@ -36,13 +36,13 @@ namespace VRTR
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 
         std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
+        std::string cornell_box_model_path = cornell_box_path + "nvidiaScene_sub_separated.obj";
         glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
 
         auto [floorVertices, floorIndices] = CustomModels::createRectangle();
         Material floorMat{
-            .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+            .albedo = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f),
             .metallic = 1.0f,
             .roughness = 0.0f,
             .type = MaterialType::METALLIC,
@@ -85,6 +85,7 @@ namespace VRTR
             std::vector<Material> mats{
                 Material{
                     .albedo = color,
+                    .emission = glm::vec3(1.0f, 1.0f, 1.0f),
                     .type = MaterialType::LIGHT,
                 }
             };

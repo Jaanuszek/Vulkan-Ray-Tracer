@@ -34,7 +34,7 @@ namespace VRTR
         glm::vec3 emission = glm::vec3(0.0f);
         float metallic = 0.0f; // 4B
         float roughness = 1.0f; // 4B
-        MaterialType type = MaterialType::NONE; // 4B
+        MaterialType type = MaterialType::ALBEDO; // 4B
         uint32_t textureIndex = 0;
     };
 

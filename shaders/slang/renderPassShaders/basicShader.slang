@@ -183,15 +183,15 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     // // payload.hitValue = tri.vertices[PrimitiveIndex()].normal; // Color based on normal
     // payload.hitValue = materialBuffer[instanceIndex].albedo.bgr; // Color from material buffer
 
-    if(mat.type == MaterialType::METALLIC)
-    {
-        payload.hitValue = float3(1.0,0.0,0.0); // Color from material buffer
-        payload.distance = RayTCurrent();
-        payload.normal = worldNormal;
-        payload.reflector = 0.95f; // High reflectivity for metallic materials
-        payload.shadowed = false;
-        return;
-    }
+    // if(mat.type == MaterialType::METALLIC)
+    // {
+    //     payload.hitValue = float3(1.0,0.0,0.0); // Color from material buffer
+    //     payload.distance = RayTCurrent();
+    //     payload.normal = worldNormal;
+    //     payload.reflector = 0.95f; // High reflectivity for metallic materials
+    //     payload.shadowed = false;
+    //     return;
+    // }
 
     if(cameraData.enableRadiosityPass && patchId == selectedPatchId)
     {
@@ -238,10 +238,10 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     
     // TEST
     bool isMetallic = mat.type == MaterialType::METALLIC;
-    if (isMetallic)
-    {
-        color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
-    }
+    // if (isMetallic)
+    // {
+    //     color = float4(materialBuffer[instanceIndex].albedo.rgb, 1.0);
+    // }
 
     float3 hitPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 toLight = cameraData.light_pos - hitPosition;
@@ -312,6 +312,6 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
     payload.hitValue = FinalColor;
     payload.distance = RayTCurrent();
     payload.normal = worldNormal;
-    payload.reflector = isMetallic ? 0.95f : 0.0f;
+    payload.reflector = isMetallic ? 0.5f : 0.0f;
     payload.shadowed = shadowed;
 }
