@@ -27,6 +27,20 @@ namespace VRTR::CUDA
         return false;
     }
 
+    __device__ inline bool isPatchSelected(const SelectedPatch* selectedPatches,
+                                           uint32_t patchId)
+    {
+        for (uint32_t i = 0; i < SELECTED_PATCHES_COUNT; ++i)
+        {
+            if (selectedPatches[i].patchId == patchId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     __global__ void filterPatches(Patch* patches, uint32_t numPatches,
                                   const SelectedPatch* alreadySelectedPatches,
                                   uint32_t alreadySelectedCount,
@@ -136,6 +150,7 @@ namespace VRTR::CUDA
     __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                        PatchVisibility *visibilities, uint32_t numVisibilities,
                                        const SelectedPatch* selectedPatch,
+                                       glm::vec3* receivedEnergy,
                                        float4* d_lightMap)
     {
         uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -193,23 +208,55 @@ namespace VRTR::CUDA
 
         glm::vec3 energyPerRay = (srcPatch.unshotEnergy) / static_cast<float>(CUDA::RAYS_PER_PATCH);
 
+        float areaTerm = (srcPatch.area / dstPatch.area);
         /*
             Obliczenie wyniku Estymowany FF * visibility * albedo
         */
-        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo;
+        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo * areaTerm;
 
-        // Aktualizuj radiosity destination patcha.
-        atomicAdd(&dstPatch.radiosity.r, transferEnergy.r);
-        atomicAdd(&dstPatch.radiosity.g, transferEnergy.g);
-        atomicAdd(&dstPatch.radiosity.b, transferEnergy.b);
-        atomicAdd(&dstPatch.unshotEnergy.r, transferEnergy.r);
-        atomicAdd(&dstPatch.unshotEnergy.g, transferEnergy.g);
-        atomicAdd(&dstPatch.unshotEnergy.b, transferEnergy.b);
+        atomicAdd(&receivedEnergy[dstPatch.id].r, transferEnergy.r);
+        atomicAdd(&receivedEnergy[dstPatch.id].g, transferEnergy.g);
+        atomicAdd(&receivedEnergy[dstPatch.id].b, transferEnergy.b);
 
         atomicAdd(&d_lightMap[dstPatch.id].x, transferEnergy.r);
         atomicAdd(&d_lightMap[dstPatch.id].y, transferEnergy.g);
         atomicAdd(&d_lightMap[dstPatch.id].z, transferEnergy.b);
-        atomicExch(&d_lightMap[dstPatch.id].w, 1.0f);
+        d_lightMap[dstPatch.id].w = 1.0f;
+    }
+
+    __global__ void applyReceivedEnergy(Patch* patches,
+                                        uint32_t numPatches,
+                                        const SelectedPatch* selectedPatch,
+                                        const glm::vec3* receivedEnergy)
+    {
+        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        if (idx >= numPatches)
+        {
+            return;
+        }
+
+        // Delta to jest wartosc energii otrzymana w tej iteracji
+        const glm::vec3 delta = receivedEnergy[idx];
+        patches[idx].radiosity += delta;
+
+        /*
+            Tutaj nie bedzie race conditions, bo kazdy patch jest aktualizowany przez jeden wątek
+        */
+        const bool selected = isPatchSelected(selectedPatch, patches[idx].id);
+        if (selected)
+        {
+            /*
+                Jeżeli patch jest wybrany, to wtedy nie zerujemy unshotEnergy, ale ustawiamy wartosc delta
+                To eliminuje sytuacje gdy patch 1 strzela promienie a potem w tym samym momencie patch2 wysyla energie do patcha 1
+                gdybysmy tu zerowali, to bylby sytuacje ze patche mają energie do wystrzelenia, ale nic z tym nie robią,
+                bo unshoot jest zerowane
+            */
+            patches[idx].unshotEnergy = delta;
+        }
+        else
+        {
+            patches[idx].unshotEnergy += delta;
+        }
     }
 
     __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
@@ -456,6 +503,7 @@ namespace VRTR::CUDA
 
     __host__ void runFilterPatchesKernelTopK(Patch *patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
     {
+
         if (numPatches == 0)
             return;
 
@@ -521,6 +569,10 @@ namespace VRTR::CUDA
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
 
+        glm::vec3* d_receivedEnergy = nullptr;
+        CUDA_CHECK_STD_ERROR(cudaMalloc(&d_receivedEnergy, sizeof(glm::vec3) * numPatches));
+        CUDA_CHECK_STD_ERROR(cudaMemsetAsync(d_receivedEnergy, 0, sizeof(glm::vec3) * numPatches, stream));
+
         cudaEventRecord(start, stream);
         cudaEventRecord(stop, stream);
         cudaEventSynchronize(stop);
@@ -538,6 +590,7 @@ namespace VRTR::CUDA
             d_visibilities,
             numVisibilities,
             d_selectedPatch,
+            d_receivedEnergy,
             d_lightMap
         );
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
@@ -546,11 +599,16 @@ namespace VRTR::CUDA
         cudaEventElapsedTime(&elapsedTime, start, stop);
         // std::cout << "CalculateRadiosity kernel took " << elapsedTime << " ms\n";
 
-        // Reset source patch energy after radiosity accumulation so the next selection pass sees the update.
-        const uint32_t resetThreads = min(TPB, SELECTED_PATCHES_COUNT);
-        const uint32_t resetBlocks = (SELECTED_PATCHES_COUNT + resetThreads - 1) / resetThreads;
-        resetSelectedPatchUnshotEnergy<<<resetBlocks, resetThreads, 0, stream>>>(d_patches, numPatches, d_selectedPatch);
+        const uint32_t applyThreads = min(TPB, numPatches);
+        const uint32_t applyBlocks = (numPatches + applyThreads - 1) / applyThreads;
+        applyReceivedEnergy<<<applyBlocks, applyThreads, 0, stream>>>(
+            d_patches,
+            numPatches,
+            d_selectedPatch,
+            d_receivedEnergy);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
+
+        cudaFree(d_receivedEnergy);
     }
 
     __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
@@ -561,10 +619,7 @@ namespace VRTR::CUDA
         {
             return;
         }
-
         int blocks = (numVertices + TPB - 1) / TPB;
-        blocks = min(blocks, 1024);
-
         interpolateVertexColors<<<blocks, TPB>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }

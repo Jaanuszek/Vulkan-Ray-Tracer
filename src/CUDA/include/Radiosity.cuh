@@ -39,6 +39,10 @@ namespace VRTR
 
         constexpr uint32_t RAYS_PER_PATCH = 1024;
 
+        // constexpr float COVERAGE_THRESHOLD = 1e-4f;
+
+        // bool COVERAGED = false;
+
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       const SelectedPatch* alreadySelectedPatches,
                                       uint32_t alreadySelectedCount,
@@ -51,6 +55,7 @@ namespace VRTR
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
                                           const SelectedPatch* selectedPatch,
+                                          glm::vec3* receivedEnergy,
                                           float4* d_lightMap);              
 
         // Kernel odpowiadający za interpolacje kolorów wierzchołków

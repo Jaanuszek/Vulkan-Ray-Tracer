@@ -30,15 +30,15 @@ namespace VRTR
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
-        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
-        std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
-        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
-        importModel(cornell_box_model_path, "", cornellBoxModel);
-
-        // std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        // std::string cornell_box_model_path = cornell_box_path + "classRoom_30_adj2.obj";
-        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+        // std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
+        // std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
+        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
         // importModel(cornell_box_model_path, "", cornellBoxModel);
+
+        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
+        std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
+        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
+        importModel(cornell_box_model_path, "", cornellBoxModel);
 
         auto [floorVertices, floorIndices] = CustomModels::createRectangle();
         Material floorMat{

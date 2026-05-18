@@ -292,7 +292,7 @@ void closestHitShader(inout RayPayload payload, in HitAttribute attribs)
 
         if (cameraData.useRadiosityLightmap)
         {
-            const float indirectStrength = 0.1f;
+            const float indirectStrength = 1.0f;
             float3 indirect = interpolatedVertexRadiosity;
             if (dot(indirect, indirect) < 1e-10f)
             {

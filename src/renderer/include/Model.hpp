@@ -175,7 +175,7 @@ namespace VRTR
             GeometryInfo geometryInfo;
             bool withTexture = false;
             bool loadedFromFile = false;
-            bool vertexInterpolation = false;
+            bool vertexInterpolation = true;
     };
 
     namespace CustomModels

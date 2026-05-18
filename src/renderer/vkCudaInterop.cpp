@@ -178,7 +178,7 @@ namespace VRTR
             selected.unshotEnergy = 0.0f;
         }
         CUDA_CHECK_ERROR(cudaMemcpyAsync(cudaSelectedPatchData, selectedInit.data(), sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT,
-                                         cudaMemcpyHostToDevice, cudaStream));
+                                        cudaMemcpyHostToDevice, cudaStream));
 
         CUDA::runFilterPatchesKernel(cudaPatchesData, patchesCount, cudaSelectedPatchData, cudaStream);
 
@@ -190,12 +190,11 @@ namespace VRTR
         if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
         {
             std::cout << "[After filter CUDA] frame=" << debugFrameIdx
-                      << " selectedPatchId=" << hostSelected.patchId
-                      << " unshotEnergy=" << hostSelected.unshotEnergy
-                      << " patchesCount=" << patchesCount << std::endl;
+                    << " selectedPatchId=" << hostSelected.patchId
+                    << " unshotEnergy=" << hostSelected.unshotEnergy
+                    << " patchesCount=" << patchesCount << std::endl;
         }
         ++debugFrameIdx;
-
         signalSemaphore(filterPatchesSignalValue);
         lastFilterPatchesSignalValue = filterPatchesSignalValue;
 
