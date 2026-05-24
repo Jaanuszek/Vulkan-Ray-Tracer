@@ -55,7 +55,8 @@ namespace VRTR
     private:
         int width, height;
         uint64_t frameCount{};
-        uint32_t radiosityDemoFrameCounter{0};
+        uint32_t radiosityIterationCount{0};
+        double radiosityIterationTimeMsTotal{0.0};
         RendererContext ctx;
 
         std::unique_ptr<GUI> gui;

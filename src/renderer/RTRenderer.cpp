@@ -1,6 +1,44 @@
 #include "RTRenderer.hpp"
 #include "pch.h"
 
+#include <chrono>
+#include <fstream>
+
+namespace
+{
+    constexpr const char* RADIOSITY_TIMING_CSV = "radiosity_timing.csv";
+
+    void resetRadiosityTimingCsv()
+    {
+        std::ofstream file(RADIOSITY_TIMING_CSV, std::ios::trunc);
+        if (!file.is_open())
+        {
+            return;
+        }
+
+        file << "record_type,iteration,iteration_time_ms,average_time_ms,total_time_ms\n";
+    }
+
+    void appendRadiosityTimingCsv(const char* recordType,
+                                  uint32_t iteration,
+                                  double iterationTimeMs,
+                                  double averageTimeMs,
+                                  double totalTimeMs)
+    {
+        std::ofstream file(RADIOSITY_TIMING_CSV, std::ios::app);
+        if (!file.is_open())
+        {
+            return;
+        }
+
+        file << recordType << ','
+             << iteration << ','
+             << iterationTimeMs << ','
+             << averageTimeMs << ','
+             << totalTimeMs << '\n';
+    }
+}
+
 namespace VRTR
 {
     RTRenderer::RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings) 
@@ -135,7 +173,7 @@ namespace VRTR
         rayTracingPipeline->recreateStorageImage(width, height);
 
         // Update camera perspective with new aspect ratio
-        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
+        camera->setPerspective(60.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
         DescriptorResources dr = buildDescriptorResources();
 
@@ -150,14 +188,48 @@ namespace VRTR
 
             if(frameManager->isComputeRadiosity())
             {
+                const auto radiosityIterationStart = std::chrono::steady_clock::now();
+
                 frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
 
                 frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
 
                 frameManager->runCudaPostVisibilityPass(scene->getPatches().size(), scene->getVertexCount());
 
+                const auto radiosityIterationEnd = std::chrono::steady_clock::now();
+                const double radiosityIterationMs = std::chrono::duration<double, std::milli>(radiosityIterationEnd - radiosityIterationStart).count();
+
+                ++radiosityIterationCount;
+                radiosityIterationTimeMsTotal += radiosityIterationMs;
+
+                VRTR_DEBUG("Radiosity iteration {} took {} ms", radiosityIterationCount, radiosityIterationMs);
+                appendRadiosityTimingCsv(
+                    "iteration",
+                    radiosityIterationCount,
+                    radiosityIterationMs,
+                    radiosityIterationTimeMsTotal / static_cast<double>(radiosityIterationCount),
+                    radiosityIterationTimeMsTotal
+                );
+
+                if(frameManager->getCOVERAGED())
+                {
+                    const double averageRadiosityFrameTimeMs = radiosityIterationTimeMsTotal / static_cast<double>(radiosityIterationCount);
+                    VRTR_DEBUG("Radiosity coveraged after {} iterations", radiosityIterationCount);
+                    VRTR_DEBUG("Average radiosity frame time: {} ms", averageRadiosityFrameTimeMs);
+                    appendRadiosityTimingCsv(
+                        "summary",
+                        radiosityIterationCount,
+                        radiosityIterationMs,
+                        averageRadiosityFrameTimeMs,
+                        radiosityIterationTimeMsTotal
+                    );
+                    frameManager->setComputeRadiosity(false);
+                    sceneSettings.ubo.enableRadiosityPass = false;
+                    radiosityBootstrapDone = true;
+                }
+
                 // ++radiosityDemoFrameCounter;
-                // if (radiosityDemoFrameCounter >= 4096)
+                // if (radiosityDemoFrameCounter >= 1)
                 // {
                 //     frameManager->setComputeRadiosity(false);
                 //     sceneSettings.ubo.enableRadiosityPass = false;
@@ -207,9 +279,16 @@ namespace VRTR
                     frameManager->setComputeRadiosity(sceneSettings.ubo.enableRadiosityPass);
                     if (sceneSettings.ubo.enableRadiosityPass)
                     {
-                        radiosityDemoFrameCounter = 0;
-                        radiosityBootstrapDone = false;
+                        radiosityIterationCount = 0;
+                        radiosityIterationTimeMsTotal = 0.0;
+                        resetRadiosityTimingCsv();
+                        VRTR_DEBUG("Radiosity timing CSV reset: {}", RADIOSITY_TIMING_CSV);
                     }
+                    // if (sceneSettings.ubo.enableRadiosityPass)
+                    // {
+                    //     radiosityDemoFrameCounter = 0;
+                    //     radiosityBootstrapDone = false;
+                    // }
                     break;
                 }
                 default:

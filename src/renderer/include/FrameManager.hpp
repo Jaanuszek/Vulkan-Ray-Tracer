@@ -47,6 +47,8 @@ namespace VRTR
             bool isComputeRadiosity() const { return computeRadiosity; }
             void setComputeRadiosity(bool value) { computeRadiosity = value; }
 
+            bool getCOVERAGED() const { return vkCudaInteropManager->getCOVERAGED(); }
+
         private:
             void waitForFence();
 

@@ -21,6 +21,8 @@ constexpr unsigned int HEIGHT = 600;
 double lastFrameTime{};
 double deltaTime{};
 
+constexpr uint32_t FrameToCapture = 50000;
+
 int main()
 {
     try
@@ -38,7 +40,7 @@ int main()
         SceneSettings sceneSettings{};
 
         std::shared_ptr<VRTR::Camera> camera = std::make_shared<VRTR::Camera>(sceneSettings, glm::vec3(0.0f, 0.0f, 4.0f));
-        camera->setPerspective(45.0f, static_cast<float>(WIDTH) / HEIGHT, 0.1f, 100.0f);
+        camera->setPerspective(60.0f, static_cast<float>(WIDTH) / HEIGHT, 0.1f, 100.0f);
 
         std::unique_ptr<VRTR::RTRenderer> renderer = std::make_unique<VRTR::RTRenderer>(camera, sceneSettings);
         renderer->init(window);
@@ -48,6 +50,9 @@ int main()
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         VRTR::InputManager::init(window);
         
+        uint32_t frameCounter = 0;
+        std::array<float, FrameToCapture> frameTimes{};
+
         while(!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
             deltaTime = currentTime - lastFrameTime;
@@ -55,7 +60,21 @@ int main()
             glfwPollEvents();
             VRTR::processInput(window, deltaTime, camera);
             renderer->drawFrame(window, deltaTime, VRTR::InputManager::renderGUI);
+            if(frameCounter < FrameToCapture)
+            {
+                frameTimes[frameCounter % FrameToCapture] = static_cast<float>(deltaTime);
+            }
+            // else
+            // {
+                // VRTR_INFO("CAPTURED ALL FRAMES");
+                // break;
+            // }
+            frameCounter++;
         }
+
+        double sum = std::accumulate(frameTimes.begin(), frameTimes.end(), 0.0);
+        double averageFrameTime = sum / std::min(frameCounter, FrameToCapture);
+        VRTR_INFO("Average frame time {} ms", averageFrameTime * 1000.0);
 
         renderer.reset();   
         glfwDestroyWindow(window);

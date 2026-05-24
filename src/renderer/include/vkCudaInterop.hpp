@@ -41,6 +41,8 @@ namespace VRTR
             uint64_t getRadiosityWaitValue() const { return radiosityWaitValue; }
             uint64_t getRadiositySignalValue() const { return lastRadiositySignalValue; }
 
+            bool getCOVERAGED() const { return COVERAGED; }
+
         private:
             void setupCuda();
 
@@ -111,5 +113,7 @@ namespace VRTR
 
             vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
             cudaExternalSemaphore_t  extCudaTimelineSemaphore{nullptr};
+
+            bool COVERAGED = false;
     };
 }

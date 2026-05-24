@@ -186,15 +186,15 @@ namespace VRTR
         SelectedPatch hostSelected{};
         CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
 
-        static uint64_t debugFrameIdx = 0;
-        if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
-        {
-            std::cout << "[After filter CUDA] frame=" << debugFrameIdx
-                    << " selectedPatchId=" << hostSelected.patchId
-                    << " unshotEnergy=" << hostSelected.unshotEnergy
-                    << " patchesCount=" << patchesCount << std::endl;
-        }
-        ++debugFrameIdx;
+        // static uint64_t debugFrameIdx = 0;
+        // if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
+        // {
+        //     std::cout << "[After filter CUDA] frame=" << debugFrameIdx
+        //             << " selectedPatchId=" << hostSelected.patchId
+        //             << " unshotEnergy=" << hostSelected.unshotEnergy
+        //             << " patchesCount=" << patchesCount << std::endl;
+        // }
+        // ++debugFrameIdx;
         signalSemaphore(filterPatchesSignalValue);
         lastFilterPatchesSignalValue = filterPatchesSignalValue;
 
@@ -213,7 +213,8 @@ namespace VRTR
             cudaPatchVisibilityData,
             patchVisibilityCount,
             cudaRadiosityLightmapData,
-            cudaStream);
+            cudaStream,
+            COVERAGED);
 
         CUDA::runInterpolateVertexKernel(
             cudaPatchesData,
@@ -221,7 +222,8 @@ namespace VRTR
             d_VertexPatchIndices,
             d_VertexPatchOffsets,
             vertexCount,
-            cudaVertexRadiosityData
+            cudaVertexRadiosityData,
+            cudaStream
         );
 
         signalSemaphore(radiositySignalValue);

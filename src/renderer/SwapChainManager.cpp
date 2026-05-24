@@ -151,7 +151,8 @@ namespace VRTR
             }
         }
 
-        return vk::PresentModeKHR::eFifo; // Fallback to FIFO
+        // return vk::PresentModeKHR::eFifo; // Fallback to FIFO
+        return vk::PresentModeKHR::eImmediate;
     }
 
     vk::Extent2D SwapChainManager::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities, GLFWwindow *window)

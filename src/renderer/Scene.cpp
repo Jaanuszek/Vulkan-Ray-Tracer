@@ -36,8 +36,8 @@ namespace VRTR
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 
         std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        std::string cornell_box_model_path = cornell_box_path + "nvidiaScene_sub_separated.obj";
-        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
+        std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
 
         auto [floorVertices, floorIndices] = CustomModels::createRectangle();
@@ -53,15 +53,17 @@ namespace VRTR
 
         auto [wallVertices, wallIndices] = CustomModels::createRectangle(glm::vec3(0.0f, 1.0f, 0.0f));
         Material wallMat{
-            .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-            .type = MaterialType::LIGHT,
+            .albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+            .metallic = 1.0f,
+            .roughness = 0.0f,
+            .type = MaterialType::METALLIC,
         };
         glm::mat4 wallModel(1.0f);
         wallModel = glm::translate(wallModel, glm::vec3(0.0f, 0.5f, -1.0f));
         wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         wallModel = glm::scale(wallModel, glm::vec3(0.1f));
 
-        // addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
+        // addObject("wall", wallVertices, wallIndices, {wallMat}, wallModel);
 
         auto [wallVertices2, wallIndices2] = CustomModels::createRectangle(glm::vec3(1.0f, 0.0f, 0.0f));
         Material wallMat2{
@@ -93,7 +95,7 @@ namespace VRTR
         };
 
         // Glowne zrodlo sterowane przez GUI (Light Position).
-        // lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(0.0f));
+        // lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
 
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 

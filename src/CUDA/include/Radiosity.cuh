@@ -35,9 +35,11 @@ namespace VRTR
     {
         constexpr uint32_t TPB = 1024;
 
-        constexpr uint32_t SELECTED_PATCHES_COUNT = 2048;
+        constexpr uint32_t SELECTED_PATCHES_COUNT = 1024;
 
         constexpr uint32_t RAYS_PER_PATCH = 1024;
+
+        constexpr float UNSHOT_ENERGY_THRESHOLD = 1e-8f;
 
         // constexpr float COVERAGE_THRESHOLD = 1e-4f;
 
@@ -81,12 +83,15 @@ namespace VRTR
 
         __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                                 SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                                uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
+                                                uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream,
+                                                bool& COVERAGED);
 
         __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
-                                            const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
-                                            uint32_t numVertices, glm::vec3* radVertexColors);
+                            const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
+                            uint32_t numVertices, glm::vec3* radVertexColors,
+                            cudaStream_t stream);
 
         __host__ void topKPatches(uint32_t numPatches, float* d_energies, uint32_t* d_selectedPatchesId, cudaStream_t stream);
+
     }
 }

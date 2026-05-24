@@ -43,7 +43,7 @@ namespace VRTR
         const std::vector<VertexRT>& vertices, 
         const std::vector<uint32_t>& indices,
         const std::vector<Material>& mats, const glm::mat4& transform)
-        : ctx(ctx), materials(mats), modelTransform(transform)
+        : ctx(ctx), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
@@ -77,6 +77,8 @@ namespace VRTR
             // fallback: use first material for all triangles
             std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
         }
+        
+        materials.push_back(mats.at(0));
 
         if(vertexInterpolation)
         {
@@ -293,9 +295,12 @@ namespace VRTR
         const uint32_t trianglesPerPatch = std::max<uint32_t>(1, patchSize);
         triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
 
+        VRTR_INFO("SCENE CONSISTS OF {} TRIANGLES", triCount);
+        VRTR_INFO("SCENE INFO: Building {} patches for model: {}", (triCount + trianglesPerPatch - 1) / trianglesPerPatch, modelName);
+        VRTR_INFO("SCENE INFO: PATCH SIZE: {} triangles per patch", triCount * sizeof(Patch));
+
         // chyba bardziej triangleIdToPatchId
         patchIdToTriangleId.resize(triCount);
-        // std::vector<std::vector<uint32_t>>
         vertexToPatchIds.resize(modelMesh->vertices.size(), std::vector<uint32_t>{});
         patches.clear();
         patches.reserve((triCount + trianglesPerPatch - 1) / trianglesPerPatch);

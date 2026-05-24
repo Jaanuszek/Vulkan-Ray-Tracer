@@ -10,6 +10,8 @@ namespace VRTR::CUDA
             // return (e.r + e.g + e.b) / 3.0f;
             return 0.2126f * e.r + 0.7152f * e.g + 0.0722f * e.b; // luminance
         }
+        // If the maximum unshot energy across all patches is below this
+        // threshold we will skip radiosity computation for this iteration.
     }
 
     __device__ inline bool isAlreadySelected(const SelectedPatch* selectedPatches,
@@ -557,7 +559,8 @@ namespace VRTR::CUDA
 
     __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                         SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream)
+                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream,
+                                        bool& COVERAGED)
     {
         if (numPatches == 0 || numVisibilities == 0)
         {
@@ -569,6 +572,31 @@ namespace VRTR::CUDA
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
 
+        {
+            SelectedPatch hostSelected[SELECTED_PATCHES_COUNT];
+            CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(
+                hostSelected,
+                d_selectedPatch,
+                sizeof(SelectedPatch) * SELECTED_PATCHES_COUNT,
+                cudaMemcpyDeviceToHost,
+                stream
+            ));
+            CUDA_CHECK_STD_ERROR(cudaStreamSynchronize(stream));
+
+            if(hostSelected[0].patchId == 0xFFFFFFFF)
+            {
+                COVERAGED = false;
+                return;
+            }
+            // tak mozna bo selectedPatch jest posortowany od najwiekszego do najmniejszego
+            float maxEnergy = hostSelected[0].unshotEnergy;
+
+            if (maxEnergy < CUDA::UNSHOT_ENERGY_THRESHOLD)
+            {
+                COVERAGED = true;
+                return;
+            }
+        }
         glm::vec3* d_receivedEnergy = nullptr;
         CUDA_CHECK_STD_ERROR(cudaMalloc(&d_receivedEnergy, sizeof(glm::vec3) * numPatches));
         CUDA_CHECK_STD_ERROR(cudaMemsetAsync(d_receivedEnergy, 0, sizeof(glm::vec3) * numPatches, stream));
@@ -613,14 +641,15 @@ namespace VRTR::CUDA
 
     __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
                                     const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
-                                    uint32_t numVertices, glm::vec3* radVertexColors)
+                                    uint32_t numVertices, glm::vec3* radVertexColors,
+                                    cudaStream_t stream)
     {
         if (numPatches == 0 || numVertices == 0)
         {
             return;
         }
         int blocks = (numVertices + TPB - 1) / TPB;
-        interpolateVertexColors<<<blocks, TPB>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
+        interpolateVertexColors<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 
