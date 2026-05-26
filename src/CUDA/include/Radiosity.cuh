@@ -37,13 +37,9 @@ namespace VRTR
 
         constexpr uint32_t SELECTED_PATCHES_COUNT = 1024;
 
-        constexpr uint32_t RAYS_PER_PATCH = 1024;
+        constexpr uint32_t RAYS_PER_PATCH = 32768;
 
         constexpr float UNSHOT_ENERGY_THRESHOLD = 1e-8f;
-
-        // constexpr float COVERAGE_THRESHOLD = 1e-4f;
-
-        // bool COVERAGED = false;
 
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       const SelectedPatch* alreadySelectedPatches,

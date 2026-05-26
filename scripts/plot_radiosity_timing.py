@@ -82,7 +82,7 @@ def plot_samples(samples: List[TimingSample], summary: Optional[TimingSample], o
     average_times = [sample.average_time_ms for sample in samples]
     total_times = [sample.total_time_ms for sample in samples]
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 11), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(12, 11), sharex=True)
     fig.suptitle("Radiosity Timing", fontsize=16, fontweight="bold")
 
     axes[0].plot(iterations, iteration_times, color="#2a6fdb", linewidth=1.8)
@@ -93,16 +93,10 @@ def plot_samples(samples: List[TimingSample], summary: Optional[TimingSample], o
     axes[1].set_ylabel("Average time [ms]")
     axes[1].grid(True, alpha=0.25)
 
-    axes[2].plot(iterations, total_times, color="#db4437", linewidth=1.8)
-    axes[2].set_ylabel("Total time [ms]")
-    axes[2].set_xlabel("Radiosity iteration")
-    axes[2].grid(True, alpha=0.25)
-
     if summary is not None:
         summary_text = (
             f"Coverage after {summary.iteration} iterations\n"
             f"Average frame time: {summary.average_time_ms:.3f} ms\n"
-            f"Total radiosity time: {summary.total_time_ms:.3f} ms"
         )
         fig.text(0.02, 0.01, summary_text, fontsize=10, family="monospace")
 

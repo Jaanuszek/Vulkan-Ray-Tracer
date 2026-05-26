@@ -15,8 +15,8 @@ static vk::detail::DynamicLoader dl;
 
 // Start resolution
 // On window resize, those values will not be updated here, but inside RTRenderer
-constexpr unsigned int WIDTH = 800;
-constexpr unsigned int HEIGHT = 600;
+constexpr unsigned int WIDTH = 2560;
+constexpr unsigned int HEIGHT = 1440;
 
 double lastFrameTime{};
 double deltaTime{};
@@ -34,8 +34,15 @@ int main()
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        if (!primaryMonitor) {
+            VRTR_CRITICAL("Failed to get primary monitor");
+            return EXIT_FAILURE;
+        }
+
         float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
-        GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "VRTR", nullptr, nullptr);
+        GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "VRTR", primaryMonitor, nullptr);
 
         SceneSettings sceneSettings{};
 

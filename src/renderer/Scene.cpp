@@ -36,7 +36,11 @@ namespace VRTR
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 
         std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "nvidiaScene_sub_separated.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "subdivided_sponza.obj";
+
+        std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
         glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
 
