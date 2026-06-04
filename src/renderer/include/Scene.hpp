@@ -52,12 +52,13 @@ namespace VRTR
 
             void updatePatchData(uint8_t patchSize);
 
-        private:
+        public:
+            // Public API for adding models / objects to the scene. Returns TLAS instance index.
             uint32_t importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform);
 
             uint32_t addObject(const std::string& objName, const std::vector<VertexRT>& vertices, 
-                    const std::vector<uint32_t>& indices, const std::vector<Material>& mats,
-                    const glm::mat4& transform);
+                const std::vector<uint32_t>& indices, const std::vector<Material>& mats,
+                const glm::mat4& transform);
 
             void buildTLAS();
 

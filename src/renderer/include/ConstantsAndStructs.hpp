@@ -26,14 +26,6 @@ namespace VRTR
         Properties properties;
     };
 
-    struct VertexRT
-    {
-        glm::vec3 pos;
-        glm::vec3 normal;
-        glm::vec3 color;
-        glm::vec2 texCoord;
-    };
-
     namespace CONSTANTS
     {
         inline std::filesystem::path getExecutableDir()

@@ -2,6 +2,14 @@
 
 namespace VRTR
 {
+    struct VertexRT
+    {
+        glm::vec3 pos;
+        glm::vec3 normal;
+        glm::vec3 color;
+        glm::vec2 texCoord;
+    };
+
     struct Patch
     {
         uint32_t id;

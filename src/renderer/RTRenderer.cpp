@@ -55,7 +55,7 @@ namespace VRTR
         vmaDestroyAllocator(ctx.vmaAllocator);
     }
 
-    void RTRenderer::init(GLFWwindow *window)
+    void RTRenderer::init(GLFWwindow *window, bool buildResources)
     {
         VRTR_DEBUG("RTRENDERER INIT");
 
@@ -66,21 +66,64 @@ namespace VRTR
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Instance>(*ctx.instance));
 
         DeviceManager::initDevice(window, ctx);
-
         setupVMA();
-
         RayTracingPipeline::initRayTracing(ctx);
-
         swapChainManager = std::make_shared<SwapChainManager>(ctx);
         swapChainManager->init(window);
-
         commandBufferManager = std::make_shared<CommandBufferManager>(ctx);
         commandBufferManager->init();
 
-        initImGUI(window);
-
         scene = std::make_unique<Scene>(ctx);
-        scene->createScene(sceneSettings.ubo.light_pos);
+
+        if(buildResources)
+        {
+            initImGUI(window);
+
+            // scene->createScene(sceneSettings.ubo.light_pos);
+
+            frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
+            frameManager->init(
+                scene->getPatches(),
+                scene->getVertexCount(),
+                scene->getVertexPatchIndices(),
+                scene->getVertexPatchOffsets()
+            );
+
+            uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
+                                                vk::BufferUsageFlagBits{},
+                                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                                vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
+
+            updateUniformBuffer();
+
+            DescriptorResources dr = buildDescriptorResources();
+
+            auto gi = scene->getFirstGeometryInfo();
+            PushConstant vikingRoomModelPC{
+                .vertices = gi.vertexBufferAddr,
+                .indices = gi.indexBufferAddr
+            };
+
+            rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
+            rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
+                                    dr,
+                                    commandBufferManager,
+                                    width,
+                                    height
+                                    );
+
+            visibilityPipeline = std::make_unique<VisibilityPipeline>(ctx);
+            visibilityPipeline->init(dr, commandBufferManager);
+        } 
+        else
+        {
+            VRTR_INFO("RTRenderer initialized without resource creation. Call buildResources() to set it up.");
+        }
+    }
+
+    void RTRenderer::buildResources(GLFWwindow *window)
+    {
+        initImGUI(window);
 
         frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
         frameManager->init(
@@ -313,5 +356,56 @@ namespace VRTR
             VRTR_CRITICAL("Failed to acquire swap chain image!");
             throw std::runtime_error("Failed to acquire swap chain image!");
         }
+    }
+
+    // High-level wrappers
+    uint32_t RTRenderer::addModel(const std::string& modelPath, const std::string& texPath, const glm::mat4& transform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        return scene->importModel(modelPath, texPath, transform);
+    }
+
+    uint32_t RTRenderer::addMesh(const std::string& name, const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices, const std::vector<Material>& mats, const glm::mat4& transform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        return scene->addObject(name, vertices, indices, mats, transform);
+    }
+
+    void RTRenderer::buildTLAS()
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->buildTLAS();
+    }
+
+    void RTRenderer::setInstanceTransform(uint32_t instanceIdx, const glm::mat4& newTransform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updateInstanceTLAS(instanceIdx, newTransform);
+    }
+
+    void RTRenderer::rotateScene(float rotationAngle)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updateTLAS(rotationAngle);
+    }
+
+    void RTRenderer::setLightPosition(const glm::vec3& pos)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        uint32_t lightIdx = scene->getLightTLASIdx();
+        scene->updateInstanceTLAS(lightIdx, glm::translate(glm::mat4(1.0f), pos));
+    }
+
+    void RTRenderer::setPatchSize(uint8_t size)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updatePatchData(size);
     }
 }
