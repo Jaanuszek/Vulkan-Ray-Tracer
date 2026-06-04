@@ -36,13 +36,35 @@ namespace VRTR
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 
         std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
-        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "japanese_10.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "japanese_subdivide_bigger.obj";
         // std::string cornell_box_model_path = cornell_box_path + "nvidiaScene_sub_separated.obj";
-        // std::string cornell_box_model_path = cornell_box_path + "subdivided_sponza.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
+        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
 
-        std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
+
+        std::string cornell_box_model_path = cornell_box_path + "subdivided_sponza.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "classRoom_30_adj2.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+
         glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+        // cornellBoxModel = glm::rotate(cornellBoxModel, glm::radians(-180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
+
+        // auto [sphereVertices, sphereIndices] = CustomModels::createSphere(32, 64, 1.0f);
+        // Material sphereMat{
+        //     .albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f),
+        //     .emission = glm::vec3(0.0f),
+        //     .metallic = 0.0f,
+        //     .roughness = 0.0f,
+        //     .type = MaterialType::REFRACTION,
+        // };
+        // glm::mat4 sphereModel(1.0f);
+        // // sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 0.5f, 0.0f)); // dla zwyklego cornell boxa
+        // sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 0.5f, -1.0f));
+        // sphereModel = glm::scale(sphereModel, glm::vec3(0.3f));
+        // addObject("glass_sphere", sphereVertices, sphereIndices, {sphereMat}, sphereModel);
 
         auto [floorVertices, floorIndices] = CustomModels::createRectangle();
         Material floorMat{
@@ -99,7 +121,7 @@ namespace VRTR
         };
 
         // Glowne zrodlo sterowane przez GUI (Light Position).
-        // lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
+        lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
 
         // importModel(cornell_box_model_path, "", cornellBoxModel);
 

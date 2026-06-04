@@ -25,7 +25,8 @@ namespace VRTR
         METALLIC = 2,
         ROUGHNESS = 3,
         PBR = 4,
-        LIGHT = 5
+        LIGHT = 5,
+        REFRACTION = 6,
     };
 
     struct Material
@@ -182,5 +183,6 @@ namespace VRTR
     {
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createRectangle(const glm::vec3& color = glm::vec3(0.0f));
         std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createCube(const glm::vec3& color = glm::vec3(0.0f));
+        std::pair<std::vector<VertexRT>, std::vector<uint32_t>> createSphere(uint32_t stackCount = 24, uint32_t sectorCount = 48, float radius = 1.0f, const glm::vec3& color = glm::vec3(0.0f));
     }
 }

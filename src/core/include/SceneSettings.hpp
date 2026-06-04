@@ -23,6 +23,7 @@ struct UniformData
     alignas(4) bool debugCenters = false; // pokazuje centra patchy
     alignas(4) bool useRadiosityLightmap = false;
     alignas(4) bool enableRadiosityPass = false;
+    float refractionIor = 1.5f;
     glm::vec3 light_pos = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::mat4 view_inverse;
     glm::mat4 proj_inverse;

@@ -153,6 +153,10 @@ namespace VRTR
             sceneSettings.transformations.updateRequest = UpdateRequest::LightPos;
             updated = true;
         }
+        if (ImGui::SliderFloat("Refraction IOR", &sceneSettings.ubo.refractionIor, 1.0f, 2.5f, "%.3f"))
+        {
+            updated = true;
+        }
 
         // {
         //     ImGui::SliderInt("Patch Size", &sceneSettings.transformations.patchTriangleSize, 1, 10);

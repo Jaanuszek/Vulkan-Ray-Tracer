@@ -37,7 +37,7 @@ namespace VRTR
 
         constexpr uint32_t SELECTED_PATCHES_COUNT = 1024;
 
-        constexpr uint32_t RAYS_PER_PATCH = 32768;
+        constexpr uint32_t RAYS_PER_PATCH = 4096;
 
         constexpr float UNSHOT_ENERGY_THRESHOLD = 1e-8f;
 

@@ -7,6 +7,7 @@ public struct CameraData
     bool debugCenters;
     bool useRadiosityLightmap;
     bool enableRadiosityPass;
+    float refractionIor;
     float3 light_pos;
     column_major float4x4 viewInverse;
     column_major float4x4 projInverse;
@@ -36,7 +37,10 @@ public struct RayPayload
     float distance;
     float3 normal;
     float reflector;
+    float ior;
     bool shadowed = false;
+    bool isRefracted = false;
+    bool frontFace = true;
 };
 
 public struct visibilityRayPayload
@@ -68,7 +72,8 @@ public enum class MaterialType
     METALLIC = 2,
     ROUGHNESS = 3,
     PBR = 4,
-    LIGHT = 5
+    LIGHT = 5,
+    REFRACTION = 6
 };
 
 public struct Material

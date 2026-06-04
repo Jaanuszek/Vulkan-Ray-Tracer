@@ -56,17 +56,17 @@ namespace VRTR
         // a correct tri->material index buffer used by the shader.
         const uint32_t triCountLocal = static_cast<uint32_t>(modelMesh->indices.size() / 3);
         triangleIdToMaterialId.resize(triCountLocal);
-        if (materials.empty())
+        if (mats.empty())
         {
             // default to material 0 for all triangles
             std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
         }
-        else if (materials.size() == 1)
+        else if (mats.size() == 1)
         {
             // single material for whole mesh
             std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
         }
-        else if (materials.size() >= triCountLocal)
+        else if (mats.size() >= triCountLocal)
         {
             // one material per triangle (or more) - assign accordingly
             for (uint32_t t = 0; t < triCountLocal; ++t)
@@ -77,8 +77,15 @@ namespace VRTR
             // fallback: use first material for all triangles
             std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
         }
-        
-        materials.push_back(mats.at(0));
+
+        if (mats.empty())
+        {
+            materials.push_back(Material{});
+        }
+        else
+        {
+            materials = mats;
+        }
 
         if(vertexInterpolation)
         {
@@ -146,6 +153,14 @@ namespace VRTR
                 .type = MaterialType::ALBEDO,
                 .textureIndex = 0
             };
+
+            if (path.find("sphere.obj") != std::string::npos)
+            {
+                defaultMat.albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f);
+                defaultMat.roughness = 0.0f;
+                defaultMat.type = MaterialType::REFRACTION;
+            }
+
             mtlIdToMaterialIdx[0] = 0;
             materials.push_back(defaultMat);
         }
@@ -509,6 +524,66 @@ namespace VRTR
             0, 1, 2,
             2, 3, 0
         };
+
+        return {vertices, indices};
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createSphere(uint32_t stackCount, uint32_t sectorCount, float radius, const glm::vec3& color)
+    {
+        stackCount = std::max<uint32_t>(3, stackCount);
+        sectorCount = std::max<uint32_t>(3, sectorCount);
+
+        std::vector<VertexRT> vertices;
+        std::vector<uint32_t> indices;
+        vertices.reserve((stackCount + 1) * (sectorCount + 1));
+        indices.reserve(stackCount * sectorCount * 6);
+
+        for (uint32_t stack = 0; stack <= stackCount; ++stack)
+        {
+            const float stackAngle = glm::pi<float>() * 0.5f - static_cast<float>(stack) * glm::pi<float>() / static_cast<float>(stackCount);
+            const float xy = radius * std::cos(stackAngle);
+            const float z = radius * std::sin(stackAngle);
+
+            for (uint32_t sector = 0; sector <= sectorCount; ++sector)
+            {
+                const float sectorAngle = static_cast<float>(sector) * 2.0f * glm::pi<float>() / static_cast<float>(sectorCount);
+                const float x = xy * std::cos(sectorAngle);
+                const float y = xy * std::sin(sectorAngle);
+
+                const glm::vec3 position{x, y, z};
+                const glm::vec3 normal = glm::normalize(position);
+
+                vertices.push_back(VertexRT{
+                    position,
+                    normal,
+                    color,
+                    {static_cast<float>(sector) / static_cast<float>(sectorCount), static_cast<float>(stack) / static_cast<float>(stackCount)}
+                });
+            }
+        }
+
+        for (uint32_t stack = 0; stack < stackCount; ++stack)
+        {
+            const uint32_t k1 = stack * (sectorCount + 1);
+            const uint32_t k2 = k1 + sectorCount + 1;
+
+            for (uint32_t sector = 0; sector < sectorCount; ++sector)
+            {
+                if (stack != 0)
+                {
+                    indices.push_back(k1 + sector);
+                    indices.push_back(k2 + sector);
+                    indices.push_back(k1 + sector + 1);
+                }
+
+                if (stack != (stackCount - 1))
+                {
+                    indices.push_back(k1 + sector + 1);
+                    indices.push_back(k2 + sector);
+                    indices.push_back(k2 + sector + 1);
+                }
+            }
+        }
 
         return {vertices, indices};
     }
