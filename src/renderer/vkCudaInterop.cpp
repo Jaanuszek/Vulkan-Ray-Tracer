@@ -6,9 +6,6 @@ namespace VRTR
 {
     namespace
     {
-        // Must match visibility raygen dispatch width.
-        constexpr uint32_t VISIBILITY_DISPATCH_RAYS_PER_PATCH = RAYS_PER_PATCH;
-
         inline float unshotMetric(const glm::vec3& e)
         {
             return e.r * 0.2126f + e.g * 0.7152f + e.b * 0.0722f;
@@ -36,7 +33,9 @@ namespace VRTR
         const std::vector<Patch>& patches,
         uint32_t vertexCount,
         const std::vector<uint32_t>& vertexPatchIndices, 
-        const std::vector<uint32_t>& vertexPatchOffsets
+        const std::vector<uint32_t>& vertexPatchOffsets,
+        const std::vector<uint32_t>& patchNeighborIndices,
+        const std::vector<uint32_t>& patchNeighborOffsets
     )
     {
         setupCuda();
@@ -74,7 +73,7 @@ namespace VRTR
             cudaSelectedPatchExternalMemory
         );
 
-        patchVisibilityCount = VISIBILITY_DISPATCH_RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT;
+        patchVisibilityCount = CUDA::RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT;
         cudaPatchVisibilityBuffer = createCudaBuffer(
             sizeof(PatchVisibility) * patchVisibilityCount,
             (void**)&cudaPatchVisibilityData,
@@ -99,6 +98,24 @@ namespace VRTR
             e_VertexPatchOffsets
         );
 
+        b_PatchNeighborIndices = createCudaBuffer(
+            sizeof(uint32_t) * patchNeighborIndices.size(),
+            (void**)&d_PatchNeighborIndices,
+            e_PatchNeighborIndices
+        );
+
+        b_PatchNeighborOffsets = createCudaBuffer(
+            sizeof(uint32_t) * patchNeighborOffsets.size(),
+            (void**)&d_PatchNeighborOffsets,
+            e_PatchNeighborOffsets
+        );
+
+        cudaDenoisedPatchRadiosityBuffer = createCudaBuffer(
+            sizeof(glm::vec3) * patches.size(),
+            (void**)&cudaDenoisedPatchRadiosityData,
+            cudaDenoisedPatchRadiosityExternalMemory
+        );
+
         cudaVertexRadiosityBuffer = createCudaBuffer(
             sizeof(glm::vec3) * vertexCount,
             (void**)&cudaVertexRadiosityData,
@@ -109,6 +126,8 @@ namespace VRTR
         CUDA_CHECK_ERROR(cudaMemset(cudaRadiosityLightmapData, 0, sizeof(float4) * patches.size()));
         CUDA_CHECK_ERROR(cudaMemcpy(d_VertexPatchIndices, vertexPatchIndices.data(), sizeof(uint32_t) * vertexPatchIndices.size(), cudaMemcpyHostToDevice));
         CUDA_CHECK_ERROR(cudaMemcpy(d_VertexPatchOffsets, vertexPatchOffsets.data(), sizeof(uint32_t) * vertexPatchOffsets.size(), cudaMemcpyHostToDevice));
+        CUDA_CHECK_ERROR(cudaMemcpy(d_PatchNeighborIndices, patchNeighborIndices.data(), sizeof(uint32_t) * patchNeighborIndices.size(), cudaMemcpyHostToDevice));
+        CUDA_CHECK_ERROR(cudaMemcpy(d_PatchNeighborOffsets, patchNeighborOffsets.data(), sizeof(uint32_t) * patchNeighborOffsets.size(), cudaMemcpyHostToDevice));
 
         std::array<SelectedPatch, CUDA::SELECTED_PATCHES_COUNT> selectedInit{};
         for (auto& selected : selectedInit)
@@ -118,6 +137,7 @@ namespace VRTR
         }
         CUDA_CHECK_ERROR(cudaMemcpy(cudaSelectedPatchData, selectedInit.data(), sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT, cudaMemcpyHostToDevice));
 
+        CUDA_CHECK_ERROR(cudaMemset(cudaDenoisedPatchRadiosityData, 0, sizeof(glm::vec3) * patches.size()));
         CUDA_CHECK_ERROR(cudaMemset(cudaVertexRadiosityData, 0, sizeof(glm::vec3) * vertexCount));
 
         createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
@@ -181,7 +201,7 @@ namespace VRTR
             selected.unshotEnergy = 0.0f;
         }
         CUDA_CHECK_ERROR(cudaMemcpyAsync(cudaSelectedPatchData, selectedInit.data(), sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT,
-                                         cudaMemcpyHostToDevice, cudaStream));
+                                        cudaMemcpyHostToDevice, cudaStream));
 
         CUDA::runFilterPatchesKernel(cudaPatchesData, patchesCount, cudaSelectedPatchData, cudaStream);
 
@@ -189,16 +209,15 @@ namespace VRTR
         SelectedPatch hostSelected{};
         CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
 
-        static uint64_t debugFrameIdx = 0;
-        if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
-        {
-            std::cout << "[After filter CUDA] frame=" << debugFrameIdx
-                      << " selectedPatchId=" << hostSelected.patchId
-                      << " unshotEnergy=" << hostSelected.unshotEnergy
-                      << " patchesCount=" << patchesCount << std::endl;
-        }
-        ++debugFrameIdx;
-
+        // static uint64_t debugFrameIdx = 0;
+        // if (debugFrameIdx < 120 || (debugFrameIdx % 120 == 0))
+        // {
+        //     std::cout << "[After filter CUDA] frame=" << debugFrameIdx
+        //             << " selectedPatchId=" << hostSelected.patchId
+        //             << " unshotEnergy=" << hostSelected.unshotEnergy
+        //             << " patchesCount=" << patchesCount << std::endl;
+        // }
+        // ++debugFrameIdx;
         signalSemaphore(filterPatchesSignalValue);
         lastFilterPatchesSignalValue = filterPatchesSignalValue;
 
@@ -217,41 +236,26 @@ namespace VRTR
             cudaPatchVisibilityData,
             patchVisibilityCount,
             cudaRadiosityLightmapData,
+            cudaStream,
+            COVERAGED);
+
+        CUDA::runPatchDenoiseKernel(
+            cudaPatchesData,
+            patchesCount,
+            d_PatchNeighborIndices,
+            d_PatchNeighborOffsets,
+            cudaDenoisedPatchRadiosityData,
             cudaStream);
-
-        static uint64_t debugLightmapFrame = 0;
-        if (patchesCount > 0 && (debugLightmapFrame < 120 || (debugLightmapFrame % 120 == 0)))
-        {
-            CUDA_CHECK_ERROR(cudaStreamSynchronize(cudaStream));
-
-            SelectedPatch hostSelected{};
-            CUDA_CHECK_ERROR(cudaMemcpy(&hostSelected, cudaSelectedPatchData, sizeof(SelectedPatch), cudaMemcpyDeviceToHost));
-
-            if (hostSelected.patchId != 0xFFFFFFFF && hostSelected.patchId < patchesCount)
-            {
-
-                PatchVisibility hostVisibilities[VISIBILITY_DISPATCH_RAYS_PER_PATCH * CUDA::SELECTED_PATCHES_COUNT];
-                CUDA_CHECK_ERROR(cudaMemcpy(hostVisibilities, cudaPatchVisibilityData, sizeof(PatchVisibility) * patchVisibilityCount, cudaMemcpyDeviceToHost));
-
-                for(uint32_t i = 0; i < patchVisibilityCount; ++i)
-                {
-                    const auto& vis = hostVisibilities[i];
-                    std::cout << "    visibility srcPatchId=" << vis.srcPatchId
-                              << " dstPatchId=" << vis.dstPatchId
-                              << " visibility=" << vis.visibility
-                              << std::endl;
-                }
-            }
-        }
-        ++debugLightmapFrame;
 
         CUDA::runInterpolateVertexKernel(
             cudaPatchesData,
             patchesCount,
+            cudaDenoisedPatchRadiosityData,
             d_VertexPatchIndices,
             d_VertexPatchOffsets,
             vertexCount,
-            cudaVertexRadiosityData
+            cudaVertexRadiosityData,
+            cudaStream
         );
 
         signalSemaphore(radiositySignalValue);
@@ -260,19 +264,6 @@ namespace VRTR
         radiosityWaitValue += passCount;
         radiositySignalValue += passCount;
     }
-
-    // void vkCudaInterop::runCudaInterpolateVertexColorsPass(uint32_t patchesCount, uint32_t vertexCount)
-    // {
-    //     // tutaj nie czekam na semafory bo to ma byc uruchomione po visibilityPass
-    //     CUDA::runInterpolateVertexKernel(
-    //         cudaPatchesData,
-    //         patchesCount,
-    //         d_VertexPatchIndices,
-    //         d_VertexPatchOffsets,
-    //         vertexCount,
-    //         cudaVertexRadiosityData
-    //     );
-    // }
 
     void vkCudaInterop::waitForSemapore(uint64_t waitValue)
     {

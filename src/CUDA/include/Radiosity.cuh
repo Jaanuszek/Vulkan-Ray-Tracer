@@ -2,11 +2,17 @@
 
 #include <cuda_runtime_api.h>
 #include "CommonStructs.h"
-#include <cccl/thrust/host_vector.h>
-#include <cccl/thrust/device_vector.h>
-#include <cccl/thrust/sequence.h>
-#include <cccl/thrust/sort.h>
-#include <cccl/thrust/execution_policy.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/sort.h>
+#include <thrust/sequence.h>
+#include <thrust/execution_policy.h>
+
+// #include <cccl/thrust/host_vector.h>
+// #include <cccl/thrust/device_vector.h>
+// #include <cccl/thrust/sequence.h>
+// #include <cccl/thrust/sort.h>
+// #include <cccl/thrust/execution_policy.h>
 
 
 // Poniewaz mam problemy z linkerem bo krzyczy o libke CORE gdy includuje Logger.hpp, 
@@ -29,7 +35,11 @@ namespace VRTR
     {
         constexpr uint32_t TPB = 1024;
 
-        constexpr uint32_t SELECTED_PATCHES_COUNT = 256;
+        constexpr uint32_t SELECTED_PATCHES_COUNT = 1024;
+
+        constexpr uint32_t RAYS_PER_PATCH = 16384;
+
+        constexpr float UNSHOT_ENERGY_THRESHOLD = 1e-8f;
 
         __global__ void filterPatches(Patch *patches, uint32_t numPatches,
                                       const SelectedPatch* alreadySelectedPatches,
@@ -38,31 +48,28 @@ namespace VRTR
 
         __global__ void reduceSelectedPatches(SelectedPatch *input, uint32_t n, SelectedPatch *output);
 
-        __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities, uint32_t numVisibilities,
-                              const SelectedPatch* selectedPatch, uint32_t* sourceHitCounts);
-
-        __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities, uint32_t numVisibilities,
-                              const uint32_t* selectedPatchIds, uint32_t* sourceHitCounts);
-
         __global__ void setEnergies(Patch *patches, uint32_t numPatches, float* energies);
 
         __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                           PatchVisibility *visibilities, uint32_t numVisibilities,
                                           const SelectedPatch* selectedPatch,
-                                          const uint32_t* sourceHitCounts,
-                                          float4* d_lightMap);
+                                          glm::vec3* receivedEnergy,
+                                          float4* d_lightMap);              
 
-        __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
-                                            PatchVisibility *visibilities, uint32_t numVisibilities,
-                                            const uint32_t* selectedPatchIDs,
-                                            const uint32_t* sourceHitCounts,
-                                            float4* d_lightMap);                       
+        __global__ void denoisePatchRadiosity(const Patch* patches,
+                              uint32_t numPatches,
+                              const uint32_t* patchNeighborIndices,
+                              const uint32_t* patchNeighborOffsets,
+                              glm::vec3* denoisedRadiosity);
 
         // Kernel odpowiadający za interpolacje kolorów wierzchołków
-        // Bierze patche przypisane do danego wierzchołka i robi średnią ich kolorów
-        __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+        // Bierze patche przypisane do danego wierzchołka i robi wagowane uśrednienie ich kolorów
+        __global__ void interpolateVertexColors(const Patch* patches, uint32_t numPatches,
+                            const glm::vec3* patchRadiosity,
                                                 const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
                                                 uint32_t numVertices, glm::vec3* radVertexColors);
+
+        __global__ void resetSelectedPatchUnshotEnergy(Patch *patches, uint32_t numPatches, SelectedPatch *selectedPatch);
 
         // Zamienia posortowane indeksy patchy na finalną tablicę SelectedPatch z id i energiami
         __global__ void writeTopKSelectedPatches(const Patch* patches,
@@ -72,19 +79,29 @@ namespace VRTR
                                              SelectedPatch* selectedPatch);
 
         __host__ void runFilterPatchesKernel(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runFilterPatchesKernelLegacy(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runFilterPatchesKernelTopK(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+
         __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                                 SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                                uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
-        __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
-                                        uint32_t* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream);
-        // __host__ void runPostVisibilityKernelStub(Patch* d_patches, uint32_t numPatches, SelectedPatch* d_selectedPatch, cudaStream_t stream);
+                                                uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream,
+                                                bool& COVERAGED);
+
         __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
-                                            const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
-                                            uint32_t numVertices, glm::vec3* radVertexColors);
+                    const glm::vec3* d_patchRadiosity,
+                            const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
+                            uint32_t numVertices, glm::vec3* radVertexColors,
+                            cudaStream_t stream);
+
+        __host__ void runPatchDenoiseKernel(Patch* d_patches, uint32_t numPatches,
+                            const uint32_t* d_patchNeighborIndices,
+                            const uint32_t* d_patchNeighborOffsets,
+                            glm::vec3* d_denoisedPatchRadiosity,
+                            cudaStream_t stream);
 
         __host__ void topKPatches(uint32_t numPatches, float* d_energies, uint32_t* d_selectedPatchesId, cudaStream_t stream);
+
     }
 }

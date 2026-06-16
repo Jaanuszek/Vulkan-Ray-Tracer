@@ -58,10 +58,10 @@ namespace VRTR
         VisibilityCommandBuffers = vk::raii::CommandBuffers(ctx.logicalDevice, allocInfo);
     }
 
-    vk::raii::CommandBuffer &CommandBufferManager::getCommandBuffer(uint32_t index)
-    {
-        return commandBuffers.at(index);
-    }
+    // vk::raii::CommandBuffer &CommandBufferManager::getCommandBuffer(uint32_t index)
+    // {
+    //     return commandBuffers.at(index);
+    // }
 
     // vk::raii::CommandBuffer &CommandBufferManager::getVisibilityCommandBuffer(uint32_t index)
     // {

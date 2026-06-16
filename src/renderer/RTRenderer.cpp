@@ -1,6 +1,44 @@
 #include "RTRenderer.hpp"
 #include "pch.h"
 
+#include <chrono>
+#include <fstream>
+
+namespace
+{
+    constexpr const char* RADIOSITY_TIMING_CSV = "radiosity_timing.csv";
+
+    void resetRadiosityTimingCsv()
+    {
+        std::ofstream file(RADIOSITY_TIMING_CSV, std::ios::trunc);
+        if (!file.is_open())
+        {
+            return;
+        }
+
+        file << "record_type,iteration,iteration_time_ms,average_time_ms,total_time_ms\n";
+    }
+
+    void appendRadiosityTimingCsv(const char* recordType,
+                                  uint32_t iteration,
+                                  double iterationTimeMs,
+                                  double averageTimeMs,
+                                  double totalTimeMs)
+    {
+        std::ofstream file(RADIOSITY_TIMING_CSV, std::ios::app);
+        if (!file.is_open())
+        {
+            return;
+        }
+
+        file << recordType << ','
+             << iteration << ','
+             << iterationTimeMs << ','
+             << averageTimeMs << ','
+             << totalTimeMs << '\n';
+    }
+}
+
 namespace VRTR
 {
     RTRenderer::RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings) 
@@ -17,7 +55,7 @@ namespace VRTR
         vmaDestroyAllocator(ctx.vmaAllocator);
     }
 
-    void RTRenderer::init(GLFWwindow *window)
+    void RTRenderer::init(GLFWwindow *window, bool buildResources)
     {
         VRTR_DEBUG("RTRENDERER INIT");
 
@@ -28,28 +66,75 @@ namespace VRTR
         VULKAN_HPP_DEFAULT_DISPATCHER.init(static_cast<vk::Instance>(*ctx.instance));
 
         DeviceManager::initDevice(window, ctx);
-
         setupVMA();
-
         RayTracingPipeline::initRayTracing(ctx);
-
         swapChainManager = std::make_shared<SwapChainManager>(ctx);
         swapChainManager->init(window);
-
         commandBufferManager = std::make_shared<CommandBufferManager>(ctx);
         commandBufferManager->init();
 
-        initImGUI(window);
-
         scene = std::make_unique<Scene>(ctx);
-        scene->createScene(sceneSettings.ubo.light_pos);
+
+        if(buildResources)
+        {
+            initImGUI(window);
+
+            // scene->createScene(sceneSettings.ubo.light_pos);
+
+            frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
+            frameManager->init(
+                scene->getPatches(),
+                scene->getVertexCount(),
+                scene->getVertexPatchIndices(),
+                scene->getVertexPatchOffsets(),
+                scene->getPatchNeighborIndices(),
+                scene->getPatchNeighborOffsets()
+            );
+
+            uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
+                                                vk::BufferUsageFlagBits{},
+                                                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                                                vk::BufferUsageFlagBits2::eUniformBuffer | vk::BufferUsageFlagBits2::eShaderDeviceAddress);
+
+            updateUniformBuffer();
+
+            DescriptorResources dr = buildDescriptorResources();
+
+            auto gi = scene->getFirstGeometryInfo();
+            PushConstant vikingRoomModelPC{
+                .vertices = gi.vertexBufferAddr,
+                .indices = gi.indexBufferAddr
+            };
+
+            rayTracingPipeline = std::make_unique<RayTracingPipeline>(ctx, vikingRoomModelPC);
+            rayTracingPipeline->init(swapChainManager->getSwapChainImages(),
+                                    dr,
+                                    commandBufferManager,
+                                    width,
+                                    height
+                                    );
+
+            visibilityPipeline = std::make_unique<VisibilityPipeline>(ctx);
+            visibilityPipeline->init(dr, commandBufferManager);
+        } 
+        else
+        {
+            VRTR_INFO("RTRenderer initialized without resource creation. Call buildResources() to set it up.");
+        }
+    }
+
+    void RTRenderer::buildResources(GLFWwindow *window)
+    {
+        initImGUI(window);
 
         frameManager = std::make_unique<FrameManager>(ctx, swapChainManager);
         frameManager->init(
             scene->getPatches(),
             scene->getVertexCount(),
             scene->getVertexPatchIndices(),
-            scene->getVertexPatchOffsets()
+            scene->getVertexPatchOffsets(),
+            scene->getPatchNeighborIndices(),
+            scene->getPatchNeighborOffsets()
         );
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
@@ -135,7 +220,7 @@ namespace VRTR
         rayTracingPipeline->recreateStorageImage(width, height);
 
         // Update camera perspective with new aspect ratio
-        camera->setPerspective(45.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
+        camera->setPerspective(60.0f, static_cast<float>(width) / height, 0.1f, 100.0f);
 
         DescriptorResources dr = buildDescriptorResources();
 
@@ -150,14 +235,48 @@ namespace VRTR
 
             if(frameManager->isComputeRadiosity())
             {
+                const auto radiosityIterationStart = std::chrono::steady_clock::now();
+
                 frameManager->runCudaSelectPass(static_cast<uint32_t>(scene->getPatches().size()));
 
                 frameManager->submitVisibilityQueue({*commandBufferManager->getVisibilityCommandBuffer(imageIndex)});
 
                 frameManager->runCudaPostVisibilityPass(scene->getPatches().size(), scene->getVertexCount());
 
+                const auto radiosityIterationEnd = std::chrono::steady_clock::now();
+                const double radiosityIterationMs = std::chrono::duration<double, std::milli>(radiosityIterationEnd - radiosityIterationStart).count();
+
+                ++radiosityIterationCount;
+                radiosityIterationTimeMsTotal += radiosityIterationMs;
+
+                VRTR_DEBUG("Radiosity iteration {} took {} ms", radiosityIterationCount, radiosityIterationMs);
+                appendRadiosityTimingCsv(
+                    "iteration",
+                    radiosityIterationCount,
+                    radiosityIterationMs,
+                    radiosityIterationTimeMsTotal / static_cast<double>(radiosityIterationCount),
+                    radiosityIterationTimeMsTotal
+                );
+
+                if(frameManager->getCOVERAGED())
+                {
+                    const double averageRadiosityFrameTimeMs = radiosityIterationTimeMsTotal / static_cast<double>(radiosityIterationCount);
+                    VRTR_DEBUG("Radiosity coveraged after {} iterations", radiosityIterationCount);
+                    VRTR_DEBUG("Average radiosity frame time: {} ms", averageRadiosityFrameTimeMs);
+                    appendRadiosityTimingCsv(
+                        "summary",
+                        radiosityIterationCount,
+                        radiosityIterationMs,
+                        averageRadiosityFrameTimeMs,
+                        radiosityIterationTimeMsTotal
+                    );
+                    frameManager->setComputeRadiosity(false);
+                    sceneSettings.ubo.enableRadiosityPass = false;
+                    radiosityBootstrapDone = true;
+                }
+
                 // ++radiosityDemoFrameCounter;
-                // if (radiosityDemoFrameCounter >= 4096)
+                // if (radiosityDemoFrameCounter >= 1)
                 // {
                 //     frameManager->setComputeRadiosity(false);
                 //     sceneSettings.ubo.enableRadiosityPass = false;
@@ -207,9 +326,16 @@ namespace VRTR
                     frameManager->setComputeRadiosity(sceneSettings.ubo.enableRadiosityPass);
                     if (sceneSettings.ubo.enableRadiosityPass)
                     {
-                        radiosityDemoFrameCounter = 0;
-                        radiosityBootstrapDone = false;
+                        radiosityIterationCount = 0;
+                        radiosityIterationTimeMsTotal = 0.0;
+                        resetRadiosityTimingCsv();
+                        VRTR_DEBUG("Radiosity timing CSV reset: {}", RADIOSITY_TIMING_CSV);
                     }
+                    // if (sceneSettings.ubo.enableRadiosityPass)
+                    // {
+                    //     radiosityDemoFrameCounter = 0;
+                    //     radiosityBootstrapDone = false;
+                    // }
                     break;
                 }
                 default:
@@ -221,7 +347,6 @@ namespace VRTR
             updateUniformBuffer(); // Camera UBO update
 
             frameManager->submitRenderQueue(submitCommandBuffers);
-            // frameManager->runCudaFrame(static_cast<uint32_t>(scene->getPatches().size()));
             frameManager->presentFrame(imageIndex);
             frameCount++;
         }
@@ -235,5 +360,56 @@ namespace VRTR
             VRTR_CRITICAL("Failed to acquire swap chain image!");
             throw std::runtime_error("Failed to acquire swap chain image!");
         }
+    }
+
+    // High-level wrappers
+    uint32_t RTRenderer::addModel(const std::string& modelPath, const std::string& texPath, const glm::mat4& transform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        return scene->importModel(modelPath, texPath, transform);
+    }
+
+    uint32_t RTRenderer::addMesh(const std::string& name, const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices, const std::vector<Material>& mats, const glm::mat4& transform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        return scene->addObject(name, vertices, indices, mats, transform);
+    }
+
+    void RTRenderer::buildTLAS()
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->buildTLAS();
+    }
+
+    void RTRenderer::setInstanceTransform(uint32_t instanceIdx, const glm::mat4& newTransform)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updateInstanceTLAS(instanceIdx, newTransform);
+    }
+
+    void RTRenderer::rotateScene(float rotationAngle)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updateTLAS(rotationAngle);
+    }
+
+    void RTRenderer::setLightPosition(const glm::vec3& pos)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        uint32_t lightIdx = scene->getLightTLASIdx();
+        scene->updateInstanceTLAS(lightIdx, glm::translate(glm::mat4(1.0f), pos));
+    }
+
+    void RTRenderer::setPatchSize(uint8_t size)
+    {
+        if(!scene)
+            throw std::runtime_error("Scene not initialized");
+        scene->updatePatchData(size);
     }
 }

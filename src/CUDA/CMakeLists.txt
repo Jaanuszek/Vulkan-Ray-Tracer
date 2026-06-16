@@ -67,6 +67,7 @@ set_target_properties(${TEST_EXECUTABLE_NAME} PROPERTIES
 target_link_libraries(${TEST_EXECUTABLE_NAME}
     common
     CUDA::cudart
+    CCCL::CCCL
     Vulkan::Vulkan
     gtest
     gtest_main

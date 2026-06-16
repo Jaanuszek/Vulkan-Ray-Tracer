@@ -36,8 +36,18 @@ namespace VRTR
 
         RTRenderer(std::shared_ptr<Camera> camera, SceneSettings &sceneSettings);
         ~RTRenderer();
-        void init(GLFWwindow *window);
+        void init(GLFWwindow *window, bool buildResources = true);
+        void buildResources(GLFWwindow *window);
         void drawFrame(GLFWwindow *window, double deltaTime, bool renderGUI);
+
+        // High-level scene API wrappers
+        uint32_t addModel(const std::string& modelPath, const std::string& texPath, const glm::mat4& transform);
+        uint32_t addMesh(const std::string& name, const std::vector<VertexRT>& vertices, const std::vector<uint32_t>& indices, const std::vector<Material>& mats, const glm::mat4& transform);
+        void buildTLAS();
+        void setInstanceTransform(uint32_t instanceIdx, const glm::mat4& newTransform);
+        void rotateScene(float rotationAngle);
+        void setLightPosition(const glm::vec3& pos);
+        void setPatchSize(uint8_t size);
 
     private:
         void setupVMA();
@@ -55,7 +65,8 @@ namespace VRTR
     private:
         int width, height;
         uint64_t frameCount{};
-        uint32_t radiosityDemoFrameCounter{0};
+        uint32_t radiosityIterationCount{0};
+        double radiosityIterationTimeMsTotal{0.0};
         RendererContext ctx;
 
         std::unique_ptr<GUI> gui;

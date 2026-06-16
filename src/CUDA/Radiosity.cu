@@ -7,8 +7,11 @@ namespace VRTR::CUDA
     {
         __host__ __device__ inline float energyMetric(const glm::vec3& e)
         {
-            return (e.r + e.g + e.b) / 3.0f;
+            // return (e.r + e.g + e.b) / 3.0f;
+            return 0.2126f * e.r + 0.7152f * e.g + 0.0722f * e.b; // luminance
         }
+        // If the maximum unshot energy across all patches is below this
+        // threshold we will skip radiosity computation for this iteration.
     }
 
     __device__ inline bool isAlreadySelected(const SelectedPatch* selectedPatches,
@@ -16,6 +19,20 @@ namespace VRTR::CUDA
                                              uint32_t patchId)
     {
         for (uint32_t i = 0; i < alreadySelectedCount; ++i)
+        {
+            if (selectedPatches[i].patchId == patchId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    __device__ inline bool isPatchSelected(const SelectedPatch* selectedPatches,
+                                           uint32_t patchId)
+    {
+        for (uint32_t i = 0; i < SELECTED_PATCHES_COUNT; ++i)
         {
             if (selectedPatches[i].patchId == patchId)
             {
@@ -76,6 +93,7 @@ namespace VRTR::CUDA
         {
             selectedPatch[blockIdx.x].patchId = maxPatchId[0];
             selectedPatch[blockIdx.x].unshotEnergy = (maxEnergy[0] > 0.0f) ? maxEnergy[0] : 0.0f;
+            selectedPatch[blockIdx.x].totalRaysShot = 0u;  // Zostanie zmienione w countSourceRaysShot
         }
     }
 
@@ -118,6 +136,7 @@ namespace VRTR::CUDA
         {
             output[blockIdx.x].patchId = maxPatchId[0];
             output[blockIdx.x].unshotEnergy = maxEnergy[0];
+            output[blockIdx.x].totalRaysShot = 0u;  // Zostanie zmienione w countSourceRaysShot
         }
     }
 
@@ -130,217 +149,217 @@ namespace VRTR::CUDA
         energies[idx] = energyMetric(energy);
     }
 
-    __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities,
-                                              uint32_t numVisibilities,
-                                              const SelectedPatch* selectedPatch,
-                                              uint32_t* sourceHitCounts)
-    {
-        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= numVisibilities)
-        {
-            return;
-        }
-
-        const PatchVisibility& vis = visibilities[idx];
-        if (vis.srcPatchId == 0xFFFFFFFF || vis.dstPatchId == 0xFFFFFFFF || vis.visibility < 0.001f)
-        {
-            return;
-        }
-
-        for (uint32_t selectedIdx = 0; selectedIdx < SELECTED_PATCHES_COUNT; ++selectedIdx)
-        {
-            if (selectedPatch[selectedIdx].patchId == vis.srcPatchId)
-            {
-                atomicAdd(&sourceHitCounts[selectedIdx], 1u);
-                break;
-            }
-        }
-    }
-
-    __global__ void countSourceVisibilityHits(const PatchVisibility* visibilities,
-                                              uint32_t numVisibilities,
-                                              const uint32_t* selectedPatchIds,
-                                              uint32_t* sourceHitCounts)
-    {
-        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= numVisibilities)
-        {
-            return;
-        }
-
-        const PatchVisibility& vis = visibilities[idx];
-        if (vis.srcPatchId == 0xFFFFFFFF || vis.dstPatchId == 0xFFFFFFFF || vis.visibility < 0.001f)
-        {
-            return;
-        }
-
-        for (uint32_t selectedIdx = 0; selectedIdx < SELECTED_PATCHES_COUNT; ++selectedIdx)
-        {
-            if (selectedPatchIds[selectedIdx] == vis.srcPatchId)
-            {
-                atomicAdd(&sourceHitCounts[selectedIdx], 1u);
-                break;
-            }
-        }
-    }
-
     __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
                                        PatchVisibility *visibilities, uint32_t numVisibilities,
                                        const SelectedPatch* selectedPatch,
-                                       const uint32_t* sourceHitCounts,
+                                       glm::vec3* receivedEnergy,
                                        float4* d_lightMap)
     {
         uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        
+
+        // Jezeli idx jest poza zakresem
         if (idx >= numVisibilities)
             return;
         
         PatchVisibility &vis = visibilities[idx];
 
+        // Jeżeli source Patch ID i destination Patch ID są poza zakresem
         if (vis.srcPatchId >= numPatches || vis.dstPatchId >= numPatches)
             return;
         
         Patch &dstPatch = patches[vis.dstPatchId];
+        Patch &srcPatch = patches[vis.srcPatchId];
         
-        // Jeśli destination patch nie jest widoczny, skip
-        if (vis.visibility < 0.001f || dstPatch.id == 0xFFFFFFFF || dstPatch.id >= numPatches)
+        // Jeżeli destination Patch ID jest ustawiony na 0xFFFFFFFF (nieaktywny) lub poza zakresem, pomiń
+        if (dstPatch.id == 0xFFFFFFFF || dstPatch.id >= numPatches)
             return;
 
         const uint32_t sourcePatchId = vis.srcPatchId;
 
-        if (sourcePatchId == 0xFFFFFFFF || sourcePatchId >= numPatches)
+        // Jeżeli source Patch ID jest ustawiony na 0xFFFFFFFF (nieaktywny) lub poza zakresem, lub jest taki sam jak destination, pomiń
+        if (sourcePatchId == 0xFFFFFFFF || sourcePatchId >= numPatches || vis.dstPatchId == sourcePatchId)
         {
             return;
         }
 
-        if (vis.dstPatchId == sourcePatchId)
-        {
-            return;
-        }
+        // Chyba to nie jest potrzebne, to jest tylko zabezpieczenie przed błędami
+        // Przeszukaj selectedPatch by znaleźć indeks patcha źródłowego zgadzającego sie z visibility buforem
+        // uint32_t selectedPatchIdx = 0xFFFFFFFF;
+        // for (uint32_t selectedIdx = 0; selectedIdx < SELECTED_PATCHES_COUNT; ++selectedIdx)
+        // {
+        //     if (selectedPatch[selectedIdx].patchId == sourcePatchId)
+        //     {
+        //         selectedPatchIdx = selectedIdx;
+        //         break;
+        //     }
+        // }
 
-        uint32_t selectedSourceIdx = 0xFFFFFFFF;
-        for (uint32_t selectedIdx = 0; selectedIdx < SELECTED_PATCHES_COUNT; ++selectedIdx)
-        {
-            if (selectedPatch[selectedIdx].patchId == sourcePatchId)
-            {
-                selectedSourceIdx = selectedIdx;
-                break;
-            }
-        }
+        // // Jeżeli z jakiegos powodu w selectedPatch nie ma odpowiedniego patchID, to pomiń
+        // if (selectedPatchIdx == 0xFFFFFFFF)
+        // {
+        //     return;
+        // }
 
-        if (selectedSourceIdx == 0xFFFFFFFF)
-        {
-            return;
-        }
+        /* 
+            Monte Carlo - każdy promień przenosi energię równą unshotEnergy / RAYS_PER_PATCH
+            W przypadku gdy visibility funkcja odwoluje sie do tego samego patcha, to akumulowana jest energia w tym patchu
+            Przez co estymujemy wartość form factora
+            Nie ma konieczności obliczania kątów padania, ponieważ to jest już zawarte w visibility shaderze
+            poprzez cosine weighted hemisphere
+        */
 
-        Patch &srcPatch = patches[sourcePatchId];
+        glm::vec3 energyPerRay = (srcPatch.unshotEnergy) / static_cast<float>(CUDA::RAYS_PER_PATCH);
 
-        const uint32_t validHitCount = max(sourceHitCounts[selectedSourceIdx], 1u);
-        glm::vec3 energyPerRay = (srcPatch.unshotEnergy) / static_cast<float>(validHitCount);
+        float areaTerm = (srcPatch.area / dstPatch.area);
+        /*
+            Obliczenie wyniku Estymowany FF * visibility * albedo
+        */
+        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo * areaTerm;
 
-        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo;
-
-        // Aktualizuj radiosity destination patcha.
-        atomicAdd(&dstPatch.radiosity.r, transferEnergy.r);
-        atomicAdd(&dstPatch.radiosity.g, transferEnergy.g);
-        atomicAdd(&dstPatch.radiosity.b, transferEnergy.b);
-        atomicAdd(&dstPatch.unshotEnergy.r, transferEnergy.r);
-        atomicAdd(&dstPatch.unshotEnergy.g, transferEnergy.g);
-        atomicAdd(&dstPatch.unshotEnergy.b, transferEnergy.b);
+        atomicAdd(&receivedEnergy[dstPatch.id].r, transferEnergy.r);
+        atomicAdd(&receivedEnergy[dstPatch.id].g, transferEnergy.g);
+        atomicAdd(&receivedEnergy[dstPatch.id].b, transferEnergy.b);
 
         atomicAdd(&d_lightMap[dstPatch.id].x, transferEnergy.r);
         atomicAdd(&d_lightMap[dstPatch.id].y, transferEnergy.g);
         atomicAdd(&d_lightMap[dstPatch.id].z, transferEnergy.b);
-        atomicExch(&d_lightMap[dstPatch.id].w, 1.0f);
+        d_lightMap[dstPatch.id].w = 1.0f;
     }
 
-    __global__ void calculateRadiosity(Patch *patches, uint32_t numPatches,
-                                       PatchVisibility *visibilities, uint32_t numVisibilities,
-                                       const uint32_t *selectedPatchID,
-                                       const uint32_t *sourceHitCounts,
-                                       float4 *d_lightMap)
+    __global__ void applyReceivedEnergy(Patch* patches,
+                                        uint32_t numPatches,
+                                        const SelectedPatch* selectedPatch,
+                                        const glm::vec3* receivedEnergy)
     {
         uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        
-        if (idx >= numVisibilities)
-            return;
-        
-        PatchVisibility &vis = visibilities[idx];
-
-        if (vis.srcPatchId >= numPatches || vis.dstPatchId >= numPatches)
-            return;
-        
-        Patch &dstPatch = patches[vis.dstPatchId];
-        
-        // Jeśli destination patch nie jest widoczny, skip
-        if (vis.visibility < 0.001f || dstPatch.id == 0xFFFFFFFF || dstPatch.id >= numPatches)
-            return;
-
-        const uint32_t sourcePatchId = vis.srcPatchId;
-
-        if (sourcePatchId == 0xFFFFFFFF || sourcePatchId >= numPatches)
+        if (idx >= numPatches)
         {
             return;
         }
 
-        if (vis.dstPatchId == sourcePatchId)
+        // Delta to jest wartosc energii otrzymana w tej iteracji
+        const glm::vec3 delta = receivedEnergy[idx];
+        patches[idx].radiosity += delta;
+
+        /*
+            Tutaj nie bedzie race conditions, bo kazdy patch jest aktualizowany przez jeden wątek
+        */
+        const bool selected = isPatchSelected(selectedPatch, patches[idx].id);
+        if (selected)
         {
-            return;
+            /*
+                Jeżeli patch jest wybrany, to wtedy nie zerujemy unshotEnergy, ale ustawiamy wartosc delta
+                To eliminuje sytuacje gdy patch 1 strzela promienie a potem w tym samym momencie patch2 wysyla energie do patcha 1
+                gdybysmy tu zerowali, to bylby sytuacje ze patche mają energie do wystrzelenia, ale nic z tym nie robią,
+                bo unshoot jest zerowane
+            */
+            patches[idx].unshotEnergy = delta;
         }
-
-        uint32_t selectedSourceIdx = selectedPatchID[idx];
-
-        Patch &srcPatch = patches[sourcePatchId];
-
-        const uint32_t validHitCount = max(sourceHitCounts[selectedSourceIdx], 1u);
-        glm::vec3 energyPerRay = (srcPatch.unshotEnergy) / static_cast<float>(validHitCount);
-
-        const glm::vec3 transferEnergy = energyPerRay * vis.visibility * dstPatch.albedo;
-
-        // Aktualizuj radiosity destination patcha.
-        atomicAdd(&dstPatch.radiosity.r, transferEnergy.r);
-        atomicAdd(&dstPatch.radiosity.g, transferEnergy.g);
-        atomicAdd(&dstPatch.radiosity.b, transferEnergy.b);
-        atomicAdd(&dstPatch.unshotEnergy.r, transferEnergy.r);
-        atomicAdd(&dstPatch.unshotEnergy.g, transferEnergy.g);
-        atomicAdd(&dstPatch.unshotEnergy.b, transferEnergy.b);
-
-        atomicAdd(&d_lightMap[dstPatch.id].x, transferEnergy.r);
-        atomicAdd(&d_lightMap[dstPatch.id].y, transferEnergy.g);
-        atomicAdd(&d_lightMap[dstPatch.id].z, transferEnergy.b);
-        atomicExch(&d_lightMap[dstPatch.id].w, 1.0f);
+        else
+        {
+            patches[idx].unshotEnergy += delta;
+        }
     }
 
-    __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+    __global__ void denoisePatchRadiosity(const Patch* patches,
+                                          uint32_t numPatches,
+                                          const uint32_t* patchNeighborIndices,
+                                          const uint32_t* patchNeighborOffsets,
+                                          glm::vec3* denoisedRadiosity)
+    {
+        const uint32_t patchId = blockIdx.x * blockDim.x + threadIdx.x;
+        if (patchId >= numPatches)
+        {
+            return;
+        }
+
+        const glm::vec3 selfColor = patches[patchId].radiosity;
+        glm::vec3 accumulatedColor = selfColor;
+        float totalWeight = 1.0f;
+
+        const uint32_t neighborBegin = patchNeighborOffsets[patchId];
+        const uint32_t neighborEnd = patchNeighborOffsets[patchId + 1];
+        const float selfArea = glm::max(0.001f, patches[patchId].area);
+
+        for (uint32_t i = neighborBegin; i < neighborEnd; ++i)
+        {
+            const uint32_t neighborPatchId = patchNeighborIndices[i];
+            if (neighborPatchId >= numPatches || neighborPatchId == patchId)
+            {
+                continue;
+            }
+
+            const glm::vec3 neighborColor = patches[neighborPatchId].radiosity;
+            const float neighborArea = glm::max(0.001f, patches[neighborPatchId].area);
+            const float colorDelta = glm::length(neighborColor - selfColor);
+
+            const float areaWeight = glm::sqrt(neighborArea / selfArea);
+            const float similarityWeight = 1.0f / (1.0f + colorDelta * 8.0f);
+            const float weight = areaWeight * similarityWeight;
+
+            accumulatedColor += neighborColor * weight;
+            totalWeight += weight;
+        }
+
+        denoisedRadiosity[patchId] = accumulatedColor / totalWeight;
+    }
+
+    __global__ void interpolateVertexColors(const Patch* patches, uint32_t numPatches,
+                                            const glm::vec3* patchRadiosity,
                                             const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
                                             uint32_t numVertices, glm::vec3* radVertexColors)
     {
-        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        if (idx >= numVertices) return;
+        if (idx >= numVertices)
+        {
+            return;
+        }
 
         for (uint32_t i = idx; i < numVertices; i += blockDim.x * gridDim.x)
         {
             glm::vec3 color(0.0f);
-            float totalArea = 0.0f;
+            float totalWeight = 0.0f;
 
             uint32_t patchStart = vertexPatchOffsets[i];
             uint32_t patchEnd = vertexPatchOffsets[i + 1];
+            
+            uint32_t patchCount = patchEnd - patchStart;
+            if (patchCount == 0) continue;
 
+            // Wylicz prosty centroid lokalnego fanu patchy wokół wierzchołka.
+            glm::vec3 vertexEstimate(0.0f);
+            
             for (uint32_t j = patchStart; j < patchEnd; ++j)
             {
                 uint32_t patchId = vertexPatchIndices[j];
                 if (patchId < numPatches)
                 {
-                    float area = patches[patchId].area;
-                    color += patches[patchId].radiosity * area;
-                    totalArea += area;
+                    vertexEstimate += patches[patchId].center;
+                }
+            }
+            vertexEstimate /= static_cast<float>(patchCount);
+
+            // Uproszczona interpolacja z denoised patch radiosity.
+            for (uint32_t j = patchStart; j < patchEnd; ++j)
+            {
+                uint32_t patchId = vertexPatchIndices[j];
+                if (patchId < numPatches)
+                {
+                    glm::vec3 toVertex = vertexEstimate - patches[patchId].center;
+                    float dist = glm::length(toVertex);
+                    float areaWeight = glm::sqrt(glm::max(0.001f, patches[patchId].area));
+                    float distWeight = 1.0f / (1.0f + dist);
+                    float weight = areaWeight * distWeight;
+
+                    color += patchRadiosity[patchId] * weight;
+                    totalWeight += weight;
                 }
             }
 
-            if (totalArea > 0.0f)
+            if (totalWeight > 0.0f)
             {
-                radVertexColors[i] = color / totalArea;
+                radVertexColors[i] = color / totalWeight;
             }
             else
             {
@@ -372,31 +391,7 @@ namespace VRTR::CUDA
 
             selectedPatch[idx].patchId = 0xFFFFFFFF;
             selectedPatch[idx].unshotEnergy = 0.0f;
-        }
-    }
-
-    __global__ void resetSelectedPatchUnshotEnergy(Patch* patches, uint32_t numPatches, uint32_t* selectedPatchIds)
-    {
-        if (patches == nullptr || selectedPatchIds == nullptr)
-        {
-            return;
-        }
-
-        const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= SELECTED_PATCHES_COUNT)
-        {
-            return;
-        }
-
-        const uint32_t selectedPatchId = selectedPatchIds[idx];
-        if (selectedPatchId != 0xFFFFFFFF)
-        {
-            if (selectedPatchId < numPatches)
-            {
-                patches[selectedPatchId].unshotEnergy = glm::vec3(0.0f);
-            }
-
-            selectedPatchIds[idx] = 0xFFFFFFFF;
+            selectedPatch[idx].totalRaysShot = 0u;
         }
     }
 
@@ -418,11 +413,13 @@ namespace VRTR::CUDA
             // Czy patchIdx to nie bedzie to samo co patches[patchIdx].id?
             selectedPatch[idx].patchId = patches[patchIdx].id;
             selectedPatch[idx].unshotEnergy = max(sortedEnergies[idx], 0.0f);
+            selectedPatch[idx].totalRaysShot = 0u;  // Zostanie zmienione w countSourceRaysShot
             return;
         }
 
         selectedPatch[idx].patchId = 0xFFFFFFFF;
         selectedPatch[idx].unshotEnergy = 0.0f;
+        selectedPatch[idx].totalRaysShot = 0u;
     }
 
     __host__ void runFilterPatchesKernelLegacy(Patch *patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
@@ -438,6 +435,7 @@ namespace VRTR::CUDA
         {
             initialSelection[i].patchId = 0xFFFFFFFF;
             initialSelection[i].unshotEnergy = 0.0f;
+            initialSelection[i].totalRaysShot = 0u;
         }
 
         CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(
@@ -518,6 +516,7 @@ namespace VRTR::CUDA
 
     __host__ void runFilterPatchesKernelTopK(Patch *patches, uint32_t numPatches, SelectedPatch* selectedPatch, cudaStream_t stream)
     {
+
         if (numPatches == 0)
             return;
 
@@ -571,7 +570,8 @@ namespace VRTR::CUDA
 
     __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
                                         SelectedPatch* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream)
+                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream,
+                                        bool& COVERAGED)
     {
         if (numPatches == 0 || numVisibilities == 0)
         {
@@ -583,20 +583,36 @@ namespace VRTR::CUDA
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
 
-        int blocks = (numVisibilities + TPB - 1) / TPB;
-        blocks = min(blocks, 1024);
+        {
+            SelectedPatch hostSelected[SELECTED_PATCHES_COUNT];
+            CUDA_CHECK_STD_ERROR(cudaMemcpyAsync(
+                hostSelected,
+                d_selectedPatch,
+                sizeof(SelectedPatch) * SELECTED_PATCHES_COUNT,
+                cudaMemcpyDeviceToHost,
+                stream
+            ));
+            CUDA_CHECK_STD_ERROR(cudaStreamSynchronize(stream));
 
-        uint32_t* d_sourceHitCounts = nullptr;
-        CUDA_CHECK_STD_ERROR(cudaMalloc(&d_sourceHitCounts, sizeof(uint32_t) * SELECTED_PATCHES_COUNT));
-        CUDA_CHECK_STD_ERROR(cudaMemsetAsync(d_sourceHitCounts, 0, sizeof(uint32_t) * SELECTED_PATCHES_COUNT, stream));
+            if(hostSelected[0].patchId == 0xFFFFFFFF)
+            {
+                COVERAGED = false;
+                return;
+            }
+            // tak mozna bo selectedPatch jest posortowany od najwiekszego do najmniejszego
+            float maxEnergy = hostSelected[0].unshotEnergy;
+
+            if (maxEnergy < CUDA::UNSHOT_ENERGY_THRESHOLD)
+            {
+                COVERAGED = true;
+                return;
+            }
+        }
+        glm::vec3* d_receivedEnergy = nullptr;
+        CUDA_CHECK_STD_ERROR(cudaMalloc(&d_receivedEnergy, sizeof(glm::vec3) * numPatches));
+        CUDA_CHECK_STD_ERROR(cudaMemsetAsync(d_receivedEnergy, 0, sizeof(glm::vec3) * numPatches, stream));
 
         cudaEventRecord(start, stream);
-        countSourceVisibilityHits<<<blocks, TPB, 0, stream>>>(
-            d_visibilities,
-            numVisibilities,
-            d_selectedPatch,
-            d_sourceHitCounts
-        );
         cudaEventRecord(stop, stream);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&elapsedTime, start, stop);
@@ -604,14 +620,16 @@ namespace VRTR::CUDA
 
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
 
+        // Dla countSourceRaysShot potrzebujemy więcej bloków, aby pokryć wszystkie visibility records
+        int blocksForRaysShot = (numVisibilities + TPB - 1) / TPB;
         cudaEventRecord(start, stream);
-        calculateRadiosity<<<blocks, TPB, 0, stream>>>(
+        calculateRadiosity<<<blocksForRaysShot, TPB, 0, stream>>>(
             d_patches,
             numPatches,
             d_visibilities,
             numVisibilities,
             d_selectedPatch,
-            d_sourceHitCounts,
+            d_receivedEnergy,
             d_lightMap
         );
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
@@ -620,88 +638,51 @@ namespace VRTR::CUDA
         cudaEventElapsedTime(&elapsedTime, start, stop);
         // std::cout << "CalculateRadiosity kernel took " << elapsedTime << " ms\n";
 
-        // Reset source patch energy after radiosity accumulation so the next selection pass sees the update.
-        const uint32_t resetThreads = min(TPB, SELECTED_PATCHES_COUNT);
-        const uint32_t resetBlocks = (SELECTED_PATCHES_COUNT + resetThreads - 1) / resetThreads;
-        resetSelectedPatchUnshotEnergy<<<resetBlocks, resetThreads, 0, stream>>>(d_patches, numPatches, d_selectedPatch);
+        const uint32_t applyThreads = min(TPB, numPatches);
+        const uint32_t applyBlocks = (numPatches + applyThreads - 1) / applyThreads;
+        applyReceivedEnergy<<<applyBlocks, applyThreads, 0, stream>>>(
+            d_patches,
+            numPatches,
+            d_selectedPatch,
+            d_receivedEnergy);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
 
-        cudaFree(d_sourceHitCounts);
+        cudaFree(d_receivedEnergy);
     }
 
-    __host__ void runPostVisibilityKernel(Patch* d_patches, uint32_t numPatches, 
-                                        uint32_t* d_selectedPatch, PatchVisibility* d_visibilities, 
-                                        uint32_t numVisibilities, float4* d_lightMap, cudaStream_t stream)
+    __host__ void runPatchDenoiseKernel(Patch* d_patches, uint32_t numPatches,
+                                        const uint32_t* d_patchNeighborIndices,
+                                        const uint32_t* d_patchNeighborOffsets,
+                                        glm::vec3* d_denoisedPatchRadiosity,
+                                        cudaStream_t stream)
     {
-        if (numPatches == 0 || numVisibilities == 0)
+        if (numPatches == 0)
         {
             return;
         }
 
-        cudaEvent_t start, stop;
-        float elapsedTime = 0.0f;
-        cudaEventCreate(&start);
-        cudaEventCreate(&stop);
-
-        int blocks = (numVisibilities + TPB - 1) / TPB;
-        blocks = min(blocks, 1024);
-
-        uint32_t* d_sourceHitCounts = nullptr;
-        CUDA_CHECK_STD_ERROR(cudaMalloc(&d_sourceHitCounts, sizeof(uint32_t) * SELECTED_PATCHES_COUNT));
-        CUDA_CHECK_STD_ERROR(cudaMemsetAsync(d_sourceHitCounts, 0, sizeof(uint32_t) * SELECTED_PATCHES_COUNT, stream));
-
-        cudaEventRecord(start, stream);
-        countSourceVisibilityHits<<<blocks, TPB, 0, stream>>>(
-            d_visibilities,
-            numVisibilities,
-            d_selectedPatch,
-            d_sourceHitCounts
-        );
-        cudaEventRecord(stop, stream);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&elapsedTime, start, stop);
-        // std::cout << "CountSourceVisibilityHits kernel took " << elapsedTime << " ms\n";
-
-        CUDA_CHECK_STD_ERROR(cudaGetLastError());
-
-        cudaEventRecord(start, stream);
-        calculateRadiosity<<<blocks, TPB, 0, stream>>>(
+        const uint32_t blocks = (numPatches + TPB - 1) / TPB;
+        denoisePatchRadiosity<<<blocks, TPB, 0, stream>>>(
             d_patches,
             numPatches,
-            d_visibilities,
-            numVisibilities,
-            d_selectedPatch,
-            d_sourceHitCounts,
-            d_lightMap
-        );
+            d_patchNeighborIndices,
+            d_patchNeighborOffsets,
+            d_denoisedPatchRadiosity);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
-        cudaEventRecord(stop, stream);
-        cudaEventSynchronize(stop);
-        cudaEventElapsedTime(&elapsedTime, start, stop);
-        // std::cout << "CalculateRadiosity kernel took " << elapsedTime << " ms\n";
-
-        // Reset source patch energy after radiosity accumulation so the next selection pass sees the update.
-        const uint32_t resetThreads = min(TPB, SELECTED_PATCHES_COUNT);
-        const uint32_t resetBlocks = (SELECTED_PATCHES_COUNT + resetThreads - 1) / resetThreads;
-        resetSelectedPatchUnshotEnergy<<<resetBlocks, resetThreads, 0, stream>>>(d_patches, numPatches, d_selectedPatch);
-        CUDA_CHECK_STD_ERROR(cudaGetLastError());
-
-        cudaFree(d_sourceHitCounts);
     }
 
     __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
+                                    const glm::vec3* d_patchRadiosity,
                                     const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
-                                    uint32_t numVertices, glm::vec3* radVertexColors)
+                                    uint32_t numVertices, glm::vec3* radVertexColors,
+                                    cudaStream_t stream)
     {
         if (numPatches == 0 || numVertices == 0)
         {
             return;
         }
-
         int blocks = (numVertices + TPB - 1) / TPB;
-        blocks = min(blocks, 1024);
-
-        interpolateVertexColors<<<blocks, TPB>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
+        interpolateVertexColors<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_patchRadiosity, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 

@@ -43,13 +43,49 @@ namespace VRTR
         const std::vector<VertexRT>& vertices, 
         const std::vector<uint32_t>& indices,
         const std::vector<Material>& mats, const glm::mat4& transform)
-        : ctx(ctx), materials(mats), modelTransform(transform)
+        : ctx(ctx), modelTransform(transform)
     {
         VRTR_DEBUG("Creating model from vertices and indices");
 
         modelMesh = std::make_unique<mesh>();
         modelMesh->vertices = vertices;
         modelMesh->indices = indices;
+
+        // If user provided per-model materials via the constructor, ensure
+        // triangle->material mapping exists so CPU-side upload produces
+        // a correct tri->material index buffer used by the shader.
+        const uint32_t triCountLocal = static_cast<uint32_t>(modelMesh->indices.size() / 3);
+        triangleIdToMaterialId.resize(triCountLocal);
+        if (mats.empty())
+        {
+            // default to material 0 for all triangles
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+        else if (mats.size() == 1)
+        {
+            // single material for whole mesh
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+        else if (mats.size() >= triCountLocal)
+        {
+            // one material per triangle (or more) - assign accordingly
+            for (uint32_t t = 0; t < triCountLocal; ++t)
+                triangleIdToMaterialId[t] = t;
+        }
+        else
+        {
+            // fallback: use first material for all triangles
+            std::fill(triangleIdToMaterialId.begin(), triangleIdToMaterialId.end(), 0u);
+        }
+
+        if (mats.empty())
+        {
+            materials.push_back(Material{});
+        }
+        else
+        {
+            materials = mats;
+        }
 
         if(vertexInterpolation)
         {
@@ -105,28 +141,53 @@ namespace VRTR
         }
 
         std::unordered_map<int, uint32_t> mtlIdToMaterialIdx;
-        for (uint32_t id = 0; id < mtl_materials.size(); id++)
+        if(mtl_materials.empty())
         {
-            const float emissionMean = (mtl_materials[id].emission[0] + mtl_materials[id].emission[1] + mtl_materials[id].emission[2]) / 3.0f;
-            Material mat = {
-                .albedo = glm::vec4(
-                    mtl_materials[id].diffuse[0], 
-                    mtl_materials[id].diffuse[1], 
-                    mtl_materials[id].diffuse[2], 
-                    1.0f),
-                .emission = glm::vec3(
-                    mtl_materials[id].emission[0],
-                    mtl_materials[id].emission[1],
-                    mtl_materials[id].emission[2]),
-                .metallic = mtl_materials[id].metallic,
-                .roughness = mtl_materials[id].roughness,
-                .type = emissionMean > 0 ? MaterialType::LIGHT : MaterialType::ALBEDO,
+            VRTR_WARN("No materials found in model: {}", path);
+            // If no materials are defined in the .obj file, create a default material
+            Material defaultMat{
+                .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
+                .emission = glm::vec3(0.0f),
+                .metallic = 0.0f,
+                .roughness = 1.0f,
+                .type = MaterialType::ALBEDO,
                 .textureIndex = 0
             };
-            mtlIdToMaterialIdx[id] = materials.size();
-            materials.push_back(mat);
-        }
 
+            if (path.find("sphere.obj") != std::string::npos)
+            {
+                defaultMat.albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f);
+                defaultMat.roughness = 0.0f;
+                defaultMat.type = MaterialType::REFRACTION;
+            }
+
+            mtlIdToMaterialIdx[0] = 0;
+            materials.push_back(defaultMat);
+        }
+        else
+        {
+            for (uint32_t id = 0; id < mtl_materials.size(); id++)
+            {
+                const float emissionMean = (mtl_materials[id].emission[0] + mtl_materials[id].emission[1] + mtl_materials[id].emission[2]) / 3.0f;
+                Material mat = {
+                    .albedo = glm::vec4(
+                        mtl_materials[id].diffuse[0], 
+                        mtl_materials[id].diffuse[1], 
+                        mtl_materials[id].diffuse[2], 
+                        1.0f),
+                    .emission = glm::vec3(
+                        mtl_materials[id].emission[0],
+                        mtl_materials[id].emission[1],
+                        mtl_materials[id].emission[2]),
+                    .metallic = mtl_materials[id].metallic,
+                    .roughness = mtl_materials[id].roughness,
+                    .type = emissionMean > 0 ? MaterialType::LIGHT : MaterialType::ALBEDO,
+                    .textureIndex = 0
+                };
+                mtlIdToMaterialIdx[id] = materials.size();
+                materials.push_back(mat);
+            }
+        }
         mesh Mesh{};
 
         // loop po wszystkich shapeach o i g w pliku .obj
@@ -249,6 +310,11 @@ namespace VRTR
         const uint32_t trianglesPerPatch = std::max<uint32_t>(1, patchSize);
         triCount = static_cast<uint32_t>(modelMesh->indices.size() / 3);
 
+        VRTR_INFO("SCENE CONSISTS OF {} TRIANGLES", triCount);
+        VRTR_INFO("SCENE INFO: Building {} patches for model: {}", (triCount + trianglesPerPatch - 1) / trianglesPerPatch, modelName);
+        VRTR_INFO("SCENE INFO: PATCH SIZE: {} triangles per patch", triCount * sizeof(Patch));
+
+        // chyba bardziej triangleIdToPatchId
         patchIdToTriangleId.resize(triCount);
         vertexToPatchIds.resize(modelMesh->vertices.size(), std::vector<uint32_t>{});
         patches.clear();
@@ -266,6 +332,9 @@ namespace VRTR
 
             for (uint32_t j = 0; j < trianglesInPatch; ++j)
             {
+                // i to jest trójkąt
+                // j to jest indeks trojkata w patchu, czyli jak patch sklada sie z 2 trojkatow, 
+                // to j=0 dla pierwszego trojkata, a j=1 dla drugiego
                 const uint32_t tri = i + j;
                 uint32_t i0 = modelMesh->indices[3 * tri + 0];
                 uint32_t i1 = modelMesh->indices[3 * tri + 1];
@@ -285,13 +354,9 @@ namespace VRTR
                 float triArea = 0.5f * glm::length(triNormalGeom);
                 glm::vec3 triCenter = (v0.pos + v1.pos + v2.pos) / 3.0f;
 
-                if (triArea <= 1e-8f)
-                {
-                    patchIdToTriangleId[tri] = patchIdx;
-                    continue;
-                }
-
+                // shading normalnej po wierzchołkach
                 const glm::vec3 shadingNormal = glm::normalize(v0.normal + v1.normal + v2.normal);
+                // upewnienie sie ze normalna jest skierowana w odpowiednią stronę
                 if (glm::length(shadingNormal) > 1e-8f && glm::dot(triNormalGeom, shadingNormal) < 0.0f)
                 {
                     triNormalGeom = -triNormalGeom;
@@ -304,7 +369,7 @@ namespace VRTR
                 if (loadedFromFile)
                 {
                     glm::vec3 triEmission(0.0f);
-                    glm::vec3 triAlbedo(0.5f);
+                    glm::vec3 triAlbedo(0.0f);
 
                     if (tri < triangleIdToMaterialId.size())
                     {
@@ -312,7 +377,7 @@ namespace VRTR
                         if (matIdx < materials.size())
                         {
                             triEmission = materials[matIdx].emission;
-                            triAlbedo = glm::vec3(materials[matIdx].albedo);
+                            triAlbedo = glm::vec3(materials[matIdx].albedo); // to jest diffusion a nie albedo ale to mniejsza
                         }
                     }
 
@@ -336,9 +401,8 @@ namespace VRTR
             p.center = (area > 0.0f) ? worldCenter : glm::vec3(0.0f);
             p.normal = (glm::length(normal) > 0.0f) ? worldNormal : glm::vec3(0.0f);
             p.albedo = (area > 0.0f) ? (albedoAccum / area) : glm::vec3(0.5f);
-
-            p.unshotEnergy = (area > 0.0f) ? (emissionAccum / area) : glm::vec3(0.0f);
-            p.radiosity = glm::vec3(0.0f);
+            p.unshotEnergy = (area > 0.0f) ? (emissionAccum/area) : glm::vec3(0.0f);
+            p.radiosity = p.unshotEnergy;
 
             patches.push_back(p);
         }
@@ -414,7 +478,6 @@ namespace VRTR
         vertexPatchOffsets[vertexCount] = offset;
 
         // rezerwujemy tyle miejsca ile wynosi offset czyli ilosc patchy w sumie
-        vertexPatchIndices.clear();
         vertexPatchIndices.reserve(offset);
         
         for(const auto& list : vertexToPatchIds)
@@ -431,36 +494,181 @@ namespace VRTR
         }
     }
 
-    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle(const glm::vec3& color)
-    {
-        std::vector<VertexRT> vertices = {
-            {{-5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {0.0f, 0.0f}},
-            {{5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {1.0f, 0.0f}},
-            {{5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {1.0f, 1.0f}},
-            {{-5.0f, 0.0f, 5.0f}, {0.0f, 1.0f, 0.0f}, {color}, {0.0f, 1.0f}}
-        };
 
-        std::vector<uint32_t> indices = {
-            0, 1, 2,
-            2, 3, 0
-        };
+    void CustomModels::appendGridPlane(std::vector<VertexRT>& vertices,
+                            std::vector<uint32_t>& indices,
+                            const glm::vec3& center,
+                            const glm::vec3& uAxis,
+                            const glm::vec3& vAxis,
+                            const glm::vec3& normal,
+                            uint32_t uSegments,
+                            uint32_t vSegments,
+                            float uSize,
+                            float vSize,
+                            const glm::vec3& color)
+    {
+        uSegments = std::max<uint32_t>(1, uSegments);
+        vSegments = std::max<uint32_t>(1, vSegments);
+
+        const uint32_t baseVertex = static_cast<uint32_t>(vertices.size());
+
+        for (uint32_t v = 0; v <= vSegments; ++v)
+        {
+            const float fv = static_cast<float>(v) / static_cast<float>(vSegments);
+            const float vOffset = (fv - 0.5f) * vSize;
+
+            for (uint32_t u = 0; u <= uSegments; ++u)
+            {
+                const float fu = static_cast<float>(u) / static_cast<float>(uSegments);
+                const float uOffset = (fu - 0.5f) * uSize;
+                const glm::vec3 position = center + uAxis * uOffset + vAxis * vOffset;
+
+                vertices.push_back(VertexRT{
+                    position,
+                    normal,
+                    color,
+                    {fu, fv}
+                });
+            }
+        }
+
+        const uint32_t rowStride = uSegments + 1;
+        for (uint32_t v = 0; v < vSegments; ++v)
+        {
+            for (uint32_t u = 0; u < uSegments; ++u)
+            {
+                const uint32_t i0 = baseVertex + v * rowStride + u;
+                const uint32_t i1 = i0 + 1;
+                const uint32_t i2 = i0 + rowStride;
+                const uint32_t i3 = i2 + 1;
+
+                indices.push_back(i0);
+                indices.push_back(i2);
+                indices.push_back(i1);
+
+                indices.push_back(i1);
+                indices.push_back(i2);
+                indices.push_back(i3);
+            }
+        }
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createDividedRectangle(
+        uint32_t xSegments,
+        uint32_t zSegments,
+        float width,
+        float depth,
+        const glm::vec3& color)
+    {
+        std::vector<VertexRT> vertices;
+        std::vector<uint32_t> indices;
+        appendGridPlane(
+            vertices,
+            indices,
+            glm::vec3(0.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            xSegments,
+            zSegments,
+            width,
+            depth,
+            color);
 
         return {vertices, indices};
     }
 
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createRectangle(const glm::vec3& color)
+    {
+        return createDividedRectangle(1, 1, 10.0f, 10.0f, color);
+    }
+
     std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createCube(const glm::vec3& color)
     {
-        std::vector<VertexRT> vertices = {
-            {{-1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {0.0f, 0.0f}},
-            {{1.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {1.0f, 0.0f}},
-            {{1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {1.0f, 1.0f}},
-            {{-1.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {color}, {0.0f, 1.0f}}
-        };
+        return createDividedCube(1, 1, 1, 2.0f, color);
+    }
 
-        std::vector<uint32_t> indices = {
-            0, 1, 2,
-            2, 3, 0
-        };
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createDividedCube(
+        uint32_t xSegments,
+        uint32_t ySegments,
+        uint32_t zSegments,
+        float size,
+        const glm::vec3& color)
+    {
+        xSegments = std::max<uint32_t>(1, xSegments);
+        ySegments = std::max<uint32_t>(1, ySegments);
+        zSegments = std::max<uint32_t>(1, zSegments);
+
+        std::vector<VertexRT> vertices;
+        std::vector<uint32_t> indices;
+        const float half = size * 0.5f;
+
+        appendGridPlane(vertices, indices, {0.0f, 0.0f, half},  {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f},   xSegments, ySegments, size, size, color);
+        appendGridPlane(vertices, indices, {0.0f, 0.0f, -half}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, -1.0f},  xSegments, ySegments, size, size, color);
+        appendGridPlane(vertices, indices, {half, 0.0f, 0.0f},   {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f},   zSegments, ySegments, size, size, color);
+        appendGridPlane(vertices, indices, {-half, 0.0f, 0.0f},  {0.0f, 0.0f, 1.0f},  {0.0f, 1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f},  zSegments, ySegments, size, size, color);
+        appendGridPlane(vertices, indices, {0.0f, half, 0.0f},   {1.0f, 0.0f, 0.0f},  {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, xSegments, zSegments, size, size, color);
+        appendGridPlane(vertices, indices, {0.0f, -half, 0.0f},  {1.0f, 0.0f, 0.0f},  {0.0f, 0.0f, 1.0f},  {0.0f, -1.0f, 0.0f}, xSegments, zSegments, size, size, color);
+
+        return {vertices, indices};
+    }
+
+    std::pair<std::vector<VertexRT>, std::vector<uint32_t>> CustomModels::createSphere(uint32_t stackCount, uint32_t sectorCount, float radius, const glm::vec3& color)
+    {
+        stackCount = std::max<uint32_t>(3, stackCount);
+        sectorCount = std::max<uint32_t>(3, sectorCount);
+
+        std::vector<VertexRT> vertices;
+        std::vector<uint32_t> indices;
+        vertices.reserve((stackCount + 1) * (sectorCount + 1));
+        indices.reserve(stackCount * sectorCount * 6);
+
+        for (uint32_t stack = 0; stack <= stackCount; ++stack)
+        {
+            const float stackAngle = glm::pi<float>() * 0.5f - static_cast<float>(stack) * glm::pi<float>() / static_cast<float>(stackCount);
+            const float xy = radius * std::cos(stackAngle);
+            const float z = radius * std::sin(stackAngle);
+
+            for (uint32_t sector = 0; sector <= sectorCount; ++sector)
+            {
+                const float sectorAngle = static_cast<float>(sector) * 2.0f * glm::pi<float>() / static_cast<float>(sectorCount);
+                const float x = xy * std::cos(sectorAngle);
+                const float y = xy * std::sin(sectorAngle);
+
+                const glm::vec3 position{x, y, z};
+                const glm::vec3 normal = glm::normalize(position);
+
+                vertices.push_back(VertexRT{
+                    position,
+                    normal,
+                    color,
+                    {static_cast<float>(sector) / static_cast<float>(sectorCount), static_cast<float>(stack) / static_cast<float>(stackCount)}
+                });
+            }
+        }
+
+        for (uint32_t stack = 0; stack < stackCount; ++stack)
+        {
+            const uint32_t k1 = stack * (sectorCount + 1);
+            const uint32_t k2 = k1 + sectorCount + 1;
+
+            for (uint32_t sector = 0; sector < sectorCount; ++sector)
+            {
+                if (stack != 0)
+                {
+                    indices.push_back(k1 + sector);
+                    indices.push_back(k2 + sector);
+                    indices.push_back(k1 + sector + 1);
+                }
+
+                if (stack != (stackCount - 1))
+                {
+                    indices.push_back(k1 + sector + 1);
+                    indices.push_back(k2 + sector);
+                    indices.push_back(k2 + sector + 1);
+                }
+            }
+        }
 
         return {vertices, indices};
     }

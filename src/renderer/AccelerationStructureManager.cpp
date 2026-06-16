@@ -39,6 +39,17 @@ namespace VRTR
             return;
         }
 
+        // Debug: print instance ordering and instanceCustomIndex
+        std::cout << "[DEBUG] vkInstances count: " << vkInstances.size() << std::endl;
+        for (size_t i = 0; i < vkInstances.size(); ++i)
+        {
+            const auto &inst = vkInstances[i];
+            std::cout << "[DEBUG] vkInstance[" << i << "] instanceCustomIndex=" << inst.instanceCustomIndex
+                      << " mask=" << static_cast<uint32_t>(inst.mask)
+                      << " blasRef=0x" << std::hex << inst.accelerationStructureReference << std::dec
+                      << std::endl;
+        }
+
         tlas.instanceBuffer = std::make_unique<Buffer>(ctx.logicalDevice,
                                                         ctx.gpu,
                                                         instanceBufferSize,

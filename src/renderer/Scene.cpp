@@ -20,9 +20,9 @@ namespace VRTR
         VRTR_DEBUG("Creating scene");
 
         std::string viking_room_path = (CONSTANTS::ASSETS_DIR / "models/viking_room/").string();
-        // std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
+        std::string viking_room_model_path = viking_room_path + "model/viking_room.obj";
         std::string viking_room_texture_path = viking_room_path + "textures/viking_room.png";
-        std::string viking_room_model_path = viking_room_path + "model/vikin_house_20SubDivision.obj";
+        // std::string viking_room_model_path = viking_room_path + "model/vikin_house_20SubDivision.obj";
 
         glm::mat4 rotatedModel = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         // importModel(viking_room_model_path, viking_room_texture_path, rotatedModel);
@@ -30,31 +30,66 @@ namespace VRTR
         std::string guy_model_path = (CONSTANTS::ASSETS_DIR / "models/guy/model/guy.obj").string();
         std::string guy_model_name = Model::getModelNameFromPath(guy_model_path);
 
-        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
-        std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
-        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
+        // std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/cornell_box/").string();
+        // std::string cornell_box_model_path = cornell_box_path + "model/cornell_box_sub20.obj";
+        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f));
+        // importModel(cornell_box_model_path, "", cornellBoxModel);
+
+        std::string cornell_box_path = (CONSTANTS::ASSETS_DIR / "models/isometric_room/").string();
+        // std::string cornell_box_model_path = cornell_box_path + "japanese_10.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "japanese_subdivide_bigger.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "nvidiaScene_sub_separated.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "room_fireplace_walls.obj";
+        // glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
+
+
+        std::string cornell_box_model_path = cornell_box_path + "subdivided_sponza.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "classRoom_30_adj2.obj";
+        // std::string cornell_box_model_path = cornell_box_path + "myCornellBoxobj.obj";
+
+        glm::mat4 cornellBoxModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+        // cornellBoxModel = glm::rotate(cornellBoxModel, glm::radians(-180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         importModel(cornell_box_model_path, "", cornellBoxModel);
 
-        // auto [floorVertices, floorIndices] = CustomModels::createRectangle();
-        // Material floorMat{
-        //     .albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f),
-        //     .type = MaterialType::METALLIC,
+        // auto [sphereVertices, sphereIndices] = CustomModels::createSphere(32, 64, 1.0f);
+        // Material sphereMat{
+        //     .albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f),
+        //     .emission = glm::vec3(0.0f),
+        //     .metallic = 0.0f,
+        //     .roughness = 0.0f,
+        //     .type = MaterialType::REFRACTION,
         // };
+        // glm::mat4 sphereModel(1.0f);
+        // // sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 0.5f, 0.0f)); // dla zwyklego cornell boxa
+        // sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 0.5f, -1.0f));
+        // sphereModel = glm::scale(sphereModel, glm::vec3(0.3f));
+        // addObject("glass_sphere", sphereVertices, sphereIndices, {sphereMat}, sphereModel);
 
-        // glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
-        // addObject("floor", floorVertices, floorIndices, floorMat, floorModel);
+        auto [floorVertices, floorIndices] = CustomModels::createRectangle();
+        Material floorMat{
+            .albedo = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f),
+            .metallic = 1.0f,
+            .roughness = 0.0f,
+            .type = MaterialType::METALLIC,
+        };
+
+        glm::mat4 floorModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f));
+        // addObject("floor", floorVertices, floorIndices, {floorMat}, floorModel);
 
         auto [wallVertices, wallIndices] = CustomModels::createRectangle(glm::vec3(0.0f, 1.0f, 0.0f));
         Material wallMat{
-            .albedo = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f),
-            .type = MaterialType::LIGHT,
+            .albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+            .metallic = 1.0f,
+            .roughness = 0.0f,
+            .type = MaterialType::METALLIC,
         };
         glm::mat4 wallModel(1.0f);
         wallModel = glm::translate(wallModel, glm::vec3(0.0f, 0.5f, -1.0f));
         wallModel = glm::rotate(wallModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         wallModel = glm::scale(wallModel, glm::vec3(0.1f));
 
-        // addObject("wall", wallVertices, wallIndices, wallMat, wallModel);
+        // addObject("wall", wallVertices, wallIndices, {wallMat}, wallModel);
 
         auto [wallVertices2, wallIndices2] = CustomModels::createRectangle(glm::vec3(1.0f, 0.0f, 0.0f));
         Material wallMat2{
@@ -68,33 +103,36 @@ namespace VRTR
 
         // addObject("wall2", wallVertices2, wallIndices2, wallMat2, wallModel2);
 
-        auto [cubeVertices, cubeIndices] = CustomModels::createCube(glm::vec3(0.0f, 0.0f, 1.0f));
+        auto [cubeVertices, cubeIndices] = CustomModels::createCube(glm::vec3(0.0f, 0.0f, 0.0f));
 
-            auto addLightCube = [&](const std::string& name, const glm::vec3& pos, const glm::vec3& scale, const glm::vec4& color)
-            {
-                glm::mat4 model(1.0f);
-                model = glm::translate(model, pos);
-                model = glm::scale(model, scale);
-                std::vector<Material> mats{
-                    Material{
-                        .albedo = color,
-                        .type = MaterialType::LIGHT,
-                    }
-                };
-                return addObject(name, cubeVertices, cubeIndices, mats, model);
+        auto addLightCube = [&](const std::string& name, const glm::vec3& pos, const glm::vec3& scale, const glm::vec4& color)
+        {
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, pos);
+            model = glm::scale(model, scale);
+            std::vector<Material> mats{
+                Material{
+                    .albedo = color,
+                    .emission = glm::vec3(1.0f, 1.0f, 1.0f),
+                    .type = MaterialType::LIGHT,
+                }
             };
+            return addObject(name, cubeVertices, cubeIndices, mats, model);
+        };
 
-            // Glowne zrodlo sterowane przez GUI (Light Position).
-            // lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
+        // Glowne zrodlo sterowane przez GUI (Light Position).
+        lightSourceTLASIdx = addLightCube("light_main", lightPos, glm::vec3(0.25f), glm::vec4(1.0f));
 
-            // Dodatkowe wypelniajace zrodla, z unikalnymi nazwami i transformacjami.
-            // addLightCube("light_fill_left", glm::vec3(0.0f, 1.0f, -0.1f), glm::vec3(0.7f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
-            // addLightCube("light_fill_right", glm::vec3(0.5f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
-            // addLightCube("light_fill_front", glm::vec3(0.0f, 1.0f, 0.3f), glm::vec3(0.14f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+        // importModel(cornell_box_model_path, "", cornellBoxModel);
+
+        // Dodatkowe wypelniajace zrodla, z unikalnymi nazwami i transformacjami.
+        // addLightCube("light_fill_left", glm::vec3(0.0f, 1.0f, -0.1f), glm::vec3(0.7f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
+        // addLightCube("light_fill_right", glm::vec3(0.5f, 1.0f, -0.1f), glm::vec3(0.18f), glm::vec4(0.0f,0.0f,1.0f,1.0f));
+        // addLightCube("light_fill_front", glm::vec3(0.0f, 1.0f, 0.3f), glm::vec3(0.14f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 
         // To musi byc na końcu
-            buildTLAS();
-            std::cout << "Patch size: " << sizeof(Patch) * patchesGlobal.size() << " bytes" << std::endl;
+        buildTLAS();
+        std::cout << "Patch size: " << sizeof(Patch) * patchesGlobal.size() << " bytes" << std::endl;
     }
 
     uint32_t Scene::importModel(const std::string &modelPath, const std::string &texPath, const glm::mat4& transform)
@@ -124,10 +162,12 @@ namespace VRTR
         {
             it->second->setTextureIndex(CONSTANTS::MAX_TEXTURES);
         }
+
+        // Push model name first so modelInstanceOrder matches TLAS instance ordering
+        modelInstanceOrder.push_back(model_name);
         uint32_t blasIndex = asManager->createBLAS(models.at(model_name));
 
         uint32_t instanceIndex = asManager->addInstance(blasIndex, transform);
-        modelInstanceOrder.push_back(model_name);
         return instanceIndex;
     }
 
@@ -149,9 +189,11 @@ namespace VRTR
         // models[objName] = std::make_unique<Model>(ctx, vertices, indices, mat);
         models.try_emplace(objName, std::make_unique<Model>(ctx, vertices, indices, mats, transform));
         models.at(objName)->setTextureIndex(CONSTANTS::MAX_TEXTURES);
+
+        // Keep modelInstanceOrder in sync with TLAS instance creation order.
+        modelInstanceOrder.push_back(objName);
         uint32_t blasIndex = asManager->createBLAS(models.at(objName));
         uint32_t instanceIndex = asManager->addInstance(blasIndex, transform);
-        modelInstanceOrder.push_back(objName);
         return instanceIndex;
     }
 
@@ -176,6 +218,20 @@ namespace VRTR
         triToPatchBuffer->copyDataToBuffer(triToPatchGlobal.data(), triToPatchGlobal.size() * sizeof(uint32_t));
         triToMaterialIdBuffer->copyDataToBuffer(triToMaterialIdGlobal.data(), triToMaterialIdGlobal.size() * sizeof(uint32_t));
         // patchBuffer->copyDataToBuffer(patchesGlobal.data(), patchesGlobal.size() * sizeof(Patch));
+
+        // Debug: dump geometryInfos mapping for verification against TLAS instances
+        std::cout << "[DEBUG] geometryInfos count: " << geometryInfos.size() << std::endl;
+        for (size_t i = 0; i < geometryInfos.size(); ++i)
+        {
+            const auto &gi = geometryInfos[i];
+            std::cout << "[DEBUG] GI[" << i << "] triToPatchOffset=" << gi.triToPatchOffset
+                      << " triCount=" << gi.triangleCount
+                      << " vertexGlobalOffset=" << gi.vertexGlobalOffset
+                      << " triToMaterialOffset=" << gi.triToMaterialOffset
+                      << " vertexAddr=0x" << std::hex << gi.vertexBufferAddr << std::dec
+                      << " indexAddr=0x" << std::hex << gi.indexBufferAddr << std::dec
+                      << std::endl;
+        }
 
         asManager->buildTLAS();
     }
@@ -245,9 +301,10 @@ namespace VRTR
         triToMaterialIdGlobal.reserve(getVertexCount());
         uint32_t globalPatchBase = 0;
         uint32_t triToPatchOffset = 0; // offset trójkąta w globalnym kontenerze triToPatchGlobal - który mapuje indekst trójkąta na indeks patcha
+        uint32_t triToMaterialIdOffset = 0; // offset trójkąta w triToMaterialIdGlobal dla tego modelu
         uint32_t globalIndexBase = 0;  // całkowita liczba indeksów patchy już dodanych (dla CSR)
         uint32_t globalVertexBase = 0; // globalny offset wierzchołków dla modelu (indeks do vertexRadiosityBuffer)
-        uint32_t globalModelBase = 0;
+        uint32_t globalModelBase = 0;  // offset do materialBuffer dla materiałów tego modelu
 
         for (const auto& modelName : modelInstanceOrder)
         {
@@ -262,7 +319,7 @@ namespace VRTR
             gi.triToPatchOffset = triToPatchOffset; // jeden na model
             gi.triangleCount = static_cast<uint32_t>(model->getTriangleCount());
             gi.vertexGlobalOffset = globalVertexBase;
-            gi.MaterialGlobalOffset = globalModelBase;
+            gi.triToMaterialOffset = triToMaterialIdOffset; // offset into triToMaterialIdGlobal for this instance
             geometryInfos.push_back(gi);
 
             // Dodaj wszystkiem aterialy z danego modelu
@@ -312,6 +369,7 @@ namespace VRTR
             }
 
             triToPatchOffset += gi.triangleCount;
+            triToMaterialIdOffset += gi.triangleCount; // increment offset into triToMaterialIdglobal
             globalPatchBase += static_cast<uint32_t>(modelPatches.size());
             globalIndexBase += static_cast<uint32_t>(localVertexToPatchIds.size());
             globalVertexBase += vertexCount;
@@ -320,6 +378,67 @@ namespace VRTR
 
         // Dodaj sentinel na koniec CSR - wskazuje za ostatni indeks
         vertexToPatchOffsetGlobal.push_back(globalIndexBase);
+        buildPatchAdjacency();
+    }
+
+    void Scene::buildPatchAdjacency()
+    {
+        patchNeighborIndices.clear();
+        patchNeighborOffsets.clear();
+
+        const uint32_t patchCount = static_cast<uint32_t>(patchesGlobal.size());
+        const uint32_t vertexCount = static_cast<uint32_t>(vertexToPatchOffsetGlobal.empty() ? 0 : vertexToPatchOffsetGlobal.size() - 1);
+
+        patchNeighborOffsets.resize(patchCount + 1);
+
+        std::vector<std::vector<uint32_t>> neighbors(patchCount);
+        for (uint32_t vertexIdx = 0; vertexIdx < vertexCount; ++vertexIdx)
+        {
+            const uint32_t begin = vertexToPatchOffsetGlobal[vertexIdx];
+            const uint32_t end = vertexToPatchOffsetGlobal[vertexIdx + 1];
+
+            for (uint32_t i = begin; i < end; ++i)
+            {
+                const uint32_t patchA = vertexToPatchGlobal[i];
+                if (patchA >= patchCount)
+                {
+                    continue;
+                }
+
+                for (uint32_t j = begin; j < end; ++j)
+                {
+                    const uint32_t patchB = vertexToPatchGlobal[j];
+                    if (patchB >= patchCount || patchA == patchB)
+                    {
+                        continue;
+                    }
+
+                    neighbors[patchA].push_back(patchB);
+                }
+            }
+        }
+
+        uint32_t offset = 0;
+        for (uint32_t patchIdx = 0; patchIdx < patchCount; ++patchIdx)
+        {
+            auto& patchNeighbors = neighbors[patchIdx];
+            std::sort(patchNeighbors.begin(), patchNeighbors.end());
+            patchNeighbors.erase(std::unique(patchNeighbors.begin(), patchNeighbors.end()), patchNeighbors.end());
+
+            patchNeighborOffsets[patchIdx] = offset;
+            offset += static_cast<uint32_t>(patchNeighbors.size());
+            patchNeighborIndices.insert(patchNeighborIndices.end(), patchNeighbors.begin(), patchNeighbors.end());
+        }
+
+        if (!patchNeighborOffsets.empty())
+        {
+            patchNeighborOffsets[patchCount] = offset;
+        }
+
+        if (patchCount > 0 && patchNeighborIndices.empty())
+        {
+            patchNeighborIndices.push_back(0u);
+        }
     }
 
     uint32_t Scene::getVertexCount() const

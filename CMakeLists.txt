@@ -60,6 +60,7 @@ target_link_libraries(${PROJECT_NAME}
     renderer
     cuda_lib
     gtest_main
+    engine
 )
 # Exe needs to have different precompiled headers because of usage of different compiler flags
 target_precompile_headers(${PROJECT_NAME} PRIVATE "${PROJECT_SOURCE_DIR}/src/common/pch.h")

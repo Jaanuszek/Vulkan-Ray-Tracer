@@ -43,16 +43,6 @@ float3 safeNormalize(float3 v, float3 fallback)
     return v * rsqrt(len2);
 }
 
-float3 sampleHemisphere(float2 seed, float3 normal)
-{
-    float3 d = rand_unit_vec(seed);
-    if (dot(d, normal) < 0.0f)
-    {
-        d = -d;
-    }
-    return safeNormalize(d, normal);
-}
-
 float3 sampleCosineHemisphere(float2 u)
 {
     float r = sqrt(u.x);
@@ -85,11 +75,9 @@ float3 sampleCosineHemisphereWorld(float2 u, float3 normal)
     float3 t, b;
     buildOrthonormalBasis(normal, t, b);
 
-    return normalize(
-        localDir.x * t +
-        localDir.y * b +
-        localDir.z * normal
-    );
+    return  localDir.x * t +
+            localDir.y * b +
+            localDir.z * normal;
 }
 
 float radicalInverseVdC(uint bits)
@@ -124,6 +112,29 @@ float2 hash22(uint n)
     return float2(hash11(n * 0x9E3779B9u + 0x7F4A7C15u), hash11(n * 0x85EBCA6Bu + 0xC2B2AE35u));
 }
 
+float2 concentricSampleDisk(float2 u)
+{
+    float2 uOffset = 2.0f * u - 1.0f;
+
+    if (uOffset.x == 0 && uOffset.y == 0)
+        return float2(0, 0);
+
+    float r, theta;
+
+    if (abs(uOffset.x) > abs(uOffset.y))
+    {
+        r = uOffset.x;
+        theta = PI / 4.0f * (uOffset.y / uOffset.x);
+    }
+    else
+    {
+        r = uOffset.y;
+        theta = PI / 2.0f - PI / 4.0f * (uOffset.x / uOffset.y);
+    }
+
+    return r * float2(cos(theta), sin(theta));
+}
+
 [shader("raygeneration")]
 void rayGenShader()
 {
@@ -145,10 +156,23 @@ void rayGenShader()
     float3 normal = patch.normal;
 
     float2 uv = hash22(dispatchIndex.x + selectedPatchID);
-    float offset = sqrt(patch.area) * 0.5f;
-    // float3 origin = patch.center + normal * patch.area * 0.003f;
-    float3 origin = patch.center + normal * offset;
+    float sceneEpsilon = 1e-4f;
+    float3 origin = patch.center + normal * sceneEpsilon;
 
+    // float2 jitter = hash22(dispatchIndex.x + selectedPatchID);
+
+    // float3 t, b;
+    // buildOrthonormalBasis(normal, t, b);
+
+    // float radius = sqrt(patch.area) * 0.25f;
+
+    // float2 disk = concentricSampleDisk(jitter);
+
+    // float3 origin =
+    //     patch.center +
+    //     t * disk.x * radius +
+    //     b * disk.y * radius +
+    //     normal * 1e-4f;
 
     RayDesc ray;
     ray.Origin = origin;

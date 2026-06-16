@@ -20,7 +20,9 @@ namespace VRTR
                 const std::vector<Patch>& patches,
                 uint32_t vertexCount,
                 const std::vector<uint32_t>& vertexPatchIndices, 
-                const std::vector<uint32_t>& vertexPatchOffsets
+                const std::vector<uint32_t>& vertexPatchOffsets,
+                const std::vector<uint32_t>& patchNeighborIndices,
+                const std::vector<uint32_t>& patchNeighborOffsets
             );
 
             // void runCudaFrame(uint32_t patchesCount);
@@ -40,6 +42,8 @@ namespace VRTR
 
             uint64_t getRadiosityWaitValue() const { return radiosityWaitValue; }
             uint64_t getRadiositySignalValue() const { return lastRadiositySignalValue; }
+
+            bool getCOVERAGED() const { return COVERAGED; }
 
         private:
             void setupCuda();
@@ -90,6 +94,18 @@ namespace VRTR
             uint32_t* d_VertexPatchOffsets{};
             cudaExternalMemory_t e_VertexPatchOffsets{nullptr};
 
+            std::unique_ptr<Buffer> b_PatchNeighborIndices;
+            uint32_t* d_PatchNeighborIndices{};
+            cudaExternalMemory_t e_PatchNeighborIndices{nullptr};
+
+            std::unique_ptr<Buffer> b_PatchNeighborOffsets;
+            uint32_t* d_PatchNeighborOffsets{};
+            cudaExternalMemory_t e_PatchNeighborOffsets{nullptr};
+
+            std::unique_ptr<Buffer> cudaDenoisedPatchRadiosityBuffer;
+            glm::vec3* cudaDenoisedPatchRadiosityData{};
+            cudaExternalMemory_t cudaDenoisedPatchRadiosityExternalMemory{nullptr};
+
             std::unique_ptr<Buffer> cudaVertexRadiosityBuffer;
             glm::vec3* cudaVertexRadiosityData{};
             cudaExternalMemory_t cudaVertexRadiosityExternalMemory{nullptr};
@@ -111,5 +127,7 @@ namespace VRTR
 
             vk::raii::Semaphore cudaCompleteSemaphore{nullptr};
             cudaExternalSemaphore_t  extCudaTimelineSemaphore{nullptr};
+
+            bool COVERAGED = false;
     };
 }

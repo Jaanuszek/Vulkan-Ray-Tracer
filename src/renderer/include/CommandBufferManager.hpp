@@ -17,7 +17,10 @@ namespace VRTR
 
         void createVisibilityCommandBuffers();
 
-        vk::raii::CommandBuffer &getCommandBuffer(uint32_t index);
+        vk::raii::CommandBuffer &getCommandBuffer(uint32_t index)
+        {
+            return commandBuffers.at(index);
+        }
 
         vk::raii::CommandBuffer &getVisibilityCommandBuffer(uint32_t index)
         {

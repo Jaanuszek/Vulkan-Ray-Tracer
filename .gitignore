@@ -9,3 +9,7 @@ __pycache__*
 cornell_box_sub20*
 *_sub20*
 *_20SubDivision.obj
+assets/models/isometric_room/*
+assets/models/cornell_box/*
+build_bak/*
+*.csv

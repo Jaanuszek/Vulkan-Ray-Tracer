@@ -185,7 +185,7 @@ namespace VRTR
                 missShaderSBTEntry,
                 hitShaderSBTEntry,
                 callableShaderSBTEntry,
-                RAYS_PER_PATCH, // ilosc promieni do wystrzelenia w poziomie - trzeba bedzie to dopasowac do ilosci promieni wystrzelonych w hemisferze
+                CUDA::RAYS_PER_PATCH, // ilosc promieni do wystrzelenia w poziomie - trzeba bedzie to dopasowac do ilosci promieni wystrzelonych w hemisferze
                 CUDA::SELECTED_PATCHES_COUNT, // jedna warstwa dispatchu na kazdy selected patch
                 1);
 
