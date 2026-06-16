@@ -378,6 +378,67 @@ namespace VRTR
 
         // Dodaj sentinel na koniec CSR - wskazuje za ostatni indeks
         vertexToPatchOffsetGlobal.push_back(globalIndexBase);
+        buildPatchAdjacency();
+    }
+
+    void Scene::buildPatchAdjacency()
+    {
+        patchNeighborIndices.clear();
+        patchNeighborOffsets.clear();
+
+        const uint32_t patchCount = static_cast<uint32_t>(patchesGlobal.size());
+        const uint32_t vertexCount = static_cast<uint32_t>(vertexToPatchOffsetGlobal.empty() ? 0 : vertexToPatchOffsetGlobal.size() - 1);
+
+        patchNeighborOffsets.resize(patchCount + 1);
+
+        std::vector<std::vector<uint32_t>> neighbors(patchCount);
+        for (uint32_t vertexIdx = 0; vertexIdx < vertexCount; ++vertexIdx)
+        {
+            const uint32_t begin = vertexToPatchOffsetGlobal[vertexIdx];
+            const uint32_t end = vertexToPatchOffsetGlobal[vertexIdx + 1];
+
+            for (uint32_t i = begin; i < end; ++i)
+            {
+                const uint32_t patchA = vertexToPatchGlobal[i];
+                if (patchA >= patchCount)
+                {
+                    continue;
+                }
+
+                for (uint32_t j = begin; j < end; ++j)
+                {
+                    const uint32_t patchB = vertexToPatchGlobal[j];
+                    if (patchB >= patchCount || patchA == patchB)
+                    {
+                        continue;
+                    }
+
+                    neighbors[patchA].push_back(patchB);
+                }
+            }
+        }
+
+        uint32_t offset = 0;
+        for (uint32_t patchIdx = 0; patchIdx < patchCount; ++patchIdx)
+        {
+            auto& patchNeighbors = neighbors[patchIdx];
+            std::sort(patchNeighbors.begin(), patchNeighbors.end());
+            patchNeighbors.erase(std::unique(patchNeighbors.begin(), patchNeighbors.end()), patchNeighbors.end());
+
+            patchNeighborOffsets[patchIdx] = offset;
+            offset += static_cast<uint32_t>(patchNeighbors.size());
+            patchNeighborIndices.insert(patchNeighborIndices.end(), patchNeighbors.begin(), patchNeighbors.end());
+        }
+
+        if (!patchNeighborOffsets.empty())
+        {
+            patchNeighborOffsets[patchCount] = offset;
+        }
+
+        if (patchCount > 0 && patchNeighborIndices.empty())
+        {
+            patchNeighborIndices.push_back(0u);
+        }
     }
 
     uint32_t Scene::getVertexCount() const

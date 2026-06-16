@@ -86,7 +86,9 @@ namespace VRTR
                 scene->getPatches(),
                 scene->getVertexCount(),
                 scene->getVertexPatchIndices(),
-                scene->getVertexPatchOffsets()
+                scene->getVertexPatchOffsets(),
+                scene->getPatchNeighborIndices(),
+                scene->getPatchNeighborOffsets()
             );
 
             uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),
@@ -130,7 +132,9 @@ namespace VRTR
             scene->getPatches(),
             scene->getVertexCount(),
             scene->getVertexPatchIndices(),
-            scene->getVertexPatchOffsets()
+            scene->getVertexPatchOffsets(),
+            scene->getPatchNeighborIndices(),
+            scene->getPatchNeighborOffsets()
         );
 
         uniform_buffer = std::make_unique<Buffer>(ctx.logicalDevice, ctx.gpu, sizeof(UniformData),

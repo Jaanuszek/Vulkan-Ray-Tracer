@@ -11,13 +11,21 @@ namespace VRTR
                 const std::vector<Patch>& patches,
                 uint32_t vertexCount,
                 const std::vector<uint32_t>& vertexPatchIndices, 
-                const std::vector<uint32_t>& vertexPatchOffsets)
+                const std::vector<uint32_t>& vertexPatchOffsets,
+                const std::vector<uint32_t>& patchNeighborIndices,
+                const std::vector<uint32_t>& patchNeighborOffsets)
     {
         frameSyncManager = std::make_unique<vkFrameSync>(ctx);
         frameSyncManager->init();
 
         vkCudaInteropManager = std::make_unique<vkCudaInterop>(ctx, PASS_COUNT);
-        vkCudaInteropManager->init(patches, vertexCount, vertexPatchIndices, vertexPatchOffsets);
+        vkCudaInteropManager->init(
+            patches,
+            vertexCount,
+            vertexPatchIndices,
+            vertexPatchOffsets,
+            patchNeighborIndices,
+            patchNeighborOffsets);
     }
     uint32_t FrameManager::acquireNextImage()
     {

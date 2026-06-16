@@ -37,7 +37,7 @@ namespace VRTR
 
         constexpr uint32_t SELECTED_PATCHES_COUNT = 1024;
 
-        constexpr uint32_t RAYS_PER_PATCH = 4096;
+        constexpr uint32_t RAYS_PER_PATCH = 16384;
 
         constexpr float UNSHOT_ENERGY_THRESHOLD = 1e-8f;
 
@@ -56,9 +56,16 @@ namespace VRTR
                                           glm::vec3* receivedEnergy,
                                           float4* d_lightMap);              
 
+        __global__ void denoisePatchRadiosity(const Patch* patches,
+                              uint32_t numPatches,
+                              const uint32_t* patchNeighborIndices,
+                              const uint32_t* patchNeighborOffsets,
+                              glm::vec3* denoisedRadiosity);
+
         // Kernel odpowiadający za interpolacje kolorów wierzchołków
-        // Bierze patche przypisane do danego wierzchołka i robi średnią ich kolorów
-        __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+        // Bierze patche przypisane do danego wierzchołka i robi wagowane uśrednienie ich kolorów
+        __global__ void interpolateVertexColors(const Patch* patches, uint32_t numPatches,
+                            const glm::vec3* patchRadiosity,
                                                 const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
                                                 uint32_t numVertices, glm::vec3* radVertexColors);
 
@@ -83,8 +90,15 @@ namespace VRTR
                                                 bool& COVERAGED);
 
         __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
+                    const glm::vec3* d_patchRadiosity,
                             const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
                             uint32_t numVertices, glm::vec3* radVertexColors,
+                            cudaStream_t stream);
+
+        __host__ void runPatchDenoiseKernel(Patch* d_patches, uint32_t numPatches,
+                            const uint32_t* d_patchNeighborIndices,
+                            const uint32_t* d_patchNeighborOffsets,
+                            glm::vec3* d_denoisedPatchRadiosity,
                             cudaStream_t stream);
 
         __host__ void topKPatches(uint32_t numPatches, float* d_energies, uint32_t* d_selectedPatchesId, cudaStream_t stream);

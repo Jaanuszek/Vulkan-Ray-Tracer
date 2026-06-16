@@ -21,7 +21,9 @@ namespace VRTR
                 const std::vector<Patch>& patches,
                 uint32_t vertexCount,
                 const std::vector<uint32_t>& vertexPatchIndices, 
-                const std::vector<uint32_t>& vertexPatchOffsets
+                const std::vector<uint32_t>& vertexPatchOffsets,
+                const std::vector<uint32_t>& patchNeighborIndices,
+                const std::vector<uint32_t>& patchNeighborOffsets
             );
 
             /* AKA acquireNextFrame */

@@ -56,32 +56,32 @@ int main()
         floorModel = glm::rotate(floorModel, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         engine.addMesh("floor", floorVertices, floorIndices, {floorMat}, floorModel);
 
-        // auto [sphereVertices, sphereIndices] = VRTR::CustomModels::createSphere(32, 64, 1.0f, glm::vec3(0.95f, 0.97f, 1.0f));
-        // VRTR::Material sphereMat{
-        //     .albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f),
-        //     .emission = glm::vec3(0.0f),
-        //     .metallic = 0.0f,
-        //     .roughness = 0.0f,
-        //     .type = VRTR::MaterialType::REFRACTION,
-        // };
-        // glm::mat4 sphereModel(1.0f);
-        // sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 2.5f, -2.0f));
-        // sphereModel = glm::scale(sphereModel, glm::vec3(0.3f));
-        // engine.addMesh("glass_sphere", sphereVertices, sphereIndices, {sphereMat}, sphereModel);
+        auto [sphereVertices, sphereIndices] = VRTR::CustomModels::createSphere(32, 64, 1.0f, glm::vec3(0.95f, 0.97f, 1.0f));
+        VRTR::Material sphereMat{
+            .albedo = glm::vec4(0.95f, 0.97f, 1.0f, 1.0f),
+            .emission = glm::vec3(0.0f),
+            .metallic = 0.0f,
+            .roughness = 0.0f,
+            .type = VRTR::MaterialType::REFRACTION,
+        };
+        glm::mat4 sphereModel(1.0f);
+        sphereModel = glm::translate(sphereModel, glm::vec3(0.0f, 2.5f, -2.0f));
+        sphereModel = glm::scale(sphereModel, glm::vec3(0.3f));
+        engine.addMesh("glass_sphere", sphereVertices, sphereIndices, {sphereMat}, sphereModel);
 
-        // auto [squareVertices, squareIndices] = VRTR::CustomModels::createDividedCube(10, 10, 10, 1.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-        // VRTR::Material squareMat{
-        //     .albedo = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-        //     .emission = glm::vec3(0.0f),
-        //     .metallic = 1.0f,
-        //     .roughness = 0.0f,
-        //     .type = VRTR::MaterialType::ALBEDO,
-        // };
-        // glm::mat4 squareModel(1.0f);
-        // squareModel = glm::translate(squareModel, glm::vec3(1.0f, 2.5f, -4.5f));
-        // squareModel = glm::rotate(squareModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        // squareModel = glm::scale(squareModel, glm::vec3(1.5f));
-        // engine.addMesh("red_square", squareVertices, squareIndices, {squareMat}, squareModel);
+        auto [squareVertices, squareIndices] = VRTR::CustomModels::createDividedCube(10, 10, 10, 1.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+        VRTR::Material squareMat{
+            .albedo = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+            .emission = glm::vec3(0.0f),
+            .metallic = 1.0f,
+            .roughness = 0.0f,
+            .type = VRTR::MaterialType::ALBEDO,
+        };
+        glm::mat4 squareModel(1.0f);
+        squareModel = glm::translate(squareModel, glm::vec3(1.0f, 2.5f, -4.5f));
+        squareModel = glm::rotate(squareModel, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        squareModel = glm::scale(squareModel, glm::vec3(1.5f));
+        engine.addMesh("red_square", squareVertices, squareIndices, {squareMat}, squareModel);
 
         // Build scene, resources and run infinite program loop
         engine.buildScene();

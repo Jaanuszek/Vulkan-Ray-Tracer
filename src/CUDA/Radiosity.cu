@@ -261,13 +261,60 @@ namespace VRTR::CUDA
         }
     }
 
-    __global__ void interpolateVertexColors(Patch* patches, uint32_t numPatches,
+    __global__ void denoisePatchRadiosity(const Patch* patches,
+                                          uint32_t numPatches,
+                                          const uint32_t* patchNeighborIndices,
+                                          const uint32_t* patchNeighborOffsets,
+                                          glm::vec3* denoisedRadiosity)
+    {
+        const uint32_t patchId = blockIdx.x * blockDim.x + threadIdx.x;
+        if (patchId >= numPatches)
+        {
+            return;
+        }
+
+        const glm::vec3 selfColor = patches[patchId].radiosity;
+        glm::vec3 accumulatedColor = selfColor;
+        float totalWeight = 1.0f;
+
+        const uint32_t neighborBegin = patchNeighborOffsets[patchId];
+        const uint32_t neighborEnd = patchNeighborOffsets[patchId + 1];
+        const float selfArea = glm::max(0.001f, patches[patchId].area);
+
+        for (uint32_t i = neighborBegin; i < neighborEnd; ++i)
+        {
+            const uint32_t neighborPatchId = patchNeighborIndices[i];
+            if (neighborPatchId >= numPatches || neighborPatchId == patchId)
+            {
+                continue;
+            }
+
+            const glm::vec3 neighborColor = patches[neighborPatchId].radiosity;
+            const float neighborArea = glm::max(0.001f, patches[neighborPatchId].area);
+            const float colorDelta = glm::length(neighborColor - selfColor);
+
+            const float areaWeight = glm::sqrt(neighborArea / selfArea);
+            const float similarityWeight = 1.0f / (1.0f + colorDelta * 8.0f);
+            const float weight = areaWeight * similarityWeight;
+
+            accumulatedColor += neighborColor * weight;
+            totalWeight += weight;
+        }
+
+        denoisedRadiosity[patchId] = accumulatedColor / totalWeight;
+    }
+
+    __global__ void interpolateVertexColors(const Patch* patches, uint32_t numPatches,
+                                            const glm::vec3* patchRadiosity,
                                             const uint32_t* vertexPatchIndices, const uint32_t* vertexPatchOffsets,
                                             uint32_t numVertices, glm::vec3* radVertexColors)
     {
-        uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+        const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        if (idx >= numVertices) return;
+        if (idx >= numVertices)
+        {
+            return;
+        }
 
         for (uint32_t i = idx; i < numVertices; i += blockDim.x * gridDim.x)
         {
@@ -280,10 +327,8 @@ namespace VRTR::CUDA
             uint32_t patchCount = patchEnd - patchStart;
             if (patchCount == 0) continue;
 
-            // Najpierw wylicz centroid wierzchołka (średnia z center patchy)
+            // Wylicz prosty centroid lokalnego fanu patchy wokół wierzchołka.
             glm::vec3 vertexEstimate(0.0f);
-            float avgArea = 0.0f;
-            float maxDist = 0.0f;
             
             for (uint32_t j = patchStart; j < patchEnd; ++j)
             {
@@ -291,14 +336,11 @@ namespace VRTR::CUDA
                 if (patchId < numPatches)
                 {
                     vertexEstimate += patches[patchId].center;
-                    avgArea += patches[patchId].area;
                 }
             }
             vertexEstimate /= static_cast<float>(patchCount);
-            avgArea /= static_cast<float>(patchCount);
-            avgArea = glm::max(0.001f, avgArea);
 
-            // Precompute max distance dla normalizacji distance-based weighting
+            // Uproszczona interpolacja z denoised patch radiosity.
             for (uint32_t j = patchStart; j < patchEnd; ++j)
             {
                 uint32_t patchId = vertexPatchIndices[j];
@@ -306,42 +348,11 @@ namespace VRTR::CUDA
                 {
                     glm::vec3 toVertex = vertexEstimate - patches[patchId].center;
                     float dist = glm::length(toVertex);
-                    maxDist = glm::max(maxDist, dist);
-                }
-            }
-            maxDist = glm::max(0.001f, maxDist);
+                    float areaWeight = glm::sqrt(glm::max(0.001f, patches[patchId].area));
+                    float distWeight = 1.0f / (1.0f + dist);
+                    float weight = areaWeight * distWeight;
 
-            // Interpolacja z ulepszonymi wagami: znormalizowana area + distance + normal orientation
-            for (uint32_t j = patchStart; j < patchEnd; ++j)
-            {
-                uint32_t patchId = vertexPatchIndices[j];
-                if (patchId < numPatches)
-                {
-                    float patchArea = patches[patchId].area;
-                    
-                    // 1. Area weight - znormalizowany względem średniej (unika dominacji dużych patchy)
-                    float areaWeight = patchArea / avgArea;
-                    areaWeight = glm::pow(areaWeight, 0.5f); // Łagodne skalowanie - unika ekstremalnych różnic
-                    areaWeight = glm::clamp(areaWeight, 0.2f, 5.0f); // Clamp extreme values [0.2, 5.0]
-
-                    // 2. Distance weighting - bliskie patchy mają wyższą wagę
-                    glm::vec3 toVertex = vertexEstimate - patches[patchId].center;
-                    float dist = glm::length(toVertex);
-                    float distWeight = 1.0f - (dist / maxDist) * 0.7f; // Falloff od 0.3 do 1.0
-                    distWeight = glm::max(0.3f, distWeight);
-
-                    // 3. Normal weighting - patchy skierowane w stronę vertex mają wyższą wagę
-                    float normalWeight = 1.0f;
-                    if (dist > 0.001f)
-                    {
-                        // Cosine weighting - patchy z lepszą orientacją mają więcej wpływu
-                        normalWeight = 0.6f + 0.4f * glm::dot(patches[patchId].normal, glm::normalize(toVertex));
-                        normalWeight = glm::max(0.2f, normalWeight);
-                    }
-
-                    // Combined weight - multiplikatywnie aby zachować naturalną interpolację
-                    float weight = areaWeight * distWeight * normalWeight;
-                    color += patches[patchId].radiosity * weight;
+                    color += patchRadiosity[patchId] * weight;
                     totalWeight += weight;
                 }
             }
@@ -639,7 +650,29 @@ namespace VRTR::CUDA
         cudaFree(d_receivedEnergy);
     }
 
+    __host__ void runPatchDenoiseKernel(Patch* d_patches, uint32_t numPatches,
+                                        const uint32_t* d_patchNeighborIndices,
+                                        const uint32_t* d_patchNeighborOffsets,
+                                        glm::vec3* d_denoisedPatchRadiosity,
+                                        cudaStream_t stream)
+    {
+        if (numPatches == 0)
+        {
+            return;
+        }
+
+        const uint32_t blocks = (numPatches + TPB - 1) / TPB;
+        denoisePatchRadiosity<<<blocks, TPB, 0, stream>>>(
+            d_patches,
+            numPatches,
+            d_patchNeighborIndices,
+            d_patchNeighborOffsets,
+            d_denoisedPatchRadiosity);
+        CUDA_CHECK_STD_ERROR(cudaGetLastError());
+    }
+
     __host__ void runInterpolateVertexKernel(Patch* d_patches, uint32_t numPatches,
+                                    const glm::vec3* d_patchRadiosity,
                                     const uint32_t* d_vertexPatchIndices, const uint32_t* d_vertexPatchOffsets,
                                     uint32_t numVertices, glm::vec3* radVertexColors,
                                     cudaStream_t stream)
@@ -649,7 +682,7 @@ namespace VRTR::CUDA
             return;
         }
         int blocks = (numVertices + TPB - 1) / TPB;
-        interpolateVertexColors<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
+        interpolateVertexColors<<<blocks, TPB, 0, stream>>>(d_patches, numPatches, d_patchRadiosity, d_vertexPatchIndices, d_vertexPatchOffsets, numVertices, radVertexColors);
         CUDA_CHECK_STD_ERROR(cudaGetLastError());
     }
 

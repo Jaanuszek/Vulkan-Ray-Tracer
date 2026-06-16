@@ -33,7 +33,9 @@ namespace VRTR
         const std::vector<Patch>& patches,
         uint32_t vertexCount,
         const std::vector<uint32_t>& vertexPatchIndices, 
-        const std::vector<uint32_t>& vertexPatchOffsets
+        const std::vector<uint32_t>& vertexPatchOffsets,
+        const std::vector<uint32_t>& patchNeighborIndices,
+        const std::vector<uint32_t>& patchNeighborOffsets
     )
     {
         setupCuda();
@@ -96,6 +98,24 @@ namespace VRTR
             e_VertexPatchOffsets
         );
 
+        b_PatchNeighborIndices = createCudaBuffer(
+            sizeof(uint32_t) * patchNeighborIndices.size(),
+            (void**)&d_PatchNeighborIndices,
+            e_PatchNeighborIndices
+        );
+
+        b_PatchNeighborOffsets = createCudaBuffer(
+            sizeof(uint32_t) * patchNeighborOffsets.size(),
+            (void**)&d_PatchNeighborOffsets,
+            e_PatchNeighborOffsets
+        );
+
+        cudaDenoisedPatchRadiosityBuffer = createCudaBuffer(
+            sizeof(glm::vec3) * patches.size(),
+            (void**)&cudaDenoisedPatchRadiosityData,
+            cudaDenoisedPatchRadiosityExternalMemory
+        );
+
         cudaVertexRadiosityBuffer = createCudaBuffer(
             sizeof(glm::vec3) * vertexCount,
             (void**)&cudaVertexRadiosityData,
@@ -106,6 +126,8 @@ namespace VRTR
         CUDA_CHECK_ERROR(cudaMemset(cudaRadiosityLightmapData, 0, sizeof(float4) * patches.size()));
         CUDA_CHECK_ERROR(cudaMemcpy(d_VertexPatchIndices, vertexPatchIndices.data(), sizeof(uint32_t) * vertexPatchIndices.size(), cudaMemcpyHostToDevice));
         CUDA_CHECK_ERROR(cudaMemcpy(d_VertexPatchOffsets, vertexPatchOffsets.data(), sizeof(uint32_t) * vertexPatchOffsets.size(), cudaMemcpyHostToDevice));
+        CUDA_CHECK_ERROR(cudaMemcpy(d_PatchNeighborIndices, patchNeighborIndices.data(), sizeof(uint32_t) * patchNeighborIndices.size(), cudaMemcpyHostToDevice));
+        CUDA_CHECK_ERROR(cudaMemcpy(d_PatchNeighborOffsets, patchNeighborOffsets.data(), sizeof(uint32_t) * patchNeighborOffsets.size(), cudaMemcpyHostToDevice));
 
         std::array<SelectedPatch, CUDA::SELECTED_PATCHES_COUNT> selectedInit{};
         for (auto& selected : selectedInit)
@@ -115,6 +137,7 @@ namespace VRTR
         }
         CUDA_CHECK_ERROR(cudaMemcpy(cudaSelectedPatchData, selectedInit.data(), sizeof(SelectedPatch) * CUDA::SELECTED_PATCHES_COUNT, cudaMemcpyHostToDevice));
 
+        CUDA_CHECK_ERROR(cudaMemset(cudaDenoisedPatchRadiosityData, 0, sizeof(glm::vec3) * patches.size()));
         CUDA_CHECK_ERROR(cudaMemset(cudaVertexRadiosityData, 0, sizeof(glm::vec3) * vertexCount));
 
         createExternalSemaphore(vk::ExternalSemaphoreHandleTypeFlagBits::eOpaqueFd);
@@ -216,9 +239,18 @@ namespace VRTR
             cudaStream,
             COVERAGED);
 
+        CUDA::runPatchDenoiseKernel(
+            cudaPatchesData,
+            patchesCount,
+            d_PatchNeighborIndices,
+            d_PatchNeighborOffsets,
+            cudaDenoisedPatchRadiosityData,
+            cudaStream);
+
         CUDA::runInterpolateVertexKernel(
             cudaPatchesData,
             patchesCount,
+            cudaDenoisedPatchRadiosityData,
             d_VertexPatchIndices,
             d_VertexPatchOffsets,
             vertexCount,

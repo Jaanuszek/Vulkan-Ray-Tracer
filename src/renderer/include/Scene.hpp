@@ -49,6 +49,8 @@ namespace VRTR
 
             const std::vector<uint32_t>& getVertexPatchIndices() const { return vertexToPatchGlobal; }
             const std::vector<uint32_t>& getVertexPatchOffsets() const { return vertexToPatchOffsetGlobal; }
+            const std::vector<uint32_t>& getPatchNeighborIndices() const { return patchNeighborIndices; }
+            const std::vector<uint32_t>& getPatchNeighborOffsets() const { return patchNeighborOffsets; }
 
             void updatePatchData(uint8_t patchSize);
 
@@ -85,6 +87,9 @@ namespace VRTR
             std::vector<uint32_t> vertexToPatchGlobal;
             std::vector<uint32_t> vertexToPatchOffsetGlobal;
 
+            std::vector<uint32_t> patchNeighborIndices;
+            std::vector<uint32_t> patchNeighborOffsets;
+
             std::vector<uint32_t> triToMaterialIdGlobal; // Trójkąt -> material Id (globalne)
 
             std::vector<GeometryInfo> geometryInfos;
@@ -95,5 +100,7 @@ namespace VRTR
             std::unique_ptr<StorageBuffer> triToPatchBuffer;
             std::unique_ptr<StorageBuffer> patchBuffer;
             std::unique_ptr<StorageBuffer> triToMaterialIdBuffer;
+
+            void buildPatchAdjacency();
     };
 }
